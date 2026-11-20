@@ -1,0 +1,30 @@
+{
+  "type": "https://eips.ethereum.org/EIPS/eip-8004#registration-v1",
+  "name": "NairaTag Sovereign Agent Network",
+  "description": "Sovereign naming, autonomous micropayments, and Stablecoin Corridors (USD₮ ⇄ cNGN via Textile FX) on Celo Mainnet.",
+  "image": "https://celo.nairatag.ng/logo.png",
+  "agentWallet": "0xc519729BF6D15e5984702BBa2C553f1c74A73C95",
+  "agentRegistry": "eip155:42220:0x8004A169FB4a3325136EB29fA0ceB6D2e539a432",
+  "services": [
+    {
+      "name": "a2a-settlement",
+      "endpoint": "https://celo.nairatag.ng/api/a2a",
+      "version": "1.0.0"
+    },
+    {
+      "name": "mcp",
+      "endpoint": "https://celo.nairatag.ng/api/mcp",
+      "version": "1.0.0"
+    }
+  ],
+  "supportedTrust": ["erc-8004"],
+  "attribution": {
+    "code": "celo_9f7deabd99a6",
+    "standard": "ERC-8021"
+  },
+  "corridor": {
+    "pair": "USDT/cNGN",
+    "router": "0xa9AA0a64769cBed4d3B1Ceb4Df01CdE915C235b3",
+    "provider": "Textile FX"
+  }
+}

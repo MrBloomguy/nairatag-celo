@@ -16,6 +16,8 @@ Built specifically for the **Celo "Agents Open for Business" Hackathon (Nov 20 â
 - **Agent Card RFC Manifest**: [https://celo.nairatag.ng/.well-known/agent-card.json](https://celo.nairatag.ng/.well-known/agent-card.json)
 - **Official Agent Wallet**: `0xc519729BF6D15e5984702BBa2C553f1c74A73C95`
 - **Mandatory Attribution Tag**: `celo_9f7deabd99a6`
+- **Registered Agent Token ID**: `10078` (ERC-8004 NFT on Celo Mainnet)
+- **Confirmed Registration Tx**: [`0x5dea3fcc2e575a5a90c7812e36152eaa0d412367d49f67f9e3bb5b2cec0044d7`](https://celoscan.io/tx/0x5dea3fcc2e575a5a90c7812e36152eaa0d412367d49f67f9e3bb5b2cec0044d7)
 
 ---
 

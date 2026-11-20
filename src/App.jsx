@@ -5,6 +5,7 @@ import AuthConnectModal from './components/auth/AuthConnectModal';
 import ProfileAvatar from './components/ProfileAvatar';
 import ChatActivityIndicator from './components/chat/ChatActivityIndicator';
 import PersonalAgentPanel from './components/chat/PersonalAgentPanel';
+import CorridorSwapCard from './components/CorridorSwapCard';
 import { ClipboardCheck as ClipboardCheckIcon } from 'lucide-react';
 import { ChevronsLeftRight as ChevronsLeftRightIcon } from 'lucide-react';
 import { Car as CarIcon } from 'lucide-react';
@@ -1378,6 +1379,7 @@ function ArcAppShell() {
     : null;
 
   // Pay / Send Terminal State
+  const [payMode, setPayMode] = useState('send'); // 'send' | 'corridor'
   const [recipientInput, setRecipientInput] = useState('');
   const [amountInput, setAmountInput] = useState('10.00');
   const [memoInput, setMemoInput] = useState('');
@@ -3197,176 +3199,264 @@ function ArcAppShell() {
             ─────────────────────────────────────────────────────────────────── */}
         {mainTab === 'pay' && (
           <div className="terminal-layout-centered">
-            <div className="crypto-card-terminal">
-              <div className="card-header-bar">
-                <span className="card-header-title">
-                  <Send size={15} />
-                  <span>Send USDC</span>
-                </span>
-                <div className="card-header-actions">
-                  <span className="slippage-pill">
-                    <Clock size={10} />
-                    <span>&lt; 1s</span>
-                  </span>
-                  <button
-                    type="button"
-                    className="quick-chip-btn"
-                    onClick={() => setMainTab('claim')}
-                  >
-                    + Claim ₦Tag
-                  </button>
-                </div>
-              </div>
-
-              {/* 1. Recipient ₦Tag Input Box */}
-              <div className="tag-recipient-box">
-                <div className="token-input-header">
-                  <span>To</span>
-                  <span style={{ color: 'var(--privy-color-border-interactive)' }}>Direct Resolve</span>
-                </div>
-                <div className="tag-input-field-wrap">
-                  <span className="tag-currency-symbol">₦</span>
-                  <input
-                    type="text"
-                    className="tag-text-field"
-                    placeholder="Enter name (e.g. SEGUN, FOOD)"
-                    value={recipientInput.replace(/^[$₦]/, '')}
-                    onChange={(e) => setRecipientInput(e.target.value)}
-                  />
-                  {resolution.loading && <RefreshCw size={14} className="animate-spin" color="var(--privy-color-border-interactive)" />}
-                </div>
-
-                {/* Quick suggestions chips */}
-                <div className="quick-tag-suggestions">
-                  <span style={{ fontSize: '10.5px', color: 'var(--privy-color-foreground-3)' }}>Suggestions:</span>
-                  {['segun', 'alice', 'food', 'ride', 'pay'].map((tag) => (
-                    <button
-                      key={tag}
-                      type="button"
-                      className="tag-suggestion-chip"
-                      onClick={() => setRecipientInput(`₦${tag}`)}
-                    >
-                      ₦{tag}
-                    </button>
-                  ))}
-                </div>
-
-                {/* Resolved Recipient Card */}
-                {resolution.data && resolution.data.resolvedAddress && (
-                  <div className="resolved-recipient-card">
-                    <div className="resolved-left">
-                      <div className="resolved-avatar">
-                        {resolution.data.tag ? resolution.data.tag.slice(1, 2) : '₦'}
-                      </div>
-                      <div>
-                        <div className="resolved-title">
-                          {resolution.data.tag || 'Verified Recipient'}
-                          <span style={{ marginLeft: '6px', fontSize: '10px', color: 'var(--privy-color-success-dark)', fontWeight: 600 }}>
-                            ● RESOLVED
-                          </span>
-                        </div>
-                        {resolution.data.phone && (
-                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '10.5px', color: '#047857', fontWeight: 700, margin: '2px 0' }}>
-                            <Phone size={10} />
-                            <span>{resolution.data.phone} (Nigerian Telco Gateway)</span>
-                          </div>
-                        )}
-                        <div className="resolved-sub">
-                          {shorten(resolution.data.resolvedAddress)}
-                        </div>
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      className="quick-chip-btn"
-                      onClick={() => triggerCopy('resolved_copy', resolution.data.resolvedAddress)}
-                    >
-                      <Copy size={11} />
-                      <span>{copiedKey === 'resolved_copy' ? 'Copied' : 'Copy'}</span>
-                    </button>
-                  </div>
-                )}
-
-                {resolution.error && (
-                  <div style={{ fontSize: '11px', color: 'var(--privy-color-error)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <AlertCircle size={12} />
-                    <span>{resolution.error}</span>
-                  </div>
-                )}
-              </div>
-
-              {/* 2. Amount Input Box */}
-              <div className="token-input-box">
-                <div className="token-input-header">
-                  <span>You Send</span>
-                  <span>Balance: {usdcBalance.formatted} USDC</span>
-                </div>
-                <div className="token-input-row">
-                  <input
-                    type="number"
-                    step="any"
-                    className="token-amount-field"
-                    placeholder="0.00"
-                    value={amountInput}
-                    onChange={(e) => setAmountInput(e.target.value)}
-                  />
-                  <div className="token-selector-capsule">
-                    <span className="token-icon-round token-icon-usdc">$</span>
-                    <span>USDC</span>
-                  </div>
-                </div>
-                <div className="token-input-footer">
-                  <span>Arc USDC</span>
-                  <div className="balance-quick-chips">
-                    <button type="button" className="quick-chip-btn" onClick={() => setAmountInput('5.00')}>5</button>
-                    <button type="button" className="quick-chip-btn" onClick={() => setAmountInput('10.00')}>10</button>
-                    <button type="button" className="quick-chip-btn" onClick={() => setAmountInput('25.00')}>25</button>
-                    <button
-                      type="button"
-                      className="quick-chip-btn"
-                      onClick={() => setAmountInput(usdcBalance.formatted !== '0.00' ? usdcBalance.formatted : '100.00')}
-                    >
-                      MAX
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {/* 3. Optional Memo */}
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                  <button
-                    type="button"
-                    style={{ background: 'none', border: 'none', color: 'var(--privy-color-border-interactive)', fontSize: '11px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '3px' }}
-                    onClick={() => setShowMemoField(!showMemoField)}
-                  >
-                    <span>{showMemoField ? '− Hide Memo' : '+ Add Memo (Optional)'}</span>
-                  </button>
-                  <span style={{ fontSize: '10px', color: 'var(--privy-color-foreground-3)' }}>0x5294...e3dc</span>
-                </div>
-                {showMemoField && (
-                  <input
-                    type="text"
-                    className="tag-text-field"
-                    style={{ background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', padding: '8px 10px', fontSize: '12.5px', width: '100%', textTransform: 'none' }}
-                    placeholder="e.g. Lunch / Invoice #104"
-                    value={memoInput}
-                    onChange={(e) => setMemoInput(e.target.value)}
-                  />
-                )}
-              </div>
-
-              {/* Action Button */}
+            {/* Mode Switcher: Send vs Corridor Swap */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                marginBottom: '16px',
+                background: 'var(--surface2, #f3f4f6)',
+                padding: '4px',
+                borderRadius: '12px',
+                maxWidth: '440px',
+                width: '100%',
+                margin: '0 auto 16px',
+              }}
+            >
               <button
                 type="button"
-                className="btn-action-primary"
-                disabled={resolution.loading && !recipientInput.startsWith('0x')}
-                onClick={handleInitiateSend}
+                onClick={() => setPayMode('send')}
+                style={{
+                  flex: 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px',
+                  padding: '9px 14px',
+                  borderRadius: '9px',
+                  fontSize: '13px',
+                  fontWeight: 600,
+                  border: 'none',
+                  cursor: 'pointer',
+                  background: payMode === 'send' ? 'var(--card-bg, #ffffff)' : 'transparent',
+                  color: payMode === 'send' ? '#059669' : 'var(--privy-color-foreground-2)',
+                  boxShadow: payMode === 'send' ? '0 2px 6px rgba(0,0,0,0.06)' : 'none',
+                  transition: 'all 0.15s ease',
+                }}
               >
-                <Send size={15} />
-                <span>Review & Send</span>
+                <Send size={14} />
+                <span>Send to ₦Tag</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setPayMode('corridor')}
+                style={{
+                  flex: 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px',
+                  padding: '9px 14px',
+                  borderRadius: '9px',
+                  fontSize: '13px',
+                  fontWeight: 600,
+                  border: 'none',
+                  cursor: 'pointer',
+                  background: payMode === 'corridor' ? 'var(--card-bg, #ffffff)' : 'transparent',
+                  color: payMode === 'corridor' ? '#059669' : 'var(--privy-color-foreground-2)',
+                  boxShadow: payMode === 'corridor' ? '0 2px 6px rgba(0,0,0,0.06)' : 'none',
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                <TrendingUp size={14} />
+                <span>USD₮ ⇄ cNGN</span>
+                <span
+                  style={{
+                    fontSize: '9.5px',
+                    padding: '2px 5px',
+                    borderRadius: '4px',
+                    background: '#35D07F',
+                    color: '#042f2e',
+                    fontWeight: 700,
+                  }}
+                >
+                  Track 1
+                </span>
               </button>
             </div>
+
+            {payMode === 'corridor' ? (
+              <div style={{ maxWidth: '440px', width: '100%', margin: '0 auto' }}>
+                <CorridorSwapCard
+                  walletAddress={walletAddress}
+                  onConnectWallet={() => setIsConnectModalOpen(true)}
+                />
+              </div>
+            ) : (
+              <div className="crypto-card-terminal">
+                <div className="card-header-bar">
+                  <span className="card-header-title">
+                    <Send size={15} />
+                    <span>Send to ₦Tag</span>
+                  </span>
+                  <div className="card-header-actions">
+                    <span className="slippage-pill">
+                      <Clock size={10} />
+                      <span>&lt; 1s</span>
+                    </span>
+                    <button
+                      type="button"
+                      className="quick-chip-btn"
+                      onClick={() => setMainTab('claim')}
+                    >
+                      + Claim ₦Tag
+                    </button>
+                  </div>
+                </div>
+
+                {/* 1. Recipient ₦Tag Input Box */}
+                <div className="tag-recipient-box">
+                  <div className="token-input-header">
+                    <span>To</span>
+                    <span style={{ color: 'var(--privy-color-border-interactive)' }}>Direct Resolve</span>
+                  </div>
+                  <div className="tag-input-field-wrap">
+                    <span className="tag-currency-symbol">₦</span>
+                    <input
+                      type="text"
+                      className="tag-text-field"
+                      placeholder="Enter name (e.g. SEGUN, FOOD)"
+                      value={recipientInput.replace(/^[$₦]/, '')}
+                      onChange={(e) => setRecipientInput(e.target.value)}
+                    />
+                    {resolution.loading && <RefreshCw size={14} className="animate-spin" color="var(--privy-color-border-interactive)" />}
+                  </div>
+
+                  {/* Quick suggestions chips */}
+                  <div className="quick-tag-suggestions">
+                    <span style={{ fontSize: '10.5px', color: 'var(--privy-color-foreground-3)' }}>Suggestions:</span>
+                    {['segun', 'alice', 'food', 'ride', 'pay'].map((tag) => (
+                      <button
+                        key={tag}
+                        type="button"
+                        className="tag-suggestion-chip"
+                        onClick={() => setRecipientInput(`₦${tag}`)}
+                      >
+                        ₦{tag}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Resolved Recipient Card */}
+                  {resolution.data && resolution.data.resolvedAddress && (
+                    <div className="resolved-recipient-card">
+                      <div className="resolved-left">
+                        <div className="resolved-avatar">
+                          {resolution.data.tag ? resolution.data.tag.slice(1, 2) : '₦'}
+                        </div>
+                        <div>
+                          <div className="resolved-title">
+                            {resolution.data.tag || 'Verified Recipient'}
+                            <span style={{ marginLeft: '6px', fontSize: '10px', color: 'var(--privy-color-success-dark)', fontWeight: 600 }}>
+                              ● RESOLVED
+                            </span>
+                          </div>
+                          {resolution.data.phone && (
+                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '10.5px', color: '#047857', fontWeight: 700, margin: '2px 0' }}>
+                              <Phone size={10} />
+                              <span>{resolution.data.phone} (Nigerian Telco Gateway)</span>
+                            </div>
+                          )}
+                          <div className="resolved-sub">
+                            {shorten(resolution.data.resolvedAddress)}
+                          </div>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        className="quick-chip-btn"
+                        onClick={() => triggerCopy('resolved_copy', resolution.data.resolvedAddress)}
+                      >
+                        <Copy size={11} />
+                        <span>{copiedKey === 'resolved_copy' ? 'Copied' : 'Copy'}</span>
+                      </button>
+                    </div>
+                  )}
+
+                  {resolution.error && (
+                    <div style={{ fontSize: '11px', color: 'var(--privy-color-error)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <AlertCircle size={12} />
+                      <span>{resolution.error}</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* 2. Amount Input Box */}
+                <div className="token-input-box">
+                  <div className="token-input-header">
+                    <span>You Send</span>
+                    <span>Balance: {usdcBalance.formatted} CELO</span>
+                  </div>
+                  <div className="token-input-row">
+                    <input
+                      type="number"
+                      step="any"
+                      className="token-amount-field"
+                      placeholder="0.00"
+                      value={amountInput}
+                      onChange={(e) => setAmountInput(e.target.value)}
+                    />
+                    <div className="token-selector-capsule">
+                      <span className="token-icon-round token-icon-usdc" style={{ background: '#35D07F', color: '#042f2e' }}>C</span>
+                      <span>CELO</span>
+                    </div>
+                  </div>
+                  <div className="token-input-footer">
+                    <span>Celo Mainnet (ERC-8021)</span>
+                    <div className="balance-quick-chips">
+                      <button type="button" className="quick-chip-btn" onClick={() => setAmountInput('0.1')}>0.1</button>
+                      <button type="button" className="quick-chip-btn" onClick={() => setAmountInput('0.5')}>0.5</button>
+                      <button type="button" className="quick-chip-btn" onClick={() => setAmountInput('1.0')}>1.0</button>
+                      <button
+                        type="button"
+                        className="quick-chip-btn"
+                        onClick={() => setAmountInput(usdcBalance.formatted !== '0.00' ? usdcBalance.formatted : '1.0')}
+                      >
+                        MAX
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 3. Optional Memo */}
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                    <button
+                      type="button"
+                      style={{ background: 'none', border: 'none', color: 'var(--privy-color-border-interactive)', fontSize: '11px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '3px' }}
+                      onClick={() => setShowMemoField(!showMemoField)}
+                    >
+                      <span>{showMemoField ? '− Hide Memo' : '+ Add Memo (Optional)'}</span>
+                    </button>
+                    <span style={{ fontSize: '10px', color: 'var(--privy-color-foreground-3)', fontFamily: 'monospace' }}>celo_9f7deabd99a6</span>
+                  </div>
+                  {showMemoField && (
+                    <input
+                      type="text"
+                      className="tag-text-field"
+                      style={{ background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', padding: '8px 10px', fontSize: '12.5px', width: '100%', textTransform: 'none' }}
+                      placeholder="e.g. Lunch / Invoice #104"
+                      value={memoInput}
+                      onChange={(e) => setMemoInput(e.target.value)}
+                    />
+                  )}
+                </div>
+
+                {/* Action Button */}
+                <button
+                  type="button"
+                  className="btn-action-primary"
+                  disabled={resolution.loading && !recipientInput.startsWith('0x')}
+                  onClick={handleInitiateSend}
+                >
+                  <Send size={15} />
+                  <span>Review & Send</span>
+                </button>
+              </div>
+            )}
           </div>
         )}
 
@@ -4891,7 +4981,7 @@ function ArcAppShell() {
 
             <div style={{ textAlign: 'center', padding: '12px 0 6px' }}>
               <div style={{ fontSize: '11px', color: 'var(--privy-color-foreground-2)', textTransform: 'uppercase', fontWeight: 600 }}>Total Transfer</div>
-              <div style={{ fontSize: '26px', fontWeight: 700, color: 'var(--privy-color-foreground)', marginTop: '2px' }}>{amountInput || '0'} USDC</div>
+              <div style={{ fontSize: '26px', fontWeight: 700, color: 'var(--privy-color-foreground)', marginTop: '2px' }}>{amountInput || '0'} CELO</div>
               <div style={{ fontSize: '12px', color: 'var(--privy-color-border-interactive)', marginTop: '3px', fontWeight: 600 }}>
                 To: {resolution.data?.tag || recipientInput}
               </div>
@@ -4904,28 +4994,28 @@ function ArcAppShell() {
                   <Cpu size={12} />
                   <span>Settlement Network</span>
                 </span>
-                <span className="details-value">Arc Testnet (Chain ID 5042002)</span>
+                <span className="details-value">Celo Mainnet (Chain ID 42220)</span>
               </div>
               <div className="details-row">
                 <span className="details-label">
                   <ShieldCheck size={12} />
-                  <span>Tag Resolver Contract</span>
+                  <span>Attribution Tag</span>
                 </span>
-                <span className="details-value">{shorten(ARC_TESTNET_CONFIG.contracts.nairatagResolver)}</span>
+                <span className="details-value" style={{ fontFamily: 'monospace', color: '#059669' }}>celo_9f7deabd99a6</span>
               </div>
               <div className="details-row">
                 <span className="details-label">
                   <Flame size={12} />
-                  <span>Gas Token & Floor</span>
+                  <span>Est. Gas Fee</span>
                 </span>
-                <span className="details-value">Arc USDC (18 dec) • 20 Gwei min</span>
+                <span className="details-value">&lt; 0.001 CELO (&lt; $0.0005)</span>
               </div>
               <div className="details-row">
                 <span className="details-label">
                   <Clock size={12} />
                   <span>Expected Finality</span>
                 </span>
-                <span className="details-value">&lt; 1s (Deterministic Osaka EVM)</span>
+                <span className="details-value">&lt; 1s (Celo L2 / Alfajores)</span>
               </div>
               {memoInput.trim() && (
                 <div className="details-row">
@@ -4946,7 +5036,7 @@ function ArcAppShell() {
             {isSending && (
               <ChatActivityIndicator
                 status={chatActivityStep}
-                prompt="USDC transfer"
+                prompt="CELO transfer"
                 agentAvatar={currentTaggedAgent?.avatar}
               />
             )}
@@ -4965,7 +5055,7 @@ function ArcAppShell() {
               ) : (
                 <>
                   <Send size={15} />
-                  <span>Confirm & Send {amountInput || '0'} USDC</span>
+                  <span>Confirm & Send {amountInput || '0'} CELO</span>
                 </>
               )}
             </button>

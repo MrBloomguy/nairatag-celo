@@ -5,7 +5,6 @@ import AuthConnectModal from './components/auth/AuthConnectModal';
 import ProfileAvatar from './components/ProfileAvatar';
 import ChatActivityIndicator from './components/chat/ChatActivityIndicator';
 import PersonalAgentPanel from './components/chat/PersonalAgentPanel';
-import CeloHackathonBanner from './components/CeloHackathonBanner';
 import { ClipboardCheck as ClipboardCheckIcon } from 'lucide-react';
 import { ChevronsLeftRight as ChevronsLeftRightIcon } from 'lucide-react';
 import { Car as CarIcon } from 'lucide-react';
@@ -3148,7 +3147,6 @@ function ArcAppShell() {
 
       {/* ─── Main Application Body ─── */}
       <main className={`main-content-wrapper ${mainTab === 'claim' ? 'claim-active' : ''} ${mainTab === 'chat' ? 'chat-mode' : ''}`}>
-        <CeloHackathonBanner userAddress={walletAddress} onConnectWallet={() => setIsConnectModalOpen(true)} />
         {mainTab === 'profile' && (
           <section className="account-dashboard">
             <div className="account-dashboard-heading">

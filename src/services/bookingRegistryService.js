@@ -42,8 +42,13 @@ export const AVAILABILITY_MODES = {
   MANUAL: 'manual',
 };
 
+import { loadDurableEntityStore, persistDurableEntityStore } from './durableBookingStore.js';
+
 // In-memory persistent registry store
 const servicesStore = new Map();
+
+// Initialize durable persistence
+loadDurableEntityStore('services', servicesStore).catch(() => {});
 
 /**
  * Validates a BookableService definition.
@@ -120,6 +125,7 @@ export function registerService(serviceData, callerIdentity = {}) {
   };
 
   servicesStore.set(record.id, record);
+  persistDurableEntityStore('services', servicesStore).catch(() => {});
   return record;
 }
 
@@ -146,6 +152,7 @@ export function updateService(serviceId, patch, callerIdentity = {}) {
 
   validateServiceDefinition(updated);
   servicesStore.set(serviceId, updated);
+  persistDurableEntityStore('services', servicesStore).catch(() => {});
   return updated;
 }
 

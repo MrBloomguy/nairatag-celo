@@ -41,7 +41,6 @@ import {
   FileText,
   Key,
 } from 'lucide-react';
-import PanoramicWalkthroughView from './PanoramicWalkthroughView.jsx';
 import {
   BOOKING_CATEGORIES,
   searchServices,
@@ -91,8 +90,8 @@ export default function BookingMarketplace({
   // Navigation Tabs: 'discover' | 'agent_chat' | 'my_bookings' | 'provider_dashboard'
   const [activeSubTab, setActiveSubTab] = useState('discover');
 
-  // Booking Flow Steps: 'walkthrough' (7-view panoramic mockup default) | 'discover' | 'details' | 'schedule' | 'review' | 'created' | 'confirmed_details'
-  const [currentStep, setCurrentStep] = useState('walkthrough');
+  // Booking Flow Steps: 'discover' | 'details' | 'schedule' | 'review' | 'created' | 'confirmed_details'
+  const [currentStep, setCurrentStep] = useState('discover');
 
   // Search & Filters
   const [searchQuery, setSearchQuery] = useState('');
@@ -324,7 +323,7 @@ export default function BookingMarketplace({
   };
 
   return (
-    <div style={{ maxWidth: currentStep === 'walkthrough' ? '1440px' : '1040px', margin: '0 auto', width: '100%', fontFamily: 'inherit' }}>
+    <div style={{ maxWidth: '800px', margin: '0 auto', width: '100%', fontFamily: 'inherit' }}>
       {/* ── Sub Navigation Header ── */}
       <div
         style={{
@@ -363,36 +362,15 @@ export default function BookingMarketplace({
               padding: '6px 14px',
               borderRadius: '9999px',
               border: 'none',
-              background: (activeSubTab === 'discover' && currentStep !== 'walkthrough') ? '#fff' : 'transparent',
-              color: (activeSubTab === 'discover' && currentStep !== 'walkthrough') ? '#059669' : '#475569',
-              fontWeight: (activeSubTab === 'discover' && currentStep !== 'walkthrough') ? 700 : 500,
+              background: activeSubTab === 'discover' ? '#fff' : 'transparent',
+              color: activeSubTab === 'discover' ? '#059669' : '#475569',
+              fontWeight: activeSubTab === 'discover' ? 700 : 500,
               fontSize: '12.5px',
               cursor: 'pointer',
-              boxShadow: (activeSubTab === 'discover' && currentStep !== 'walkthrough') ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+              boxShadow: activeSubTab === 'discover' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
             }}
           >
             Discover Services
-          </button>
-          <button
-            type="button"
-            onClick={() => { setActiveSubTab('discover'); setCurrentStep('walkthrough'); }}
-            style={{
-              padding: '6px 14px',
-              borderRadius: '9999px',
-              border: 'none',
-              background: (activeSubTab === 'discover' && currentStep === 'walkthrough') ? '#fff' : 'transparent',
-              color: (activeSubTab === 'discover' && currentStep === 'walkthrough') ? '#059669' : '#475569',
-              fontWeight: (activeSubTab === 'discover' && currentStep === 'walkthrough') ? 700 : 500,
-              fontSize: '12.5px',
-              cursor: 'pointer',
-              boxShadow: (activeSubTab === 'discover' && currentStep === 'walkthrough') ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '5px',
-            }}
-          >
-            <Sparkles size={13} color={(activeSubTab === 'discover' && currentStep === 'walkthrough') ? '#059669' : '#64748b'} />
-            <span>Walkthrough Grid (7 Views)</span>
           </button>
           <button
             type="button"
@@ -458,38 +436,6 @@ export default function BookingMarketplace({
       </div>
 
       {/* ─────────────────────────────────────────────────────────────
-          FLOW VIEW 0: PANORAMIC WALKTHROUGH (ALL 7 VIEWS)
-          ───────────────────────────────────────────────────────────── */}
-      {activeSubTab === 'discover' && currentStep === 'walkthrough' && (
-        <PanoramicWalkthroughView
-          servicesList={servicesList}
-          selectedService={selectedService}
-          setSelectedService={setSelectedService}
-          setCurrentStep={setCurrentStep}
-          selectedDate={selectedDate}
-          setSelectedDate={setSelectedDate}
-          selectedSlotTime={selectedSlotTime}
-          setSelectedSlotTime={setSelectedSlotTime}
-          customerNotes={customerNotes}
-          setCustomerNotes={setCustomerNotes}
-          selectedPaymentMethod={selectedPaymentMethod}
-          setSelectedPaymentMethod={setSelectedPaymentMethod}
-          vaultScenario={vaultScenario}
-          setVaultScenario={setVaultScenario}
-          isPasskeyApproved={isPasskeyApproved}
-          setIsPasskeyApproved={setIsPasskeyApproved}
-          handleRequestBooking={handleRequestBooking}
-          isSubmitting={isSubmitting}
-          bookingError={bookingError}
-          activeBookingRecord={activeBookingRecord}
-          chatMessages={chatMessages}
-          chatInput={chatInput}
-          setChatInput={setChatInput}
-          handleSendChatMessage={handleSendChatMessage}
-        />
-      )}
-
-      {/* ─────────────────────────────────────────────────────────────
           FLOW VIEW 1: DISCOVER SERVICES
           ───────────────────────────────────────────────────────────── */}
       {activeSubTab === 'discover' && currentStep === 'discover' && (
@@ -497,18 +443,34 @@ export default function BookingMarketplace({
           <div style={{ background: '#fff', borderRadius: '20px', border: '1px solid #e2e8f0', padding: '24px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.03)' }}>
             {/* Header */}
             <div style={{ marginBottom: '20px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+                <div>
+                  <h2 style={{ fontSize: '18px', fontWeight: 800, margin: 0, color: '#0f172a' }}>Discover Services</h2>
+                  <p style={{ margin: '4px 0 0', fontSize: '13px', color: '#64748b' }}>
+                    Book services from agents across NairaTag
+                  </p>
+                </div>
                 <button
                   type="button"
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#0f172a', padding: 0 }}
+                  onClick={() => setIsCreateServiceOpen(true)}
+                  style={{
+                    background: '#f0fdf4',
+                    border: '1px solid #bbf7d0',
+                    color: '#15803d',
+                    padding: '6px 12px',
+                    borderRadius: '8px',
+                    fontSize: '12px',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                  }}
                 >
-                  <ArrowLeft size={18} />
+                  <PlusCircle size={13} />
+                  <span>List Service</span>
                 </button>
-                <h2 style={{ fontSize: '18px', fontWeight: 800, margin: 0, color: '#0f172a' }}>Discover Services</h2>
               </div>
-              <p style={{ margin: '4px 0 0 26px', fontSize: '13px', color: '#64748b' }}>
-                Book services from agents across NairaTag
-              </p>
             </div>
 
             {/* Search Input */}

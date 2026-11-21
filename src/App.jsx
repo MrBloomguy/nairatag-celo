@@ -3241,189 +3241,214 @@ function ArcAppShell() {
             ─────────────────────────────────────────────────────────────────── */}
         {mainTab === 'pay' && (
           <div className="terminal-layout-centered">
-            {/* Mode Switcher: Send vs Corridor Swap */}
+            {/* Modern Segmented Control Pill Bar (Matching Clean Minimal Pill Style) */}
             <div
+              className="pay-mode-segmented-control"
               style={{
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: '8px',
-                marginBottom: '16px',
-                background: 'var(--surface2, #f3f4f6)',
+                gap: '4px',
+                marginBottom: '20px',
+                background: 'var(--surface2, #ebeef2)',
                 padding: '4px',
-                borderRadius: '12px',
-                maxWidth: '440px',
+                borderRadius: '9999px',
+                maxWidth: '680px',
                 width: '100%',
-                margin: '0 auto 16px',
+                margin: '0 auto 20px',
+                border: '1px solid rgba(0, 0, 0, 0.04)',
+                boxSizing: 'border-box',
+                overflowX: 'auto',
+                scrollbarWidth: 'none',
+                WebkitOverflowScrolling: 'touch',
               }}
             >
+              {/* 1. Send to ₦Tag */}
               <button
                 type="button"
                 onClick={() => setPayMode('send')}
                 style={{
                   flex: 1,
-                  display: 'flex',
+                  minWidth: 'fit-content',
+                  display: 'inline-flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   gap: '6px',
-                  padding: '9px 14px',
-                  borderRadius: '9px',
+                  padding: '7px 14px',
+                  borderRadius: '9999px',
                   fontSize: '13px',
-                  fontWeight: 600,
-                  border: 'none',
+                  fontWeight: payMode === 'send' ? 600 : 500,
+                  border: payMode === 'send' ? '1px solid rgba(0, 0, 0, 0.05)' : '1px solid transparent',
                   cursor: 'pointer',
                   background: payMode === 'send' ? 'var(--card-bg, #ffffff)' : 'transparent',
-                  color: payMode === 'send' ? '#059669' : 'var(--privy-color-foreground-2)',
-                  boxShadow: payMode === 'send' ? '0 2px 6px rgba(0,0,0,0.06)' : 'none',
-                  transition: 'all 0.15s ease',
+                  color: payMode === 'send' ? 'var(--privy-color-foreground, #0f172a)' : '#64748b',
+                  boxShadow: payMode === 'send' ? '0 2px 6px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04)' : 'none',
+                  transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)',
+                  whiteSpace: 'nowrap',
                 }}
               >
-                <Send size={14} />
+                <Send size={13} />
                 <span>Send to ₦Tag</span>
               </button>
 
+              {/* 2. USD₮ ⇄ cNGN (Track 1) */}
               <button
                 type="button"
                 onClick={() => setPayMode('corridor')}
                 style={{
                   flex: 1,
-                  display: 'flex',
+                  minWidth: 'fit-content',
+                  display: 'inline-flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   gap: '6px',
-                  padding: '9px 14px',
-                  borderRadius: '9px',
+                  padding: '7px 14px',
+                  borderRadius: '9999px',
                   fontSize: '13px',
-                  fontWeight: 600,
-                  border: 'none',
+                  fontWeight: payMode === 'corridor' ? 600 : 500,
+                  border: payMode === 'corridor' ? '1px solid rgba(0, 0, 0, 0.05)' : '1px solid transparent',
                   cursor: 'pointer',
                   background: payMode === 'corridor' ? 'var(--card-bg, #ffffff)' : 'transparent',
-                  color: payMode === 'corridor' ? '#059669' : 'var(--privy-color-foreground-2)',
-                  boxShadow: payMode === 'corridor' ? '0 2px 6px rgba(0,0,0,0.06)' : 'none',
-                  transition: 'all 0.15s ease',
+                  color: payMode === 'corridor' ? 'var(--privy-color-foreground, #0f172a)' : '#64748b',
+                  boxShadow: payMode === 'corridor' ? '0 2px 6px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04)' : 'none',
+                  transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)',
+                  whiteSpace: 'nowrap',
                 }}
               >
-                <TrendingUp size={14} />
+                <TrendingUp size={13} />
                 <span>USD₮ ⇄ cNGN</span>
                 <span
                   style={{
                     fontSize: '9.5px',
-                    padding: '2px 5px',
-                    borderRadius: '4px',
-                    background: '#35D07F',
-                    color: '#042f2e',
+                    padding: '2px 7px',
+                    borderRadius: '9999px',
+                    background: payMode === 'corridor' ? '#ecfdf5' : 'rgba(0, 0, 0, 0.05)',
+                    color: payMode === 'corridor' ? '#059669' : '#64748b',
                     fontWeight: 700,
+                    letterSpacing: '0.2px',
                   }}
                 >
                   Track 1
                 </span>
               </button>
 
+              {/* 3. Agent Wallets (Track 4) */}
               <button
                 type="button"
                 onClick={() => setPayMode('altana')}
                 style={{
                   flex: 1,
-                  display: 'flex',
+                  minWidth: 'fit-content',
+                  display: 'inline-flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   gap: '6px',
-                  padding: '9px 14px',
-                  borderRadius: '9px',
+                  padding: '7px 14px',
+                  borderRadius: '9999px',
                   fontSize: '13px',
-                  fontWeight: 600,
-                  border: 'none',
+                  fontWeight: payMode === 'altana' ? 600 : 500,
+                  border: payMode === 'altana' ? '1px solid rgba(0, 0, 0, 0.05)' : '1px solid transparent',
                   cursor: 'pointer',
                   background: payMode === 'altana' ? 'var(--card-bg, #ffffff)' : 'transparent',
-                  color: payMode === 'altana' ? '#5B4FFF' : 'var(--privy-color-foreground-2)',
-                  boxShadow: payMode === 'altana' ? '0 2px 6px rgba(0,0,0,0.06)' : 'none',
-                  transition: 'all 0.15s ease',
+                  color: payMode === 'altana' ? 'var(--privy-color-foreground, #0f172a)' : '#64748b',
+                  boxShadow: payMode === 'altana' ? '0 2px 6px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04)' : 'none',
+                  transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)',
+                  whiteSpace: 'nowrap',
                 }}
               >
-                <Key size={14} />
+                <Key size={13} />
                 <span>Agent Wallets</span>
                 <span
                   style={{
                     fontSize: '9.5px',
-                    padding: '2px 5px',
-                    borderRadius: '4px',
-                    background: '#5B4FFF',
-                    color: '#ffffff',
+                    padding: '2px 7px',
+                    borderRadius: '9999px',
+                    background: payMode === 'altana' ? '#eef2ff' : 'rgba(0, 0, 0, 0.05)',
+                    color: payMode === 'altana' ? '#4f46e5' : '#64748b',
                     fontWeight: 700,
+                    letterSpacing: '0.2px',
                   }}
                 >
                   Track 4
                 </span>
               </button>
 
+              {/* 4. Agent Vault (Track 2) */}
               <button
                 type="button"
                 onClick={() => setPayMode('vault')}
                 style={{
                   flex: 1,
-                  display: 'flex',
+                  minWidth: 'fit-content',
+                  display: 'inline-flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   gap: '6px',
-                  padding: '9px 14px',
-                  borderRadius: '9px',
+                  padding: '7px 14px',
+                  borderRadius: '9999px',
                   fontSize: '13px',
-                  fontWeight: 600,
-                  border: 'none',
+                  fontWeight: payMode === 'vault' ? 600 : 500,
+                  border: payMode === 'vault' ? '1px solid rgba(0, 0, 0, 0.05)' : '1px solid transparent',
                   cursor: 'pointer',
                   background: payMode === 'vault' ? 'var(--card-bg, #ffffff)' : 'transparent',
-                  color: payMode === 'vault' ? '#2563EB' : 'var(--privy-color-foreground-2)',
-                  boxShadow: payMode === 'vault' ? '0 2px 6px rgba(0,0,0,0.06)' : 'none',
-                  transition: 'all 0.15s ease',
+                  color: payMode === 'vault' ? 'var(--privy-color-foreground, #0f172a)' : '#64748b',
+                  boxShadow: payMode === 'vault' ? '0 2px 6px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04)' : 'none',
+                  transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)',
+                  whiteSpace: 'nowrap',
                 }}
               >
-                <ShoppingCart size={14} />
+                <ShoppingCart size={13} />
                 <span>Agent Vault</span>
                 <span
                   style={{
                     fontSize: '9.5px',
-                    padding: '2px 5px',
-                    borderRadius: '4px',
-                    background: '#2563EB',
-                    color: '#ffffff',
+                    padding: '2px 7px',
+                    borderRadius: '9999px',
+                    background: payMode === 'vault' ? '#eff6ff' : 'rgba(0, 0, 0, 0.05)',
+                    color: payMode === 'vault' ? '#2563eb' : '#64748b',
                     fontWeight: 700,
+                    letterSpacing: '0.2px',
                   }}
                 >
                   Track 2
                 </span>
               </button>
 
+              {/* 5. Self Agent ID (Track 3) */}
               <button
                 type="button"
                 onClick={() => setPayMode('self')}
                 style={{
                   flex: 1,
-                  display: 'flex',
+                  minWidth: 'fit-content',
+                  display: 'inline-flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   gap: '6px',
-                  padding: '9px 14px',
-                  borderRadius: '9px',
+                  padding: '7px 14px',
+                  borderRadius: '9999px',
                   fontSize: '13px',
-                  fontWeight: 600,
-                  border: 'none',
+                  fontWeight: payMode === 'self' ? 600 : 500,
+                  border: payMode === 'self' ? '1px solid rgba(0, 0, 0, 0.05)' : '1px solid transparent',
                   cursor: 'pointer',
                   background: payMode === 'self' ? 'var(--card-bg, #ffffff)' : 'transparent',
-                  color: payMode === 'self' ? '#0D9488' : 'var(--privy-color-foreground-2)',
-                  boxShadow: payMode === 'self' ? '0 2px 6px rgba(0,0,0,0.06)' : 'none',
-                  transition: 'all 0.15s ease',
+                  color: payMode === 'self' ? 'var(--privy-color-foreground, #0f172a)' : '#64748b',
+                  boxShadow: payMode === 'self' ? '0 2px 6px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04)' : 'none',
+                  transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)',
+                  whiteSpace: 'nowrap',
                 }}
               >
-                <Fingerprint size={14} />
+                <Fingerprint size={13} />
                 <span>Self Agent ID</span>
                 <span
                   style={{
                     fontSize: '9.5px',
-                    padding: '2px 5px',
-                    borderRadius: '4px',
-                    background: '#0D9488',
-                    color: '#ffffff',
+                    padding: '2px 7px',
+                    borderRadius: '9999px',
+                    background: payMode === 'self' ? '#f0fdfa' : 'rgba(0, 0, 0, 0.05)',
+                    color: payMode === 'self' ? '#0d9488' : '#64748b',
                     fontWeight: 700,
+                    letterSpacing: '0.2px',
                   }}
                 >
                   Track 3

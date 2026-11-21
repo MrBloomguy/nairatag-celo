@@ -31,7 +31,7 @@ import {
 } from '../config/celo.js';
 import { getEthereumProvider } from '../services/celoPayment.js';
 
-export default function CorridorSwapCard({ walletAddress, onConnectWallet }) {
+export default function CorridorSwapCard({ walletAddress, onConnectWallet, embedded = false }) {
   const [direction, setDirection] = useState('USDT_TO_CNGN'); // 'USDT_TO_CNGN' | 'CNGN_TO_USDT'
   const [amountIn, setAmountIn] = useState('');
   const [rates, setRates] = useState({ rateUsdtToCngn: 1445.50, rateCngnToUsdt: 0.000692 });
@@ -281,7 +281,7 @@ export default function CorridorSwapCard({ walletAddress, onConnectWallet }) {
 
   return (
     <div
-      style={{
+      style={embedded ? {} : {
         borderRadius: '16px',
         padding: '20px',
         background: 'var(--card-bg, #ffffff)',

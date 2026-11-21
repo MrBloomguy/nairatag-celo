@@ -17,6 +17,7 @@ import { HandCoins as HandCoinsIcon } from 'lucide-react';
 import { Ticket as TicketIcon } from 'lucide-react';
 import {
   Wallet,
+  ArrowDownUp,
   ShoppingCart,
   Fingerprint,
   CheckCircle2,
@@ -1398,7 +1399,8 @@ function ArcAppShell() {
     : null;
 
   // Pay / Send Terminal State
-  const [payMode, setPayMode] = useState('send'); // 'send' | 'corridor'
+  const [payMode, setPayMode] = useState('send'); // 'send' | 'altana' | 'vault' | 'self'
+  const [paySubMode, setPaySubMode] = useState('direct'); // 'direct' | 'corridor'
   const [recipientInput, setRecipientInput] = useState('');
   const [amountInput, setAmountInput] = useState('10.00');
   const [memoInput, setMemoInput] = useState('');
@@ -3244,29 +3246,19 @@ function ArcAppShell() {
             ─────────────────────────────────────────────────────────────────── */}
         {mainTab === 'pay' && (
           <div className="terminal-layout-centered">
-            {/* Modern Segmented Control Pill Bar (Clean Minimal Pill Style, No Carousel, Theme Adaptive) */}
+            {/* Modern Segmented Control Pill Bar: 4 Clean Unified Tabs */}
             <div className="pay-mode-segmented-control">
-              {/* 1. Send */}
+              {/* 1. Send & Swap */}
               <button
                 type="button"
                 className={`pay-mode-pill-btn pill-send ${payMode === 'send' ? 'active' : ''}`}
                 onClick={() => setPayMode('send')}
               >
                 <Send size={13} />
-                <span>Send</span>
+                <span>Send & Swap</span>
               </button>
 
-              {/* 2. Swap */}
-              <button
-                type="button"
-                className={`pay-mode-pill-btn pill-corridor ${payMode === 'corridor' ? 'active' : ''}`}
-                onClick={() => setPayMode('corridor')}
-              >
-                <TrendingUp size={13} />
-                <span>Swap</span>
-              </button>
-
-              {/* 3. Wallets */}
+              {/* 2. Wallets */}
               <button
                 type="button"
                 className={`pay-mode-pill-btn pill-altana ${payMode === 'altana' ? 'active' : ''}`}
@@ -3276,7 +3268,7 @@ function ArcAppShell() {
                 <span>Wallets</span>
               </button>
 
-              {/* 4. Vault */}
+              {/* 3. Vault */}
               <button
                 type="button"
                 className={`pay-mode-pill-btn pill-vault ${payMode === 'vault' ? 'active' : ''}`}
@@ -3286,7 +3278,7 @@ function ArcAppShell() {
                 <span>Vault</span>
               </button>
 
-              {/* 5. Self ID */}
+              {/* 4. Self ID */}
               <button
                 type="button"
                 className={`pay-mode-pill-btn pill-self ${payMode === 'self' ? 'active' : ''}`}
@@ -3297,14 +3289,7 @@ function ArcAppShell() {
               </button>
             </div>
 
-            {payMode === 'corridor' ? (
-              <div style={{ maxWidth: '440px', width: '100%', margin: '0 auto' }}>
-                <CorridorSwapCard
-                  walletAddress={walletAddress}
-                  onConnectWallet={() => setIsConnectModalOpen(true)}
-                />
-              </div>
-            ) : payMode === 'vault' ? (
+            {payMode === 'vault' ? (
               <div style={{ maxWidth: '520px', width: '100%', margin: '0 auto' }}>
                 <AgentVaultCard
                   walletAddress={walletAddress}
@@ -3327,11 +3312,26 @@ function ArcAppShell() {
               </div>
             ) : (
               <div className="crypto-card-terminal">
-                <div className="card-header-bar">
-                  <span className="card-header-title">
-                    <Send size={15} />
-                    <span>Send</span>
-                  </span>
+                {/* Unified Card Header Bar with In-Card Mode Switcher */}
+                <div className="card-header-bar" style={{ gap: '8px', flexWrap: 'wrap' }}>
+                  <div className="unified-card-subtoggle">
+                    <button
+                      type="button"
+                      className={`subtoggle-pill ${paySubMode === 'direct' ? 'active' : ''}`}
+                      onClick={() => setPaySubMode('direct')}
+                    >
+                      <Send size={12} />
+                      <span>Send to ₦Tag</span>
+                    </button>
+                    <button
+                      type="button"
+                      className={`subtoggle-pill ${paySubMode === 'corridor' ? 'active' : ''}`}
+                      onClick={() => setPaySubMode('corridor')}
+                    >
+                      <ArrowDownUp size={12} />
+                      <span>USD₮ ⇄ cNGN</span>
+                    </button>
+                  </div>
                   <div className="card-header-actions">
                     <span className="slippage-pill">
                       <Clock size={10} />
@@ -3346,6 +3346,15 @@ function ArcAppShell() {
                     </button>
                   </div>
                 </div>
+
+                {paySubMode === 'corridor' ? (
+                  <CorridorSwapCard
+                    embedded={true}
+                    walletAddress={walletAddress}
+                    onConnectWallet={() => setIsConnectModalOpen(true)}
+                  />
+                ) : (
+                  <>
 
                 {/* 1. Recipient ₦Tag Input Box */}
                 <div className="tag-recipient-box">
@@ -3485,6 +3494,45 @@ function ArcAppShell() {
                   )}
                 </div>
 
+                {/* Smart Cross-Currency FX Corridor Callout */}
+                <div
+                  style={{
+                    padding: '9px 12px',
+                    borderRadius: '8px',
+                    background: 'rgba(5, 150, 105, 0.05)',
+                    border: '1px solid rgba(5, 150, 105, 0.16)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    fontSize: '11.5px',
+                    color: 'var(--text-secondary, #4b5563)',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <ArrowDownUp size={13} color="#059669" />
+                    <span>Need USD₮ ⇄ cNGN conversion?</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setPaySubMode('corridor')}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: '#059669',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '3px',
+                      padding: 0,
+                      fontSize: '11.5px',
+                    }}
+                  >
+                    <span>FX Corridor</span>
+                    <ArrowRight size={11} />
+                  </button>
+                </div>
+
                 {/* Action Button */}
                 <button
                   type="button"
@@ -3495,10 +3543,12 @@ function ArcAppShell() {
                   <Send size={15} />
                   <span>Review & Send</span>
                 </button>
-              </div>
+              </>
             )}
           </div>
         )}
+      </div>
+    )}
 
         {/* ───────────────────────────────────────────────────────────────────
             TAB 2: CLAIM NAIRATAG IDENTITY

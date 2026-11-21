@@ -762,6 +762,70 @@ html[data-theme="dark"] body {
   border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
+/* In-Card Sub-Mode Toggle for Send & Swap */
+.unified-card-subtoggle {
+  display: flex;
+  align-items: center;
+  background: #F1F3F5;
+  padding: 3px;
+  border-radius: 9999px;
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  gap: 2px;
+}
+
+[data-theme="dark"] .unified-card-subtoggle,
+.dark .unified-card-subtoggle {
+  background: #1C212B;
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.subtoggle-pill {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 9999px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: #64748B;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+[data-theme="dark"] .subtoggle-pill,
+.dark .subtoggle-pill {
+  color: #94A3B8;
+}
+
+.subtoggle-pill:hover {
+  color: #111827;
+}
+
+[data-theme="dark"] .subtoggle-pill:hover,
+.dark .subtoggle-pill:hover {
+  color: #F8FAFC;
+}
+
+.subtoggle-pill.active {
+  background: #FFFFFF;
+  color: #059669;
+  font-weight: 600;
+  border-color: rgba(5, 150, 105, 0.2);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+[data-theme="dark"] .subtoggle-pill.active,
+.dark .subtoggle-pill.active {
+  background: #173224;
+  color: #34D399;
+  border: 1px solid rgba(52, 211, 153, 0.45);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+}
+
 .pay-mode-pill-btn {
   flex: 1;
   min-width: 0;

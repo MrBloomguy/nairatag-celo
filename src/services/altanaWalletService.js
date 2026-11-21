@@ -78,11 +78,9 @@ export const CELO_VERIFIED_PERMISSIONS = {
     cngn: CELO_CNGN_ADDRESS,
     signatures: {
       transfer: 'transfer(address,uint256)', // selector 0xa9059cbb
-      approve: 'approve(address,uint256)',   // selector 0x095ea7b3
     },
     selectors: {
       transfer: '0xa9059cbb',
-      approve: '0x095ea7b3',
     },
   },
   erc8004: {
@@ -235,6 +233,20 @@ export async function recoverAltanaPasskeyWallet({ rpId, webAuthn, chainId = ALT
 }
 
 /**
+ * Checks whether WebAuthn biometric passkeys are natively supported in the current browser environment.
+ * 
+ * @returns {boolean} True if WebAuthn is supported
+ */
+export function isWebAuthnSupported() {
+  if (typeof window === 'undefined') return false;
+  return !!(
+    window.PublicKeyCredential &&
+    typeof window.PublicKeyCredential === 'function' &&
+    typeof window.PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable === 'function'
+  );
+}
+
+/**
  * Creates a headless passkey signer for test environments, CI, or Node scripts without an OS keychain.
  * 
  * @returns {Object} Headless PasskeySigner
@@ -345,6 +357,39 @@ export function buildSessionPolicy({
       throw new Error(`Invalid destination address at rule index ${idx}: ${rule.to}`);
     }
     const cleanTo = getAddress(rule.to);
+
+    // SECURITY CHECK 1: Generic ERC-20 approval prohibition
+    if (rule.signature && rule.signature.toLowerCase().includes('approve')) {
+      if (!rule.spender || !isAddress(rule.spender)) {
+        throw new Error(
+          `Unrestricted ERC-20 approve permission is prohibited at rule index ${idx}. Approvals can bypass spending allowances; approvals must be explicitly bounded to a verified spender address.`
+        );
+      }
+      if (!rule.maxAllowance || typeof rule.maxAllowance !== 'bigint' || rule.maxAllowance <= 0n) {
+        throw new Error(
+          `Unrestricted ERC-20 approve permission is prohibited at rule index ${idx}. A strict positive maxAllowance (bigint) is required.`
+        );
+      }
+      return {
+        to: cleanTo,
+        signature: String(rule.signature).trim(),
+        spender: getAddress(rule.spender),
+        maxAllowance: rule.maxAllowance,
+      };
+    }
+
+    // SECURITY CHECK 2: Recipient-bound transfer permission
+    if (rule.recipient) {
+      if (!isAddress(rule.recipient)) {
+        throw new Error(`Invalid recipient address at rule index ${idx}: ${rule.recipient}`);
+      }
+      return {
+        to: cleanTo,
+        signature: rule.signature ? String(rule.signature).trim() : 'transfer(address,uint256)',
+        recipient: getAddress(rule.recipient),
+      };
+    }
+
     if (rule.signature) {
       const cleanSig = String(rule.signature).trim();
       return { to: cleanTo, signature: cleanSig };
@@ -410,13 +455,17 @@ export function buildSessionPolicy({
 
 /**
  * Convenience builder for standard NairaTag Agent commerce policies on Celo.
- * Combines verified Textile RFQ reactor execution, ERC-20 token transfers, and ERC-8004 identity maintenance.
+ * Combines verified Textile RFQ reactor execution, ERC-8004 identity maintenance, and optional recipient-bound transfers.
+ * 
+ * Strict Security Rules:
+ * 1. Generic unconstrained ERC-20 approvals (approve(address,uint256)) are NEVER included.
+ * 2. Blanket token transfers without explicit recipient binding are omitted by default.
+ * 3. Specific authorized recipient transfers are supported via authorizedTransfers.
  * 
  * @param {Object} [options]
  * @param {boolean} [options.allowTextile=true] - Permit Textile LimitOrderReactor batch execution.
- * @param {boolean} [options.allowUsdt=true] - Permit USD₮ transfers and approvals.
- * @param {boolean} [options.allowCngn=true] - Permit cNGN transfers and approvals.
  * @param {boolean} [options.allowIdentity=true] - Permit ERC-8004 registration and URI updates.
+ * @param {Array<{ token: string, recipient: string }>} [options.authorizedTransfers=[]] - Explicit recipient-bound transfers.
  * @param {string} [options.dailyUsdtLimit='10.0'] - Daily USD₮ spend limit.
  * @param {string} [options.dailyCngnLimit='15000.0'] - Daily cNGN spend limit.
  * @param {string} [options.dailyCeloLimit='0.5'] - Daily native CELO spend limit (for gas/fees).
@@ -425,9 +474,8 @@ export function buildSessionPolicy({
  */
 export function buildStandardAgentPolicy({
   allowTextile = true,
-  allowUsdt = true,
-  allowCngn = true,
   allowIdentity = true,
+  authorizedTransfers = [],
   dailyUsdtLimit = '10.0',
   dailyCngnLimit = '15000.0',
   dailyCeloLimit = '0.5',
@@ -442,18 +490,17 @@ export function buildStandardAgentPolicy({
     );
   }
 
-  if (allowUsdt) {
-    allowedContracts.push(
-      { to: CELO_USDT_ADDRESS, signature: CELO_VERIFIED_PERMISSIONS.tokens.signatures.transfer },
-      { to: CELO_USDT_ADDRESS, signature: CELO_VERIFIED_PERMISSIONS.tokens.signatures.approve }
-    );
-  }
-
-  if (allowCngn) {
-    allowedContracts.push(
-      { to: CELO_CNGN_ADDRESS, signature: CELO_VERIFIED_PERMISSIONS.tokens.signatures.transfer },
-      { to: CELO_CNGN_ADDRESS, signature: CELO_VERIFIED_PERMISSIONS.tokens.signatures.approve }
-    );
+  // Bound recipient transfers only (no arbitrary transfers or approvals)
+  if (Array.isArray(authorizedTransfers) && authorizedTransfers.length > 0) {
+    for (const item of authorizedTransfers) {
+      if (item.token && item.recipient) {
+        allowedContracts.push({
+          to: getAddress(item.token),
+          signature: CELO_VERIFIED_PERMISSIONS.tokens.signatures.transfer,
+          recipient: getAddress(item.recipient),
+        });
+      }
+    }
   }
 
   if (allowIdentity) {
@@ -477,6 +524,56 @@ export function buildStandardAgentPolicy({
   return buildSessionPolicy({
     allowedContracts,
     spendLimits,
+    expiryDurationSeconds,
+  });
+}
+
+/**
+ * Constructs a tightly bounded session policy for paying an external worker/agent for a human-approved Task or Booking.
+ * 
+ * Security Guarantees:
+ * 1. Binds the exact recipient address (e.g. worker's NairaTag address).
+ * 2. Binds the exact token contract (cNGN or USD₮).
+ * 3. Sets the spend cap to the exact reward amount (plus gas reserve).
+ * 4. Enforces short expiration.
+ * 
+ * @param {Object} params
+ * @param {string} params.recipientAddress - Verified recipient address of the task claimer.
+ * @param {string} params.tokenAddress - USD₮ or cNGN address.
+ * @param {string} params.amount - Human-readable token amount.
+ * @param {number} [params.expiryDurationSeconds=7200] - Default 2 hours.
+ * @returns {{ permissions: Object, expiry: number, summary: Object }}
+ */
+export function buildTaskPaymentPolicy({
+  recipientAddress,
+  tokenAddress,
+  amount,
+  expiryDurationSeconds = 7200,
+}) {
+  if (!recipientAddress || !isAddress(recipientAddress)) {
+    throw new Error('Valid recipient address is required to bind task payment.');
+  }
+  if (!tokenAddress || !isAddress(tokenAddress)) {
+    throw new Error('Valid token address is required.');
+  }
+  const cleanRecipient = getAddress(recipientAddress);
+  const cleanToken = getAddress(tokenAddress);
+
+  return buildSessionPolicy({
+    allowedContracts: [
+      {
+        to: cleanToken,
+        signature: CELO_VERIFIED_PERMISSIONS.tokens.signatures.transfer,
+        recipient: cleanRecipient,
+      },
+    ],
+    spendLimits: [
+      {
+        amount,
+        period: 'day',
+        token: cleanToken,
+      },
+    ],
     expiryDurationSeconds,
   });
 }
@@ -572,6 +669,7 @@ export async function executeAgentAction({
   value = 0n,
   chainId = ALTANA_CELO_CHAIN_ID,
   appendAttribution = true,
+  authorizedRecipient = null,
 }) {
   if (!session || !session.walletAddress || !session.signer) {
     throw new Error('Valid executable Altana session is required.');
@@ -588,6 +686,7 @@ export async function executeAgentAction({
 
   const targetAddr = getAddress(targetContract);
   const allowedCalls = session.permissions?.calls || [];
+  let matchedRule = null;
   const isTargetAllowed = allowedCalls.some(rule => {
     if (rule.to && rule.to.toLowerCase() !== targetAddr.toLowerCase()) return false;
     if (rule.signature && calldata !== '0x') {
@@ -595,11 +694,51 @@ export async function executeAgentAction({
       const selector = keccak256(stringToHex(cleanSig)).slice(0, 10);
       if (!calldata.toLowerCase().startsWith(selector.toLowerCase())) return false;
     }
+    matchedRule = rule;
     return true;
   });
 
-  if (!isTargetAllowed) {
+  if (!isTargetAllowed || !matchedRule) {
     throw new Error(`Destination contract or method signature is not permitted by Altana session policy. Target: ${targetAddr}`);
+  }
+
+  // SECURITY CHECK 1: Prohibit unrestricted ERC-20 approve bypass attempts
+  if (calldata !== '0x' && calldata.toLowerCase().startsWith('0x095ea7b3')) {
+    if (!matchedRule.spender) {
+      throw new Error(
+        'Unrestricted ERC-20 approval prohibited: Approval bypass detected. Generic approvals cannot be executed by delegated agents.'
+      );
+    }
+    const attemptedSpender = getAddress('0x' + calldata.slice(34, 74));
+    const attemptedAllowance = BigInt('0x' + calldata.slice(74, 138));
+
+    if (matchedRule.spender.toLowerCase() !== attemptedSpender.toLowerCase()) {
+      throw new Error(
+        `ERC-20 approval rejected: Spender ${attemptedSpender} is not authorized. Authorized spender: ${matchedRule.spender}`
+      );
+    }
+    if (matchedRule.maxAllowance && attemptedAllowance > matchedRule.maxAllowance) {
+      throw new Error(
+        `ERC-20 approval rejected: Allowance ${attemptedAllowance} exceeds bounded maxAllowance ${matchedRule.maxAllowance}`
+      );
+    }
+  }
+
+  // SECURITY CHECK 2: Restrict ERC-20 transfer recipients
+  if (calldata !== '0x' && calldata.toLowerCase().startsWith('0xa9059cbb')) {
+    const attemptedRecipient = getAddress('0x' + calldata.slice(34, 74));
+
+    if (matchedRule.recipient && matchedRule.recipient.toLowerCase() !== attemptedRecipient.toLowerCase()) {
+      throw new Error(
+        `Transfer recipient is not authorized by the Altana session policy. Expected: ${matchedRule.recipient}, Attempted: ${attemptedRecipient}`
+      );
+    }
+
+    if (authorizedRecipient && getAddress(authorizedRecipient).toLowerCase() !== attemptedRecipient.toLowerCase()) {
+      throw new Error(
+        `Transfer recipient does not match human-authorized task recipient. Expected: ${authorizedRecipient}, Attempted: ${attemptedRecipient}`
+      );
+    }
   }
 
   // 2. Append ERC-8021 Hackathon Attribution Suffix if Calldata is present

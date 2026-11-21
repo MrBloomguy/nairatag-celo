@@ -7,6 +7,7 @@ import {
   getAltanaWalletAddress,
   buildSessionPolicy,
   buildStandardAgentPolicy,
+  buildTaskPaymentPolicy,
   grantAgentSession,
   executeAgentAction,
   getAgentSessionStatus,
@@ -14,6 +15,7 @@ import {
   serializeAgentSession,
   restoreAgentSession,
   createHeadlessPasskeySigner,
+  isWebAuthnSupported,
   ALTANA_CELO_CHAIN_ID,
   ALTANA_CELO_SEPOLIA_CHAIN_ID,
   ALTANA_CELO_KEYSTORE,
@@ -256,9 +258,8 @@ test('Celo Deployed Contracts & Function Selector Mathematical Verification', ()
   assert.equal(tokens.usdt.toLowerCase(), '0x48065fbbe25f71c9282ddf5e1cd6d6a887483d5e'.toLowerCase());
   assert.equal(tokens.cngn.toLowerCase(), '0xf6829d7393dae24509eb1e52ee8e572e2e271a4f'.toLowerCase());
   assert.equal(toFunctionSelector(tokens.signatures.transfer), tokens.selectors.transfer);
-  assert.equal(toFunctionSelector(tokens.signatures.approve), tokens.selectors.approve);
   assert.equal(tokens.selectors.transfer, '0xa9059cbb');
-  assert.equal(tokens.selectors.approve, '0x095ea7b3');
+  assert.equal(tokens.signatures.approve, undefined, 'Generic approve MUST NOT be exported in verified token permissions');
 
   // 4. ERC-8004 Registry
   const erc8004 = CELO_VERIFIED_PERMISSIONS.erc8004;
@@ -272,17 +273,19 @@ test('Celo Deployed Contracts & Function Selector Mathematical Verification', ()
 test('buildStandardAgentPolicy: Full Suite Composition & Bounds Enforcement', () => {
   const policy = buildStandardAgentPolicy({
     allowTextile: true,
-    allowUsdt: true,
-    allowCngn: true,
     allowIdentity: true,
+    authorizedTransfers: [
+      { token: CELO_USDT_ADDRESS, recipient: '0xc519729BF6D15e5984702BBa2C553f1c74A73C95' }
+    ],
     dailyUsdtLimit: '25.0',
     dailyCngnLimit: '35000.0',
     dailyCeloLimit: '1.5',
     expiryDurationSeconds: 43200, // 12h
   });
 
-  // Verify call rules count: 2 Textile + 2 USDT + 2 cNGN + 2 ERC-8004 = 8 rules
-  assert.equal(policy.permissions.calls.length, 8);
+  // Verify call rules count: 2 Textile + 1 bound recipient transfer + 2 ERC-8004 = 5 rules
+  assert.equal(policy.permissions.calls.length, 5);
+  assert.equal(policy.permissions.calls[2].recipient.toLowerCase(), '0xc519729bf6d15e5984702bba2c553f1c74a73c95'.toLowerCase());
   
   // Verify spend limits: 3 limits (USDT, cNGN, native CELO)
   assert.equal(policy.permissions.spend.length, 3);
@@ -293,4 +296,116 @@ test('buildStandardAgentPolicy: Full Suite Composition & Bounds Enforcement', ()
   // Expiry check
   const now = Math.floor(Date.now() / 1000);
   assert.ok(policy.expiry >= now + 43190 && policy.expiry <= now + 43210);
+});
+
+test('Security Remediation: Rejection of Unrestricted ERC-20 Approve Bypass Attempts', async () => {
+  // 1. Trying to construct policy with unconstrained approve throws
+  assert.throws(
+    () => buildSessionPolicy({
+      allowedContracts: [
+        { to: CELO_USDT_ADDRESS, signature: 'approve(address,uint256)' }
+      ]
+    }),
+    /Unrestricted ERC-20 approve permission is prohibited/
+  );
+
+  // 2. Trying to execute an approve on a session without bounded approval throws
+  const mockSession = {
+    walletAddress: '0xc519729BF6D15e5984702BBa2C553f1c74A73C95',
+    signer: createPrivateKeySigner(),
+    publicKey: '0x1234',
+    permissions: {
+      calls: [{ to: CELO_USDT_ADDRESS, signature: 'transfer(address,uint256)' }],
+      spend: [{ limit: 10000000n, period: 'day', token: CELO_USDT_ADDRESS }],
+    },
+    expiry: Math.floor(Date.now() / 1000) + 3600,
+  };
+
+  // Selector 0x095ea7b3 + spender (32 bytes) + allowance (32 bytes)
+  const maliciousCalldata = '0x095ea7b30000000000000000000000001111111111111111111111111111111111111111ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff';
+  
+  await assert.rejects(
+    () => executeAgentAction({
+      session: mockSession,
+      targetContract: CELO_USDT_ADDRESS,
+      calldata: maliciousCalldata,
+    }),
+    /Destination contract or method signature is not permitted/
+  );
+});
+
+test('Security Remediation: Recipient Restriction Enforcement for Token Transfers', async () => {
+  const authorizedWorker = '0x2222222222222222222222222222222222222222';
+  const unauthorizedAttacker = '0x9999999999999999999999999999999999999999';
+
+  const boundPolicy = buildSessionPolicy({
+    allowedContracts: [
+      {
+        to: CELO_USDT_ADDRESS,
+        signature: 'transfer(address,uint256)',
+        recipient: authorizedWorker,
+      }
+    ],
+    spendLimits: [{ amount: '5.0', period: 'day', token: CELO_USDT_ADDRESS }],
+  });
+
+  const session = {
+    walletAddress: '0xc519729BF6D15e5984702BBa2C553f1c74A73C95',
+    signer: createPrivateKeySigner(),
+    publicKey: '0x1234',
+    permissions: boundPolicy.permissions,
+    expiry: boundPolicy.expiry,
+  };
+
+  // Calldata transferring to unauthorized attacker:
+  // transfer(0x9999...9999, 1000000)
+  const attackerCalldata = '0xa9059cbb000000000000000000000000999999999999999999999999999999999999999900000000000000000000000000000000000000000000000000000000000f4240';
+
+  await assert.rejects(
+    () => executeAgentAction({
+      session,
+      targetContract: CELO_USDT_ADDRESS,
+      calldata: attackerCalldata,
+    }),
+    /Transfer recipient is not authorized by the Altana session policy/
+  );
+
+  // Calldata transferring to human-authorized worker:
+  // transfer(0x2222...2222, 1000000)
+  const validCalldata = '0xa9059cbb000000000000000000000000222222222222222222222222222222222222222200000000000000000000000000000000000000000000000000000000000f4240';
+
+  // Mismatch with authorizedRecipient argument also rejects
+  await assert.rejects(
+    () => executeAgentAction({
+      session,
+      targetContract: CELO_USDT_ADDRESS,
+      calldata: validCalldata,
+      authorizedRecipient: '0x3333333333333333333333333333333333333333',
+    }),
+    /Transfer recipient does not match human-authorized task recipient/
+  );
+});
+
+test('Security Remediation: buildTaskPaymentPolicy Bound Workflow', () => {
+  const taskWorker = '0x653f773C9062e71A6554b42a9525fcD47fCC1693';
+  const policy = buildTaskPaymentPolicy({
+    recipientAddress: taskWorker,
+    tokenAddress: CELO_USDT_ADDRESS,
+    amount: '3.5',
+    expiryDurationSeconds: 3600,
+  });
+
+  assert.equal(policy.permissions.calls.length, 1);
+  assert.equal(policy.permissions.calls[0].to.toLowerCase(), CELO_USDT_ADDRESS.toLowerCase());
+  assert.equal(policy.permissions.calls[0].signature, 'transfer(address,uint256)');
+  assert.equal(policy.permissions.calls[0].recipient.toLowerCase(), taskWorker.toLowerCase());
+
+  assert.equal(policy.permissions.spend.length, 1);
+  assert.equal(policy.permissions.spend[0].limit, 3500000n);
+  assert.equal(policy.permissions.spend[0].token.toLowerCase(), CELO_USDT_ADDRESS.toLowerCase());
+});
+
+test('WebAuthn Browser Support Check', () => {
+  const supported = isWebAuthnSupported();
+  assert.equal(typeof supported, 'boolean');
 });

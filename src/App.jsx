@@ -6,6 +6,7 @@ import ProfileAvatar from './components/ProfileAvatar';
 import ChatActivityIndicator from './components/chat/ChatActivityIndicator';
 import PersonalAgentPanel from './components/chat/PersonalAgentPanel';
 import CorridorSwapCard from './components/CorridorSwapCard';
+import AltanaSessionCard from './components/AltanaSessionCard';
 import { ClipboardCheck as ClipboardCheckIcon } from 'lucide-react';
 import { ChevronsLeftRight as ChevronsLeftRightIcon } from 'lucide-react';
 import { Car as CarIcon } from 'lucide-react';
@@ -20,6 +21,7 @@ import {
   ExternalLink,
   ArrowRight,
   ShieldCheck,
+  Key,
   RefreshCw,
   Search,
   Sparkles,
@@ -3286,11 +3288,55 @@ function ArcAppShell() {
                   Track 1
                 </span>
               </button>
+
+              <button
+                type="button"
+                onClick={() => setPayMode('altana')}
+                style={{
+                  flex: 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px',
+                  padding: '9px 14px',
+                  borderRadius: '9px',
+                  fontSize: '13px',
+                  fontWeight: 600,
+                  border: 'none',
+                  cursor: 'pointer',
+                  background: payMode === 'altana' ? 'var(--card-bg, #ffffff)' : 'transparent',
+                  color: payMode === 'altana' ? '#5B4FFF' : 'var(--privy-color-foreground-2)',
+                  boxShadow: payMode === 'altana' ? '0 2px 6px rgba(0,0,0,0.06)' : 'none',
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                <Key size={14} />
+                <span>Agent Wallets</span>
+                <span
+                  style={{
+                    fontSize: '9.5px',
+                    padding: '2px 5px',
+                    borderRadius: '4px',
+                    background: '#5B4FFF',
+                    color: '#ffffff',
+                    fontWeight: 700,
+                  }}
+                >
+                  Track 4
+                </span>
+              </button>
             </div>
 
             {payMode === 'corridor' ? (
               <div style={{ maxWidth: '440px', width: '100%', margin: '0 auto' }}>
                 <CorridorSwapCard
+                  walletAddress={walletAddress}
+                  onConnectWallet={() => setIsConnectModalOpen(true)}
+                />
+              </div>
+            ) : payMode === 'altana' ? (
+              <div style={{ maxWidth: '480px', width: '100%', margin: '0 auto' }}>
+                <AltanaSessionCard
                   walletAddress={walletAddress}
                   onConnectWallet={() => setIsConnectModalOpen(true)}
                 />
@@ -3749,9 +3795,65 @@ function ArcAppShell() {
               </div>
             </div>
 
+            {/* Track 4: Altana Agent Wallets Banner */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '12px 16px',
+                borderRadius: '12px',
+                background: 'rgba(91, 79, 255, 0.08)',
+                border: '1px solid rgba(91, 79, 255, 0.25)',
+                marginBottom: '16px',
+                gap: '12px',
+                flexWrap: 'wrap',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <Key size={18} color="#5B4FFF" />
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span style={{ fontSize: '13px', fontWeight: 700, color: '#1e1b4b' }}>
+                      Altana Smart Agentic Wallets (EIP-7702)
+                    </span>
+                    <span style={{ fontSize: '10px', background: '#5B4FFF', color: '#fff', padding: '1px 6px', borderRadius: '4px', fontWeight: 700 }}>
+                      Track 4
+                    </span>
+                  </div>
+                  <span style={{ fontSize: '11.5px', color: '#4338ca' }}>
+                    Authorize your sovereign ₦Tag agent with time-bounded, spend-capped sessions anchored to Celo KeyStore.
+                  </span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setPayMode('altana');
+                  setMainTab('pay');
+                }}
+                style={{
+                  padding: '7px 14px',
+                  borderRadius: '8px',
+                  background: '#5B4FFF',
+                  color: '#fff',
+                  border: 'none',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                }}
+              >
+                <span>Manage Sessions</span>
+                <ArrowRight size={13} />
+              </button>
+            </div>
+
             {agentDirectoryError && (
               <div className="agent-directory-notice" role="status">
-                <span>Could not load the Arc agent registry: {agentDirectoryError}</span>
+                <span>Could not load the Celo agent registry: {agentDirectoryError}</span>
                 <button type="button" onClick={() => loadAgentDirectory()} disabled={agentDirectoryLoading}>
                   {agentDirectoryLoading ? 'Retrying…' : 'Try again'}
                 </button>
@@ -3759,7 +3861,7 @@ function ArcAppShell() {
             )}
 
             {agentDirectoryLoading && chatAgents.length === 0 && (
-              <div className="agent-directory-empty" role="status">Loading agents from the Arc registry…</div>
+              <div className="agent-directory-empty" role="status">Loading agents from the Celo registry…</div>
             )}
             {!agentDirectoryLoading && !agentDirectoryError && chatAgents.length === 0 && (
               <div className="agent-directory-empty" role="status">No agents have been listed yet.</div>

@@ -323,26 +323,21 @@ export default function BookingMarketplace({
   };
 
   return (
-    <div style={{ maxWidth: '800px', margin: '0 auto', width: '100%', fontFamily: 'inherit' }}>
+    <div style={{ maxWidth: (activeSubTab === 'discover' && currentStep === 'discover') ? '1080px' : '720px', margin: '0 auto', width: '100%', fontFamily: 'inherit' }}>
       {/* ── Sub Navigation Header ── */}
       <div
         style={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          marginBottom: '24px',
+          marginBottom: '20px',
           flexWrap: 'wrap',
           gap: '12px',
         }}
       >
-        <div>
-          <h1 style={{ fontSize: '22px', fontWeight: 800, margin: 0, display: 'flex', alignItems: 'center', gap: '8px', color: '#0f172a' }}>
-            <Calendar size={22} color="#059669" />
-            <span>NairaTag Bookings</span>
-          </h1>
-          <p style={{ margin: '4px 0 0', fontSize: '13px', color: '#64748b' }}>
-            Native booking engine & agent service marketplace on Celo Mainnet.
-          </p>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <Calendar size={18} color="#059669" />
+          <span style={{ fontSize: '16px', fontWeight: 800, color: '#0f172a' }}>Bookable Services</span>
         </div>
 
         {/* View Switcher Pills */}
@@ -439,7 +434,7 @@ export default function BookingMarketplace({
           FLOW VIEW 1: DISCOVER SERVICES
           ───────────────────────────────────────────────────────────── */}
       {activeSubTab === 'discover' && currentStep === 'discover' && (
-        <div style={{ maxWidth: '640px', margin: '0 auto' }}>
+        <div style={{ maxWidth: '1080px', margin: '0 auto' }}>
           <div style={{ background: '#fff', borderRadius: '20px', border: '1px solid #e2e8f0', padding: '24px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.03)' }}>
             {/* Header */}
             <div style={{ marginBottom: '20px' }}>
@@ -580,58 +575,67 @@ export default function BookingMarketplace({
               </button>
             </div>
 
-            {/* Service Cards Stack */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            {/* Service Cards Grid */}
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(290px, 1fr))',
+                gap: '18px',
+              }}
+            >
               {servicesList.map((service) => (
                 <div
                   key={service.id}
                   style={{
                     border: '1px solid #e2e8f0',
                     borderRadius: '16px',
-                    padding: '16px',
+                    overflow: 'hidden',
                     background: '#fff',
                     display: 'flex',
-                    gap: '16px',
-                    alignItems: 'center',
-                    boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
+                    flexDirection: 'column',
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.02)',
+                    transition: 'all 0.15s ease',
                   }}
                 >
-                  <img
-                    src={service.image || 'https://images.unsplash.com/photo-1598488035139-bdbb2231ce04?auto=format&fit=crop&w=400&q=80'}
-                    alt={service.title}
-                    style={{
-                      width: '84px',
-                      height: '84px',
-                      borderRadius: '12px',
-                      objectFit: 'cover',
-                      flexShrink: 0,
-                    }}
-                  />
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
-                      <span style={{ fontWeight: 800, fontSize: '13px', color: '#0f172a' }}>
+                  <div style={{ position: 'relative', height: '145px', background: '#0f172a' }}>
+                    <img
+                      src={service.image || (service.agentTag === 'music' ? 'https://images.unsplash.com/photo-1598488035139-bdbb2231ce04?auto=format&fit=crop&w=600&q=80' : 'https://images.unsplash.com/photo-1579632652768-6cb9dcf85912?auto=format&fit=crop&w=600&q=80')}
+                      alt={service.title}
+                      style={{
+                        width: '100%',
+                        height: '100%',
+                        objectFit: 'cover',
+                      }}
+                    />
+                    <div style={{ position: 'absolute', top: '10px', left: '10px', display: 'flex', gap: '6px' }}>
+                      <span style={{ fontWeight: 800, fontSize: '11px', background: 'rgba(15, 23, 42, 0.85)', color: '#fff', padding: '3px 8px', borderRadius: '6px', backdropFilter: 'blur(4px)' }}>
                         ₦{service.agentTag.toUpperCase()}
                       </span>
-                      <span style={{ fontSize: '10.5px', background: '#dcfce7', color: '#15803d', padding: '2px 8px', borderRadius: '9999px', fontWeight: 600 }}>
+                      <span style={{ fontSize: '10px', background: '#dcfce7', color: '#15803d', padding: '3px 8px', borderRadius: '6px', fontWeight: 700 }}>
                         Bookable
                       </span>
                     </div>
-                    <div style={{ fontWeight: 700, fontSize: '14px', color: '#0f172a', marginBottom: '2px' }}>
+                  </div>
+
+                  <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', flex: 1 }}>
+                    <h3 style={{ fontWeight: 800, fontSize: '15px', color: '#0f172a', margin: '0 0 6px 0', lineHeight: 1.3 }}>
                       {service.title}
-                    </div>
-                    <div style={{ fontSize: '12px', color: '#64748b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginBottom: '8px' }}>
+                    </h3>
+                    <p style={{ fontSize: '12px', color: '#64748b', margin: '0 0 16px 0', lineHeight: 1.4, flex: 1 }}>
                       {service.description}
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <span style={{ fontSize: '12px', color: '#64748b', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                          <Clock size={12} />
+                    </p>
+
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: '12px', borderTop: '1px solid #f1f5f9', marginTop: 'auto' }}>
+                      <div>
+                        <div style={{ fontSize: '11px', color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                          <Clock size={11} />
                           <span>{Math.round(service.durationMinutes / 60)} hours</span>
-                        </span>
-                        <span style={{ fontWeight: 800, fontSize: '14px', color: '#0f172a' }}>
+                        </div>
+                        <div style={{ fontWeight: 900, fontSize: '16px', color: '#0f172a' }}>
                           ₦{Number(service.price).toLocaleString()}
-                        </span>
+                        </div>
                       </div>
+
                       <button
                         type="button"
                         onClick={() => {
@@ -643,9 +647,9 @@ export default function BookingMarketplace({
                           color: '#fff',
                           border: 'none',
                           borderRadius: '8px',
-                          padding: '6px 12px',
-                          fontSize: '12px',
-                          fontWeight: 600,
+                          padding: '8px 14px',
+                          fontSize: '12.5px',
+                          fontWeight: 700,
                           cursor: 'pointer',
                           display: 'flex',
                           alignItems: 'center',
@@ -653,7 +657,7 @@ export default function BookingMarketplace({
                         }}
                       >
                         <span>View Service</span>
-                        <ArrowRight size={12} />
+                        <ArrowRight size={13} />
                       </button>
                     </div>
                   </div>

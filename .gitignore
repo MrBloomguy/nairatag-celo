@@ -9,3 +9,4 @@ cache
 broadcast
 *.log
 *.jsonl
+.x402_consumed_payments.json

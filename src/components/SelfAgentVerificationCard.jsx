@@ -66,12 +66,14 @@ export default function SelfAgentVerificationCard({ walletAddress, onConnectWall
   const [selectedCapability, setSelectedCapability] = useState('cngn_forex_intelligence');
   const [paymentAsset, setPaymentAsset] = useState('USDT'); // 'USDT' | 'CNGN'
   const [customPrice, setCustomPrice] = useState('0.05');
+  const [isSimulationMode, setIsSimulationMode] = useState(true); // true: Playground preview, false: Live on-chain
   const [flowStep, setFlowStep] = useState(0); // 0: Idle, 1: 402 Challenge Issued, 2: Payment Settled, 3: Executed
   const [activeChallenge, setActiveChallenge] = useState(null);
   const [paymentProofData, setPaymentProofData] = useState(null);
   const [executionResult, setExecutionResult] = useState(null);
   const [isExecuting, setIsExecuting] = useState(false);
   const [executionError, setExecutionError] = useState('');
+  const [canRetry, setCanRetry] = useState(false);
 
   const copyToClipboard = (text, key) => {
     navigator.clipboard.writeText(text);
@@ -166,10 +168,25 @@ export default function SelfAgentVerificationCard({ walletAddress, onConnectWall
     if (!activeChallenge) return;
     setIsExecuting(true);
     setExecutionError('');
+    setCanRetry(false);
 
     try {
-      // Create simulated settlement proof bound to the challenge nonce
-      const dummyTxHash = `0x${Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join('')}`;
+      let txHashToSubmit = null;
+      if (!isSimulationMode) {
+        if (!walletAddress) {
+          onConnectWallet?.();
+          setIsExecuting(false);
+          return;
+        }
+        // In live mode, verify on-chain settlement
+        setExecutionError('Live Mainnet settlement requires funded wallet approval. Please switch to simulation mode for zero-cost sandbox testing, or approve Celo transfer.');
+        setIsExecuting(false);
+        return;
+      } else {
+        // Playground simulation proof explicitly flagged as simulation
+        txHashToSubmit = `0x${Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join('')}`;
+      }
+
       const proof = {
         network: X402_CELO_NETWORK,
         asset: activeChallenge.asset,
@@ -177,7 +194,8 @@ export default function SelfAgentVerificationCard({ walletAddress, onConnectWall
         payTo: activeChallenge.payTo,
         nonce: activeChallenge.nonce,
         timestamp: Math.floor(Date.now() / 1000),
-        txHash: dummyTxHash,
+        txHash: txHashToSubmit,
+        isSimulation: isSimulationMode,
       };
 
       setPaymentProofData(proof);
@@ -202,6 +220,7 @@ export default function SelfAgentVerificationCard({ walletAddress, onConnectWall
         price: activeChallenge.amount,
         asset: activeChallenge.asset,
         verificationEvidence: verificationData?.isVerified ? verificationData : null,
+        strictSettlement: !isSimulationMode,
         executeHandler: async ({ agent, paymentReceipt }) => {
           return {
             intelligenceKey: selectedCapability,
@@ -225,6 +244,9 @@ export default function SelfAgentVerificationCard({ walletAddress, onConnectWall
         setFlowStep(3);
       } else {
         setExecutionError(`Capability execution failed: ${response.error} - ${response.reason}`);
+        if (response.canRetryWithoutRepay) {
+          setCanRetry(true);
+        }
       }
     } catch (err) {
       setExecutionError(`Settlement failed: ${err.message}`);
@@ -239,6 +261,7 @@ export default function SelfAgentVerificationCard({ walletAddress, onConnectWall
     setPaymentProofData(null);
     setExecutionResult(null);
     setExecutionError('');
+    setCanRetry(false);
   };
 
   return (
@@ -548,7 +571,7 @@ export default function SelfAgentVerificationCard({ walletAddress, onConnectWall
             boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
             <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--privy-color-foreground, #111827)', display: 'flex', alignItems: 'center', gap: '6px' }}>
               <Zap size={14} color="#0D9488" />
               <span>x402 Agent Micro-Payment Flow</span>
@@ -557,6 +580,57 @@ export default function SelfAgentVerificationCard({ walletAddress, onConnectWall
               Protocol: RFC-9110 / x402
             </span>
           </div>
+
+          {/* Mode Switcher */}
+          <div style={{ display: 'flex', gap: '8px', marginBottom: '10px', background: 'var(--input-bg, #f3f4f6)', padding: '3px', borderRadius: '8px' }}>
+            <button
+              type="button"
+              onClick={() => setIsSimulationMode(true)}
+              style={{
+                flex: 1,
+                padding: '6px 10px',
+                borderRadius: '6px',
+                border: 'none',
+                background: isSimulationMode ? '#f59e0b' : 'transparent',
+                color: isSimulationMode ? '#ffffff' : '#4b5563',
+                fontSize: '11px',
+                fontWeight: 700,
+                cursor: 'pointer',
+              }}
+            >
+              Playground Simulation
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsSimulationMode(false)}
+              style={{
+                flex: 1,
+                padding: '6px 10px',
+                borderRadius: '6px',
+                border: 'none',
+                background: !isSimulationMode ? '#0D9488' : 'transparent',
+                color: !isSimulationMode ? '#ffffff' : '#4b5563',
+                fontSize: '11px',
+                fontWeight: 700,
+                cursor: 'pointer',
+              }}
+            >
+              Live On-Chain Settlement
+            </button>
+          </div>
+
+          {/* Mode Explanation Warning Banner */}
+          {isSimulationMode ? (
+            <div style={{ padding: '8px 10px', borderRadius: '6px', background: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(245, 158, 11, 0.3)', marginBottom: '12px', fontSize: '11px', color: '#B45309', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <AlertCircle size={14} color="#B45309" />
+              <span><strong>Simulation Mode:</strong> Zero-cost preview. Real production facilitators require mined on-chain transactions on Celo Mainnet.</span>
+            </div>
+          ) : (
+            <div style={{ padding: '8px 10px', borderRadius: '6px', background: 'rgba(13, 148, 136, 0.1)', border: '1px solid rgba(13, 148, 136, 0.3)', marginBottom: '12px', fontSize: '11px', color: '#0F766E', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <ShieldCheck size={14} color="#0D9488" />
+              <span><strong>Live Settlement Mode:</strong> Requires funded wallet approval and confirmed transaction on Celo Mainnet (Chain ID 42220).</span>
+            </div>
+          )}
 
           {/* Capability Selector */}
           <div style={{ display: 'flex', gap: '8px', marginBottom: '10px' }}>
@@ -728,9 +802,37 @@ export default function SelfAgentVerificationCard({ walletAddress, onConnectWall
 
           {/* Error Banner */}
           {executionError && (
-            <div style={{ marginTop: '10px', padding: '8px 10px', borderRadius: '6px', background: '#fee2e2', color: '#991b1b', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <AlertCircle size={13} />
-              <span>{executionError}</span>
+            <div style={{ marginTop: '10px' }}>
+              <div style={{ padding: '8px 10px', borderRadius: '6px', background: '#fee2e2', color: '#991b1b', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <AlertCircle size={13} />
+                <span>{executionError}</span>
+              </div>
+              {canRetry && (
+                <button
+                  type="button"
+                  onClick={handleSettleAndExecute}
+                  disabled={isExecuting}
+                  style={{
+                    width: '100%',
+                    marginTop: '8px',
+                    padding: '8px 12px',
+                    borderRadius: '6px',
+                    background: '#4f46e5',
+                    color: '#ffffff',
+                    border: 'none',
+                    fontSize: '11.5px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                  }}
+                >
+                  <RefreshCw size={13} className={isExecuting ? 'animate-spin' : ''} />
+                  <span>Retry Execution (Without Double-Charging)</span>
+                </button>
+              )}
             </div>
           )}
         </div>

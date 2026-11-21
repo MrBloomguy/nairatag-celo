@@ -400,3 +400,4 @@ export function validateEvidenceIdentityBinding({ claimedAgentAddress, evidence 
  * Convenient alias for on-chain agent verification status check.
  */
 export const checkAgentVerificationOnChain = getAgentVerificationStatus;
+

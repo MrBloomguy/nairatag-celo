@@ -14,11 +14,19 @@ import {
   createX402PaymentRequirement,
   buildX402Response,
   verifyX402PaymentProof,
+  verifyOnchainSettlement,
   executeSelfGatedAgentCapability,
+  withSelfAndX402Gate,
   _resetConsumedPaymentsForTesting,
   X402_CELO_NETWORK,
   X402_SCHEME,
 } from '../src/services/selfX402Service.js';
+import {
+  consumePaymentDigestAtomic,
+  isPaymentConsumed,
+  getPaymentRecord,
+  loadDurableStore,
+} from '../src/services/durablePaymentStore.js';
 import {
   CELO_USDT_ADDRESS,
   CELO_CNGN_ADDRESS,
@@ -503,4 +511,295 @@ test('18. Successful Complete End-to-End Flow (Verification -> x402 Payment -> E
   assert.equal(finalResult.agent.verified, true);
   assert.equal(finalResult.paymentReceipt.txHash, '0x998877665544332211aabbccddeeff');
   assert.equal(finalResult.attributionTag, CELO_ATTRIBUTION_TAG);
+});
+
+test('19. Duplicate payment digest after application restart (Durable Replay Protection)', async () => {
+  await _resetConsumedPaymentsForTesting();
+
+  const requirement = createX402PaymentRequirement({
+    resourceId: 'persistent_data',
+    agentTag: '₦nairatag',
+    payTo: OFFICIAL_AGENT_WALLET,
+    amount: '0.05',
+    asset: CELO_USDT_ADDRESS,
+  });
+
+  const paymentProof = {
+    network: X402_CELO_NETWORK,
+    asset: CELO_USDT_ADDRESS,
+    amount: '50000',
+    payTo: OFFICIAL_AGENT_WALLET,
+    nonce: requirement.nonce,
+    timestamp: Math.floor(Date.now() / 1000),
+    txHash: '0xrestart_test_tx_hash_12345',
+  };
+
+  const agent = { tag: 'nairatag', owner: OFFICIAL_AGENT_WALLET };
+  const verificationEvidence = {
+    agentAddress: OFFICIAL_AGENT_WALLET,
+    status: VERIFICATION_STATUS.VERIFIED,
+    isVerified: true,
+    isProofFresh: true,
+  };
+
+  // Run 1: Execution completes and is stored to durable storage
+  const res1 = await executeSelfGatedAgentCapability({
+    agent,
+    capability: 'persistent_data',
+    verificationEvidence,
+    paymentProof,
+    executeHandler: async () => ({ value: 'persisted' }),
+  });
+
+  assert.equal(res1.ok, true);
+  const digest = res1.paymentReceipt.paymentDigest;
+
+  // Simulate process restart: reload store from disk
+  await loadDurableStore();
+  assert.equal(isPaymentConsumed(digest), true, 'Store maintains consumed status across reload');
+
+  // Attempt to execute again with same proof after simulated restart
+  const res2 = await executeSelfGatedAgentCapability({
+    agent,
+    capability: 'persistent_data',
+    verificationEvidence,
+    paymentProof,
+    executeHandler: async () => ({ value: 'persisted' }),
+  });
+
+  assert.equal(res2.ok, false);
+  assert.ok(res2.status === 402 || res2.status === 409);
+  assert.match(res2.reason || res2.error, /already been redeemed|Payment already consumed/i);
+});
+
+test('20. Two concurrent requests using the same payment (Atomic Concurrency Lock)', async () => {
+  await _resetConsumedPaymentsForTesting();
+
+  const requirement = createX402PaymentRequirement({
+    resourceId: 'race_condition_test',
+    agentTag: '₦nairatag',
+    payTo: OFFICIAL_AGENT_WALLET,
+    amount: '0.05',
+    asset: CELO_USDT_ADDRESS,
+  });
+
+  const paymentProof = {
+    network: X402_CELO_NETWORK,
+    asset: CELO_USDT_ADDRESS,
+    amount: '50000',
+    payTo: OFFICIAL_AGENT_WALLET,
+    nonce: requirement.nonce,
+    timestamp: Math.floor(Date.now() / 1000),
+    txHash: '0xconcurrent_race_test_tx',
+  };
+
+  const dummyDigest = '0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef';
+
+  // Fire two atomic consumption requests concurrently
+  const [resA, resB] = await Promise.allSettled([
+    consumePaymentDigestAtomic({
+      paymentDigest: dummyDigest,
+      requirement,
+      paymentProof,
+    }),
+    consumePaymentDigestAtomic({
+      paymentDigest: dummyDigest,
+      requirement,
+      paymentProof,
+    }),
+  ]);
+
+  // Exactly one must succeed and one must be rejected by atomic lock
+  const successCount = [resA, resB].filter((r) => r.status === 'fulfilled').length;
+  const failureCount = [resA, resB].filter((r) => r.status === 'rejected').length;
+
+  assert.equal(successCount, 1, 'Only one concurrent consumption succeeds');
+  assert.equal(failureCount, 1, 'Concurrent double-consumption is atomically rejected');
+});
+
+test('21. Invalid facilitator or network response rejection', () => {
+  const requirement = createX402PaymentRequirement({
+    resourceId: 'network_test',
+    agentTag: '₦nairatag',
+    payTo: OFFICIAL_AGENT_WALLET,
+    amount: '0.05',
+    asset: CELO_USDT_ADDRESS,
+  });
+
+  const foreignNetworkProof = {
+    network: 'eip155:1', // Ethereum Mainnet instead of Celo Mainnet
+    asset: CELO_USDT_ADDRESS,
+    amount: '50000',
+    payTo: OFFICIAL_AGENT_WALLET,
+    nonce: requirement.nonce,
+    timestamp: Math.floor(Date.now() / 1000),
+    txHash: '0xforeign_tx',
+  };
+
+  assert.throws(
+    () => verifyX402PaymentProof({
+      paymentProof: foreignNetworkProof,
+      expectedRequirement: requirement,
+    }),
+    /Invalid network: Expected eip155:42220/
+  );
+});
+
+test('22. Payment transaction not yet confirmed on Celo Mainnet', async () => {
+  const requirement = createX402PaymentRequirement({
+    resourceId: 'unmined_test',
+    agentTag: '₦nairatag',
+    payTo: OFFICIAL_AGENT_WALLET,
+    amount: '0.05',
+    asset: CELO_USDT_ADDRESS,
+  });
+
+  // Query with an unmined / non-existent tx hash
+  await assert.rejects(
+    async () => {
+      await verifyOnchainSettlement({
+        txHash: '0x000000000000000000000000000000000000000000000000000000000000dead',
+        expectedRequirement: requirement,
+      });
+    },
+    /could not be found|not be processed|not yet confirmed on Celo Mainnet|reverted/i
+  );
+});
+
+test('23. Verification revoked between challenge and execution (Fails Closed with 403)', async () => {
+  await _resetConsumedPaymentsForTesting();
+
+  const agent = { tag: 'nairatag', owner: OFFICIAL_AGENT_WALLET };
+  const requirement = createX402PaymentRequirement({
+    resourceId: 'revocation_race',
+    agentTag: '₦nairatag',
+    payTo: OFFICIAL_AGENT_WALLET,
+    amount: '0.05',
+    asset: CELO_USDT_ADDRESS,
+  });
+
+  const paymentProof = {
+    network: X402_CELO_NETWORK,
+    asset: CELO_USDT_ADDRESS,
+    amount: '50000',
+    payTo: OFFICIAL_AGENT_WALLET,
+    nonce: requirement.nonce,
+    timestamp: Math.floor(Date.now() / 1000),
+    txHash: '0xrevocation_proof_hash',
+  };
+
+  // Agent was verified initially, but operator revokes proof before execution completes
+  const revokedEvidence = {
+    agentAddress: OFFICIAL_AGENT_WALLET,
+    status: VERIFICATION_STATUS.REVOKED,
+    isVerified: false,
+    isProofFresh: false,
+  };
+
+  const result = await executeSelfGatedAgentCapability({
+    agent,
+    capability: 'revocation_race',
+    verificationEvidence: revokedEvidence,
+    paymentProof,
+    executeHandler: async () => ({ secret: 'data' }),
+  });
+
+  assert.equal(result.ok, false);
+  assert.equal(result.status, 403);
+  assert.match(result.reason, /revoked/i);
+});
+
+test('24. Alternate route attempting to bypass authorization (withSelfAndX402Gate enforcement)', async () => {
+  await _resetConsumedPaymentsForTesting();
+
+  // Create internal compute handler protected with gate
+  const internalCompute = withSelfAndX402Gate(async ({ agent }) => {
+    return { confidentialCompute: `Processed for ${agent.tag}` };
+  });
+
+  const unverifiedAgent = { tag: 'rogue-bot', owner: '0x1111111111111111111111111111111111111111' };
+
+  // Attempt bypass: Call directly without verified evidence
+  const bypassAttempt = await internalCompute({
+    agent: unverifiedAgent,
+    capability: 'deep_insights',
+    paymentProof: null,
+  });
+
+  assert.equal(bypassAttempt.ok, false);
+  assert.equal(bypassAttempt.status, 403, 'Gate fails closed and rejects unverified bypass attempt');
+});
+
+test('25. Agent execution failure after confirmed payment (Traceable receipt & Idempotent retry)', async () => {
+  await _resetConsumedPaymentsForTesting();
+
+  const verifiedEvidence = {
+    agentAddress: OFFICIAL_AGENT_WALLET,
+    status: VERIFICATION_STATUS.VERIFIED,
+    isVerified: true,
+    isProofFresh: true,
+  };
+
+  const agent = { tag: 'nairatag', owner: OFFICIAL_AGENT_WALLET };
+  const requirement = createX402PaymentRequirement({
+    resourceId: 'resilient_compute',
+    agentTag: '₦nairatag',
+    payTo: OFFICIAL_AGENT_WALLET,
+    amount: '0.05',
+    asset: CELO_USDT_ADDRESS,
+  });
+
+  const paymentProof = {
+    network: X402_CELO_NETWORK,
+    asset: CELO_USDT_ADDRESS,
+    amount: '50000',
+    payTo: OFFICIAL_AGENT_WALLET,
+    nonce: requirement.nonce,
+    timestamp: Math.floor(Date.now() / 1000),
+    txHash: '0xretry_test_tx_hash_7788',
+  };
+
+  let executionAttempt = 0;
+
+  // First Attempt: Compute node fails
+  const failedResult = await executeSelfGatedAgentCapability({
+    agent,
+    capability: 'resilient_compute',
+    verificationEvidence: verifiedEvidence,
+    paymentProof,
+    executeHandler: async () => {
+      executionAttempt++;
+      if (executionAttempt === 1) {
+        throw new Error('Downstream GPU timeout');
+      }
+      return { computeResult: 'Success on retry!' };
+    },
+  });
+
+  assert.equal(failedResult.ok, false);
+  assert.equal(failedResult.status, 500);
+  assert.equal(failedResult.canRetryWithoutRepay, true);
+  assert.ok(failedResult.paymentReceipt, 'Receipt is retained for user audit and dispute proof');
+  assert.ok(failedResult.idempotencyKey);
+
+  // Check audit record in durable store
+  const storedRecord = getPaymentRecord(failedResult.idempotencyKey);
+  assert.equal(storedRecord.status, 'failed');
+  assert.equal(storedRecord.error, 'Downstream GPU timeout');
+
+  // Second Attempt: Resubmit with same paymentProof (Idempotent Retry)
+  const retryResult = await executeSelfGatedAgentCapability({
+    agent,
+    capability: 'resilient_compute',
+    verificationEvidence: verifiedEvidence,
+    paymentProof,
+    executeHandler: async () => {
+      executionAttempt++;
+      return { computeResult: 'Success on retry!' };
+    },
+  });
+
+  assert.equal(retryResult.ok, true, 'Retry succeeds without requiring re-payment');
+  assert.equal(retryResult.status, 200);
+  assert.equal(retryResult.data.computeResult, 'Success on retry!');
 });

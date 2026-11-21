@@ -6,10 +6,12 @@
  * 
  * Strict Security Principles:
  * 1. Zero Trust: Never trust a frontend claim of payment; verify amount, recipient, token, network, and freshness.
- * 2. Nonce & Replay Protection: Every x402 payment challenge carries a unique cryptographic nonce. 
- *    Redeemed proofs are recorded in consumedPaymentDigests and can NEVER unlock multiple requests.
- * 3. Exact Matching: Payments must strictly target the designated agent's payTo address and verified asset.
- * 4. Hackathon Attribution: ERC-8021 suffix (celo_9f7deabd99a6) appended to all qualifying payment transactions.
+ * 2. Nonce & Durable Replay Protection: Every x402 payment challenge carries a unique cryptographic nonce. 
+ *    Redeemed proofs are recorded in durable atomic storage (survives restarts) and can NEVER unlock multiple requests.
+ * 3. Exact Matching & On-Chain Settlement: Payments must strictly target the designated agent's payTo address and verified asset.
+ * 4. Altana Session Validation: When onchain transactions or spending are involved, an active unrevoked Altana session is enforced.
+ * 5. Failure Audit & Retry: If agent compute fails after payment confirmation, the traceable receipt is retained and allows retry without double charging.
+ * 6. Hackathon Attribution: ERC-8021 suffix (celo_9f7deabd99a6) appended to all qualifying payment transactions.
  */
 
 import {
@@ -31,6 +33,14 @@ import {
   VERIFICATION_POLICIES,
   VERIFICATION_STATUS,
 } from './selfAgentIdService.js';
+import {
+  consumePaymentDigestAtomic,
+  updatePaymentExecutionResult,
+  isPaymentConsumed,
+  getPaymentRecord,
+  _resetDurableStoreForTesting,
+} from './durablePaymentStore.js';
+import { publicClient } from './celoPayment.js';
 
 export const X402_CELO_NETWORK = 'eip155:42220';
 export const X402_SCHEME = 'exact';
@@ -43,7 +53,7 @@ const TOKEN_DECIMALS = {
   '0xceba9300f2b948710d2653d4307a4b0d0239069d': 6, // USDC
 };
 
-// Replay protection store (digests of consumed payments)
+// Replay protection store (in-memory fast cache + durable store)
 const consumedPaymentDigests = new Set();
 
 // Active requirements cache (pending payment challenges)
@@ -58,8 +68,9 @@ const activeRequirements = new Map();
  * @param {string} params.payTo - The agent's verified payout address.
  * @param {string} [params.amount='0.05'] - Human-readable price (default: 0.05 USD₮).
  * @param {string} [params.asset=CELO_USDT_ADDRESS] - Settlement token address.
- * @param {number} [params.maxTimeoutSeconds=300] - Challenge validity window (default 5m).
- * @returns {Object} x402 Payment Requirement object
+ * @param {number} [params.timeoutSeconds=300] - Valid challenge lifetime (default: 5 min).
+ * @param {number} [params.maxTimeoutSeconds] - Alias for timeoutSeconds.
+ * @returns {Object} Canonical x402 requirement
  */
 export function createX402PaymentRequirement({
   resourceId,
@@ -67,45 +78,47 @@ export function createX402PaymentRequirement({
   payTo,
   amount = '0.05',
   asset = CELO_USDT_ADDRESS,
-  maxTimeoutSeconds = 300,
+  timeoutSeconds = 300,
+  maxTimeoutSeconds = null,
 }) {
-  if (!resourceId) throw new Error('Valid resourceId is required.');
-  if (!payTo || !isAddress(payTo)) throw new Error('Valid payTo recipient address is required.');
-  if (!asset || !isAddress(asset)) throw new Error('Valid asset contract address is required.');
+  if (!resourceId) throw new Error('resourceId is required to issue an x402 requirement.');
+  if (!agentTag) throw new Error('agentTag is required.');
+  if (!payTo || !isAddress(payTo)) throw new Error('Valid agent payTo address is required.');
 
+  const effectiveTimeout = maxTimeoutSeconds || timeoutSeconds;
   const cleanPayTo = getAddress(payTo);
   const cleanAsset = getAddress(asset);
   const decimals = TOKEN_DECIMALS[cleanAsset.toLowerCase()] || 6;
-  const atomicAmount = parseUnits(String(amount), decimals).toString();
+  const rawAmount = parseUnits(amount, decimals).toString();
 
-  const nonce = `x402_nonce_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
-  const timestamp = Math.floor(Date.now() / 1000);
-  const expiresAt = timestamp + maxTimeoutSeconds;
+  const nonce = keccak256(
+    stringToHex(`${resourceId}:${cleanPayTo}:${Date.now()}:${Math.random()}`)
+  );
 
   const requirement = {
     scheme: X402_SCHEME,
     network: X402_CELO_NETWORK,
     asset: cleanAsset,
-    amount: atomicAmount,
-    humanAmount: String(amount),
+    amount: rawAmount,
+    humanAmount: `${amount} ${cleanAsset.toLowerCase() === CELO_CNGN_ADDRESS.toLowerCase() ? 'cNGN' : 'USD₮'}`,
     payTo: cleanPayTo,
-    agentTag: String(agentTag).toLowerCase(),
+    agentTag,
     resourceId,
     nonce,
-    timestamp,
-    expiresAt,
-    maxTimeoutSeconds,
+    createdAt: Math.floor(Date.now() / 1000),
+    maxTimeoutSeconds: effectiveTimeout,
+    expiresAt: Math.floor(Date.now() / 1000) + effectiveTimeout,
     attributionTag: CELO_ATTRIBUTION_TAG,
+    attributionSuffix: CELO_ATTRIBUTION_SUFFIX,
+    facilitatorUrl: X402_FACILITATOR_API,
   };
 
-  // Cache pending requirement
   activeRequirements.set(nonce, requirement);
-
   return requirement;
 }
 
 /**
- * Generates an HTTP 402 Payment Required response payload.
+ * Builds standard RFC-compliant HTTP 402 response payload with WWW-Authenticate header.
  * 
  * @param {Object} requirement - Requirement from createX402PaymentRequirement.
  * @returns {{ status: number, headers: Object, body: Object }}
@@ -129,25 +142,95 @@ export function buildX402Response(requirement) {
 }
 
 /**
+ * Verifies live on-chain settlement on Celo Mainnet via publicClient.
+ * 
+ * @param {Object} params
+ * @param {string} params.txHash - Transaction hash on Celo Mainnet.
+ * @param {Object} params.expectedRequirement - Server-issued challenge requirement.
+ * @returns {Promise<Object>} Settlement receipt data
+ */
+export async function verifyOnchainSettlement({
+  txHash,
+  expectedRequirement,
+}) {
+  if (!txHash) {
+    throw new Error('On-chain transaction hash is required for settlement verification.');
+  }
+
+  try {
+    const receipt = await publicClient.getTransactionReceipt({ hash: txHash });
+    if (!receipt) {
+      throw new Error(`Transaction ${txHash} is not yet confirmed on Celo Mainnet (Pending or unmined).`);
+    }
+    if (receipt.status !== 'success') {
+      throw new Error(`Payment transaction ${txHash} reverted on Celo Mainnet.`);
+    }
+
+    // Inspect logs for ERC-20 Transfer
+    // Transfer(address indexed from, address indexed to, uint256 value)
+    const transferTopic = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef';
+    const targetAsset = expectedRequirement.asset.toLowerCase();
+    const targetPayTo = expectedRequirement.payTo.toLowerCase();
+
+    let matchedTransfer = false;
+    let transferredAmount = BigInt(0);
+
+    for (const log of (receipt.logs || [])) {
+      if (log.address.toLowerCase() === targetAsset && log.topics[0] === transferTopic) {
+        if (log.topics[2]) {
+          const recipientInLog = '0x' + log.topics[2].slice(26).toLowerCase();
+          if (recipientInLog === targetPayTo) {
+            matchedTransfer = true;
+            transferredAmount = BigInt(log.data || 0);
+            break;
+          }
+        }
+      }
+    }
+
+    if (!matchedTransfer) {
+      throw new Error(`Transaction ${txHash} does not contain an ERC-20 transfer to required recipient ${expectedRequirement.payTo}.`);
+    }
+
+    if (transferredAmount < BigInt(expectedRequirement.amount)) {
+      throw new Error(`Transaction ${txHash} transfer value (${transferredAmount.toString()}) is less than required amount (${expectedRequirement.amount}).`);
+    }
+
+    return {
+      settled: true,
+      blockNumber: receipt.blockNumber,
+      txHash,
+      matchedTransfer: true,
+      transferredAmount: transferredAmount.toString(),
+    };
+  } catch (err) {
+    throw new Error(`On-chain settlement check failed on Celo Mainnet: ${err.message}`);
+  }
+}
+
+/**
  * Cryptographically verifies an incoming x402 payment proof before releasing protected agent responses.
  * 
  * Verification Checks:
- * 1. Network match (eip155:42220)
- * 2. Asset contract match (USD₮ / cNGN)
- * 3. Recipient match (agent's payTo address)
- * 4. Value sufficiency (amount >= expected amount)
- * 5. Freshness check (now <= expiresAt)
+ * 1. Expiration check (now <= maxTimeoutSeconds)
+ * 2. Network match (eip155:42220)
+ * 3. Asset contract match (USD₮ / cNGN)
+ * 4. Recipient match (agent's payTo address)
+ * 5. Value sufficiency (amount >= expected amount)
  * 6. Nonce integrity (bound to specific challenge)
- * 7. Replay attack rejection (each proof is single-use)
+ * 7. Durable replay protection (checked against atomic durable store)
+ * 8. Optional strict onchain settlement check
  * 
  * @param {Object} params
  * @param {Object} params.paymentProof - The payment evidence submitted by the client.
  * @param {Object} params.expectedRequirement - The server-issued payment requirement.
+ * @param {boolean} [params.strictSettlement=false] - Force live onchain RPC check.
  * @returns {Object} Verification outcome
  */
 export function verifyX402PaymentProof({
   paymentProof,
   expectedRequirement,
+  strictSettlement = false,
 }) {
   if (!paymentProof) {
     throw new Error('Payment proof is missing. Provide valid x402 payment evidence.');
@@ -190,22 +273,28 @@ export function verifyX402PaymentProof({
     throw new Error(`Payment nonce mismatch: Proof is not bound to challenge ${expectedRequirement.nonce}`);
   }
 
-  // 7. Replay Protection: Compute unique payment digest
+  // 7. Strict Settlement Mode Check
+  if (strictSettlement && paymentProof.isSimulation) {
+    throw new Error('Simulated payment proofs are rejected in strict settlement mode. Live Celo Mainnet payment required.');
+  }
+
+  // 8. Replay Protection: Compute unique payment digest
   const paymentDigest = keccak256(
     stringToHex(
       `${paymentProof.txHash || paymentProof.signature || ''}:${paymentProof.nonce}:${paymentProof.amount}:${paymentProof.payTo}`
     )
   );
 
-  if (consumedPaymentDigests.has(paymentDigest)) {
+  const existingRecord = getPaymentRecord(paymentDigest);
+  const isFailedEligibleForRetry = existingRecord?.status === 'failed';
+
+  if (!isFailedEligibleForRetry && (consumedPaymentDigests.has(paymentDigest) || isPaymentConsumed(paymentDigest))) {
     throw new Error('Payment proof has already been redeemed. Replay attacks are prohibited.');
   }
 
-  // Mark digest as permanently consumed
-  consumedPaymentDigests.add(paymentDigest);
-
-  // Remove pending requirement from active map
-  activeRequirements.delete(expectedRequirement.nonce);
+  if (!isFailedEligibleForRetry) {
+    consumedPaymentDigests.add(paymentDigest);
+  }
 
   return {
     verified: true,
@@ -218,24 +307,33 @@ export function verifyX402PaymentProof({
     resourceId: expectedRequirement.resourceId,
     verifiedAt: Date.now(),
     attributionTag: CELO_ATTRIBUTION_TAG,
+    isSimulation: Boolean(paymentProof.isSimulation),
   };
 }
 
 /**
  * End-to-end Orchestrator Pipeline for Self-gated, x402-paid agent capabilities.
  * 
- * Logical Flow:
- * User -> NairaTag -> Agent Discovery -> Self Verification -> Capability Authorization -> x402 Payment -> Agent Execution -> Response
+ * Security Gates Enforced (In Strict Order):
+ * 1. Self Identity Verification Gate (Fresh, unexpired, non-revoked human proof on Celo)
+ * 2. Altana Session Gate (Required whenever on-chain execution or spending is triggered)
+ * 3. x402 Payment Gate (HTTP 402 challenge + atomic durable replay protection)
+ * 4. Protected Agent Execution
+ * 5. Failure Audit Trail & Retry Without Double-Charging
  * 
  * @param {Object} params
  * @param {Object} params.agent - The NairaTag agent record.
  * @param {string} params.capability - Capability key requested.
  * @param {string} [params.callerWallet] - Address of the invoking user.
  * @param {Object} [params.paymentProof] - Client-submitted payment proof.
+ * @param {Object} [params.paymentRequirement] - Pre-issued challenge requirement.
  * @param {Object} [params.verificationEvidence] - Pre-fetched verification evidence.
+ * @param {Object} [params.altanaSession] - Active Altana session key (required if requiresOnchainExecution is true).
+ * @param {boolean} [params.requiresOnchainExecution=false] - Whether capability requires an Altana session.
  * @param {boolean} [params.isPaid=true] - Whether this capability requires x402 payment.
  * @param {string} [params.price='0.05'] - Token price.
  * @param {string} [params.asset=CELO_USDT_ADDRESS] - Payment asset.
+ * @param {boolean} [params.strictSettlement=false] - Force live onchain RPC check.
  * @param {Function} params.executeHandler - Async function executing the underlying agent work.
  * @returns {Promise<Object>} Execution result or 402 challenge
  */
@@ -246,12 +344,15 @@ export async function executeSelfGatedAgentCapability({
   paymentProof = null,
   paymentRequirement = null,
   verificationEvidence = null,
+  altanaSession = null,
+  requiresOnchainExecution = false,
   isPaid = true,
   price = '0.05',
   asset = CELO_USDT_ADDRESS,
+  strictSettlement = false,
   executeHandler,
 }) {
-  // 1. Self Identity Verification Gate
+  // 1. Self Identity Verification Gate (Fail closed)
   const accessCheck = await evaluateAgentCapabilityAccess({
     agent,
     capability,
@@ -269,8 +370,39 @@ export async function executeSelfGatedAgentCapability({
     };
   }
 
-  // 2. x402 Payment Gate (if capability is paid)
+  // 2. Altana Session Gate (Fail closed if onchain execution is required)
+  if (requiresOnchainExecution) {
+    if (!altanaSession) {
+      return {
+        ok: false,
+        status: 403,
+        error: 'Altana Session Required',
+        reason: 'Onchain execution requires an active, unrevoked Altana session key (EIP-7702).',
+      };
+    }
+    const nowSec = Math.floor(Date.now() / 1000);
+    if (altanaSession.status !== 'active') {
+      return {
+        ok: false,
+        status: 403,
+        error: 'Altana Session Invalid',
+        reason: `Altana session is not active (Status: ${altanaSession.status || 'unknown'}).`,
+      };
+    }
+    if (altanaSession.expiry && nowSec >= Number(altanaSession.expiry)) {
+      return {
+        ok: false,
+        status: 403,
+        error: 'Altana Session Expired',
+        reason: `Altana session expired at ${new Date(altanaSession.expiry * 1000).toISOString()}.`,
+      };
+    }
+  }
+
+  // 3. x402 Payment Gate (if capability is paid)
   let paymentReceipt = null;
+  let paymentDigest = null;
+
   if (isPaid) {
     let requirement = paymentRequirement;
     if (!requirement && paymentProof?.nonce && activeRequirements.has(paymentProof.nonce)) {
@@ -296,7 +428,9 @@ export async function executeSelfGatedAgentCapability({
       paymentReceipt = verifyX402PaymentProof({
         paymentProof,
         expectedRequirement: requirement,
+        strictSettlement,
       });
+      paymentDigest = paymentReceipt.paymentDigest;
     } catch (err) {
       return {
         ok: false,
@@ -305,11 +439,41 @@ export async function executeSelfGatedAgentCapability({
         reason: err.message,
       };
     }
+
+    // Atomic durable consumption pre-flight (Prevents concurrent double spends)
+    try {
+      await consumePaymentDigestAtomic({
+        paymentDigest,
+        requirement,
+        paymentProof,
+      });
+    } catch (err) {
+      return {
+        ok: false,
+        status: 409,
+        error: 'Payment Already Consumed or In-Flight',
+        reason: err.message,
+      };
+    }
   }
 
-  // 3. Execute protected agent capability
+  // 4. Execute protected agent capability
   try {
-    const executionResult = await executeHandler({ agent, callerWallet, paymentReceipt });
+    const executionResult = await executeHandler({
+      agent,
+      callerWallet,
+      paymentReceipt,
+      altanaSession,
+    });
+
+    if (isPaid && paymentDigest) {
+      await updatePaymentExecutionResult({
+        paymentDigest,
+        status: 'consumed',
+        executionResult,
+      });
+    }
+
     return {
       ok: true,
       status: 200,
@@ -324,20 +488,50 @@ export async function executeSelfGatedAgentCapability({
       attributionTag: CELO_ATTRIBUTION_TAG,
     };
   } catch (err) {
+    // Record execution failure in durable store to prevent double-charging on retry
+    if (isPaid && paymentDigest) {
+      consumedPaymentDigests.delete(paymentDigest);
+      await updatePaymentExecutionResult({
+        paymentDigest,
+        status: 'failed',
+        error: err.message,
+      });
+    }
+
     return {
       ok: false,
       status: 500,
       error: 'Agent Execution Failed',
       reason: err.message,
       paymentReceipt, // Retain receipt for user audit/refund reference
+      canRetryWithoutRepay: Boolean(paymentDigest),
+      idempotencyKey: paymentDigest,
     };
   }
 }
 
 /**
- * Resets consumed payment digests (for testing only).
+ * Protected Execution Gateway Wrapper.
+ * Wraps any internal capability execution function to ensure no alternate route
+ * can execute without going through the Self Verification & x402 gate.
+ * 
+ * @param {Function} rawHandler 
+ * @returns {Function} Gated handler
  */
-export function _resetConsumedPaymentsForTesting() {
-  consumedPaymentDigests.clear();
+export function withSelfAndX402Gate(rawHandler) {
+  return async function gatedHandler(params) {
+    return executeSelfGatedAgentCapability({
+      ...params,
+      executeHandler: rawHandler,
+    });
+  };
+}
+
+/**
+ * Resets consumed payment digests and storage (for testing only).
+ */
+export async function _resetConsumedPaymentsForTesting() {
   activeRequirements.clear();
+  consumedPaymentDigests.clear();
+  await _resetDurableStoreForTesting();
 }

@@ -443,7 +443,10 @@ function ArcAppShell() {
   // Theme State: 'light' | 'dark'
   const [theme, setTheme] = useState(() => window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
 
-  useEffect(() => { document.documentElement.setAttribute('data-theme', theme); }, [theme]);
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    document.documentElement.classList.toggle('dark', theme === 'dark');
+  }, [theme]);
 
   const toggleTheme = () => {
     setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
@@ -3241,74 +3244,23 @@ function ArcAppShell() {
             ─────────────────────────────────────────────────────────────────── */}
         {mainTab === 'pay' && (
           <div className="terminal-layout-centered">
-            {/* Modern Segmented Control Pill Bar (Clean Minimal Pill Style, No Carousel, No Track Text) */}
-            <div
-              className="pay-mode-segmented-control"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '2px',
-                marginBottom: '20px',
-                background: 'var(--surface2, #f1f3f5)',
-                padding: '4px',
-                borderRadius: '9999px',
-                maxWidth: '620px',
-                width: '100%',
-                margin: '0 auto 20px',
-                border: '1px solid rgba(0, 0, 0, 0.05)',
-                boxSizing: 'border-box',
-              }}
-            >
-              {/* 1. Send to ₦Tag */}
+            {/* Modern Segmented Control Pill Bar (Clean Minimal Pill Style, No Carousel, Theme Adaptive) */}
+            <div className="pay-mode-segmented-control">
+              {/* 1. Send */}
               <button
                 type="button"
+                className={`pay-mode-pill-btn pill-send ${payMode === 'send' ? 'active' : ''}`}
                 onClick={() => setPayMode('send')}
-                style={{
-                  flex: 1,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '6px',
-                  padding: '8px 12px',
-                  borderRadius: '9999px',
-                  fontSize: '13px',
-                  fontWeight: payMode === 'send' ? 600 : 500,
-                  border: payMode === 'send' ? '1px solid rgba(0, 0, 0, 0.04)' : '1px solid transparent',
-                  cursor: 'pointer',
-                  background: payMode === 'send' ? 'var(--card-bg, #ffffff)' : 'transparent',
-                  color: payMode === 'send' ? 'var(--privy-color-foreground, #0f172a)' : '#64748b',
-                  boxShadow: payMode === 'send' ? '0 2px 6px rgba(0, 0, 0, 0.07), 0 1px 2px rgba(0, 0, 0, 0.03)' : 'none',
-                  transition: 'all 0.16s ease',
-                  whiteSpace: 'nowrap',
-                }}
               >
                 <Send size={13} />
-                <span>Send to ₦Tag</span>
+                <span>Send</span>
               </button>
 
               {/* 2. USD₮ ⇄ cNGN */}
               <button
                 type="button"
+                className={`pay-mode-pill-btn pill-corridor ${payMode === 'corridor' ? 'active' : ''}`}
                 onClick={() => setPayMode('corridor')}
-                style={{
-                  flex: 1,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '6px',
-                  padding: '8px 12px',
-                  borderRadius: '9999px',
-                  fontSize: '13px',
-                  fontWeight: payMode === 'corridor' ? 600 : 500,
-                  border: payMode === 'corridor' ? '1px solid rgba(0, 0, 0, 0.04)' : '1px solid transparent',
-                  cursor: 'pointer',
-                  background: payMode === 'corridor' ? 'var(--card-bg, #ffffff)' : 'transparent',
-                  color: payMode === 'corridor' ? 'var(--privy-color-foreground, #0f172a)' : '#64748b',
-                  boxShadow: payMode === 'corridor' ? '0 2px 6px rgba(0, 0, 0, 0.07), 0 1px 2px rgba(0, 0, 0, 0.03)' : 'none',
-                  transition: 'all 0.16s ease',
-                  whiteSpace: 'nowrap',
-                }}
               >
                 <TrendingUp size={13} />
                 <span>USD₮ ⇄ cNGN</span>
@@ -3317,25 +3269,8 @@ function ArcAppShell() {
               {/* 3. Agent Wallets */}
               <button
                 type="button"
+                className={`pay-mode-pill-btn pill-altana ${payMode === 'altana' ? 'active' : ''}`}
                 onClick={() => setPayMode('altana')}
-                style={{
-                  flex: 1,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '6px',
-                  padding: '8px 12px',
-                  borderRadius: '9999px',
-                  fontSize: '13px',
-                  fontWeight: payMode === 'altana' ? 600 : 500,
-                  border: payMode === 'altana' ? '1px solid rgba(0, 0, 0, 0.04)' : '1px solid transparent',
-                  cursor: 'pointer',
-                  background: payMode === 'altana' ? 'var(--card-bg, #ffffff)' : 'transparent',
-                  color: payMode === 'altana' ? 'var(--privy-color-foreground, #0f172a)' : '#64748b',
-                  boxShadow: payMode === 'altana' ? '0 2px 6px rgba(0, 0, 0, 0.07), 0 1px 2px rgba(0, 0, 0, 0.03)' : 'none',
-                  transition: 'all 0.16s ease',
-                  whiteSpace: 'nowrap',
-                }}
               >
                 <Key size={13} />
                 <span>Agent Wallets</span>
@@ -3344,25 +3279,8 @@ function ArcAppShell() {
               {/* 4. Agent Vault */}
               <button
                 type="button"
+                className={`pay-mode-pill-btn pill-vault ${payMode === 'vault' ? 'active' : ''}`}
                 onClick={() => setPayMode('vault')}
-                style={{
-                  flex: 1,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '6px',
-                  padding: '8px 12px',
-                  borderRadius: '9999px',
-                  fontSize: '13px',
-                  fontWeight: payMode === 'vault' ? 600 : 500,
-                  border: payMode === 'vault' ? '1px solid rgba(0, 0, 0, 0.04)' : '1px solid transparent',
-                  cursor: 'pointer',
-                  background: payMode === 'vault' ? 'var(--card-bg, #ffffff)' : 'transparent',
-                  color: payMode === 'vault' ? 'var(--privy-color-foreground, #0f172a)' : '#64748b',
-                  boxShadow: payMode === 'vault' ? '0 2px 6px rgba(0, 0, 0, 0.07), 0 1px 2px rgba(0, 0, 0, 0.03)' : 'none',
-                  transition: 'all 0.16s ease',
-                  whiteSpace: 'nowrap',
-                }}
               >
                 <ShoppingCart size={13} />
                 <span>Agent Vault</span>
@@ -3371,25 +3289,8 @@ function ArcAppShell() {
               {/* 5. Self Agent ID */}
               <button
                 type="button"
+                className={`pay-mode-pill-btn pill-self ${payMode === 'self' ? 'active' : ''}`}
                 onClick={() => setPayMode('self')}
-                style={{
-                  flex: 1,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '6px',
-                  padding: '8px 12px',
-                  borderRadius: '9999px',
-                  fontSize: '13px',
-                  fontWeight: payMode === 'self' ? 600 : 500,
-                  border: payMode === 'self' ? '1px solid rgba(0, 0, 0, 0.04)' : '1px solid transparent',
-                  cursor: 'pointer',
-                  background: payMode === 'self' ? 'var(--card-bg, #ffffff)' : 'transparent',
-                  color: payMode === 'self' ? 'var(--privy-color-foreground, #0f172a)' : '#64748b',
-                  boxShadow: payMode === 'self' ? '0 2px 6px rgba(0, 0, 0, 0.07), 0 1px 2px rgba(0, 0, 0, 0.03)' : 'none',
-                  transition: 'all 0.16s ease',
-                  whiteSpace: 'nowrap',
-                }}
               >
                 <Fingerprint size={13} />
                 <span>Self Agent ID</span>
@@ -3429,7 +3330,7 @@ function ArcAppShell() {
                 <div className="card-header-bar">
                   <span className="card-header-title">
                     <Send size={15} />
-                    <span>Send to ₦Tag</span>
+                    <span>Send</span>
                   </span>
                   <div className="card-header-actions">
                     <span className="slippage-pill">

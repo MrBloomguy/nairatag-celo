@@ -318,7 +318,7 @@ export default function CorridorSwapCard({ walletAddress, onConnectWallet }) {
           </span>
           <div>
             <div style={{ fontWeight: 700, fontSize: '15px', color: 'var(--text-primary, #111)' }}>
-              Textile FX Corridor (Track 1)
+              Textile FX Corridor
             </div>
             <div style={{ fontSize: '11px', color: 'var(--text-secondary, #666)' }}>
               USD₮ ⇄ cNGN RFQ v2 · Sub-Cent Celo Settlement

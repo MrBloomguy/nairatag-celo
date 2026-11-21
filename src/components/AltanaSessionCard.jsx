@@ -288,18 +288,6 @@ export default function AltanaSessionCard({ walletAddress: fundingWalletAddress,
           <span>Agent Smart Wallet (Altana)</span>
         </span>
         <div className="card-header-actions">
-          <span
-            style={{
-              fontSize: '10px',
-              padding: '2px 7px',
-              borderRadius: '4px',
-              background: '#5B4FFF',
-              color: '#ffffff',
-              fontWeight: 700,
-            }}
-          >
-            Track 4
-          </span>
           <span className="slippage-pill">
             <Fingerprint size={11} style={{ marginRight: '3px' }} />
             EIP-7702

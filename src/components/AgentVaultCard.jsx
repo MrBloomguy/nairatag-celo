@@ -280,19 +280,6 @@ export default function AgentVaultCard({ walletAddress, onConnectWallet }) {
           <span>Agent Vault</span>
         </span>
         <div className="card-header-actions">
-          <span
-            style={{
-              fontSize: '10px',
-              background: '#7C3AED',
-              color: '#ffffff',
-              padding: '2px 7px',
-              borderRadius: '4px',
-              fontWeight: 700,
-              letterSpacing: '0.5px',
-            }}
-          >
-            Track 2
-          </span>
           <span className="slippage-pill">
             <Lock size={11} color="#7C3AED" />
             <span>Celo 42220</span>

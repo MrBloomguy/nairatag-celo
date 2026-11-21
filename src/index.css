@@ -731,11 +731,146 @@ html[data-theme="dark"] body {
 
 .terminal-layout-centered {
   width: 100%;
-  max-width: 480px;
+  max-width: 540px;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   PAY MODE SEGMENTED CONTROL PILL BAR (IMAGE-ACCURATE SEGMENTED PILL STYLE)
+   ───────────────────────────────────────────────────────────────────────────── */
+.pay-mode-segmented-control {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  background: #F1F3F5;
+  padding: 4px;
+  border-radius: 9999px;
+  border: 1px solid rgba(0, 0, 0, 0.04);
+  max-width: 620px;
+  width: 100%;
+  margin: 0 auto 16px;
+  box-sizing: border-box;
+}
+
+[data-theme="dark"] .pay-mode-segmented-control,
+.dark .pay-mode-segmented-control {
+  background: #1C212B;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.pay-mode-pill-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border-radius: 9999px;
+  font-size: 13px;
+  font-weight: 500;
+  border: 1px solid transparent;
+  cursor: pointer;
+  background: transparent;
+  color: #4B5563;
+  transition: all 0.16s ease;
+  white-space: nowrap;
+}
+
+[data-theme="dark"] .pay-mode-pill-btn,
+.dark .pay-mode-pill-btn {
+  color: #94A3B8;
+}
+
+.pay-mode-pill-btn:hover {
+  color: #111827;
+  background: rgba(0, 0, 0, 0.04);
+}
+
+[data-theme="dark"] .pay-mode-pill-btn:hover,
+.dark .pay-mode-pill-btn:hover {
+  color: #F8FAFC;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+/* Active Base Pill: Elevated white pill in light mode, distinct solid button in dark mode */
+.pay-mode-pill-btn.active {
+  font-weight: 600;
+  background: #FFFFFF;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+/* 1. Send (Emerald) */
+.pay-mode-pill-btn.pill-send.active {
+  color: #059669;
+  border: 1px solid rgba(5, 150, 105, 0.2);
+  box-shadow: 0 1px 3px rgba(5, 150, 105, 0.12), 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+[data-theme="dark"] .pay-mode-pill-btn.pill-send.active,
+.dark .pay-mode-pill-btn.pill-send.active {
+  background: #173224;
+  color: #34D399;
+  border: 1px solid rgba(52, 211, 153, 0.45);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35), 0 0 12px rgba(52, 211, 153, 0.2);
+}
+
+/* 2. Corridor USD₮ ⇄ cNGN (Mint Green) */
+.pay-mode-pill-btn.pill-corridor.active {
+  color: #059669;
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  box-shadow: 0 1px 3px rgba(16, 185, 129, 0.12), 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+[data-theme="dark"] .pay-mode-pill-btn.pill-corridor.active,
+.dark .pay-mode-pill-btn.pill-corridor.active {
+  background: #173224;
+  color: #34D399;
+  border: 1px solid rgba(52, 211, 153, 0.45);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35), 0 0 12px rgba(52, 211, 153, 0.2);
+}
+
+/* 3. Agent Wallets (Electric Indigo) */
+.pay-mode-pill-btn.pill-altana.active {
+  color: #4F46E5;
+  border: 1px solid rgba(99, 102, 241, 0.2);
+  box-shadow: 0 1px 3px rgba(99, 102, 241, 0.12), 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+[data-theme="dark"] .pay-mode-pill-btn.pill-altana.active,
+.dark .pay-mode-pill-btn.pill-altana.active {
+  background: #232247;
+  color: #A5B4FC;
+  border: 1px solid rgba(165, 180, 252, 0.45);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35), 0 0 12px rgba(99, 102, 241, 0.25);
+}
+
+/* 4. Agent Vault (Cobalt Blue) */
+.pay-mode-pill-btn.pill-vault.active {
+  color: #2563EB;
+  border: 1px solid rgba(37, 99, 235, 0.2);
+  box-shadow: 0 1px 3px rgba(37, 99, 235, 0.12), 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+[data-theme="dark"] .pay-mode-pill-btn.pill-vault.active,
+.dark .pay-mode-pill-btn.pill-vault.active {
+  background: #1C2844;
+  color: #93C5FD;
+  border: 1px solid rgba(147, 197, 253, 0.45);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35), 0 0 12px rgba(37, 99, 235, 0.25);
+}
+
+/* 5. Self Agent ID (Teal / Cyan) */
+.pay-mode-pill-btn.pill-self.active {
+  color: #0D9488;
+  border: 1px solid rgba(13, 148, 136, 0.2);
+  box-shadow: 0 1px 3px rgba(13, 148, 136, 0.12), 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+[data-theme="dark"] .pay-mode-pill-btn.pill-self.active,
+.dark .pay-mode-pill-btn.pill-self.active {
+  background: #163333;
+  color: #5EEAD4;
+  border: 1px solid rgba(94, 234, 212, 0.45);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35), 0 0 12px rgba(13, 148, 136, 0.25);
 }
 
 .crypto-card-terminal {

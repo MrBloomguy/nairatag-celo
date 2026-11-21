@@ -273,19 +273,6 @@ export default function SelfAgentVerificationCard({ walletAddress, onConnectWall
           <span>Self Agent ID</span>
         </span>
         <div className="card-header-actions">
-          <span
-            style={{
-              fontSize: '10px',
-              background: '#0D9488',
-              color: '#ffffff',
-              padding: '2px 7px',
-              borderRadius: '4px',
-              fontWeight: 700,
-              letterSpacing: '0.5px',
-            }}
-          >
-            Track 3
-          </span>
           <span className="slippage-pill">
             <ShieldCheck size={11} color="#0D9488" />
             <span>Celo 42220</span>

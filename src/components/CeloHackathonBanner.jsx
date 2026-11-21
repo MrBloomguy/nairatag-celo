@@ -147,7 +147,7 @@ export default function CeloHackathonBanner({ userAddress, onConnectWallet }) {
               Celo Hackathon · Agents Open for Business
             </div>
             <div style={{ fontSize: '12px', color: 'var(--text-secondary, #666)' }}>
-              Track 1: Stablecoin Corridors (USD₮ ⇄ cNGN via Textile FX) · Celo Mainnet (42220)
+              Stablecoin Corridors (USD₮ ⇄ cNGN via Textile FX) · Celo Mainnet (42220)
             </div>
           </div>
         </div>

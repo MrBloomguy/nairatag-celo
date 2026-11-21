@@ -323,7 +323,7 @@ export default function BookingMarketplace({
   };
 
   return (
-    <div style={{ maxWidth: (activeSubTab === 'discover' && currentStep === 'discover') ? '1080px' : '720px', margin: '0 auto', width: '100%', fontFamily: 'inherit' }}>
+    <div style={{ maxWidth: activeSubTab === 'discover' ? '1080px' : '720px', margin: '0 auto', width: '100%', fontFamily: 'inherit' }}>
       {/* ── Sub Navigation Header ── */}
       <div
         style={{
@@ -428,7 +428,7 @@ export default function BookingMarketplace({
       {/* ─────────────────────────────────────────────────────────────
           FLOW VIEW 1: DISCOVER SERVICES
           ───────────────────────────────────────────────────────────── */}
-      {activeSubTab === 'discover' && currentStep === 'discover' && (
+      {activeSubTab === 'discover' && (
         <div style={{ maxWidth: '1080px', margin: '0 auto' }}>
           <div style={{ background: '#fff', borderRadius: '20px', border: '1px solid #e2e8f0', padding: '24px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.03)' }}>
             {/* Header */}
@@ -664,21 +664,72 @@ export default function BookingMarketplace({
       )}
 
       {/* ─────────────────────────────────────────────────────────────
-          FLOW VIEW 2: SERVICE DETAILS
+          BOOKING FLOW MODAL DIALOG (OVERLAY OVER DISCOVER SERVICES)
           ───────────────────────────────────────────────────────────── */}
-      {activeSubTab === 'discover' && currentStep === 'details' && selectedService && (
+      {activeSubTab === 'discover' && selectedService && currentStep !== 'discover' && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 9999,
+            background: 'rgba(15, 23, 42, 0.65)',
+            backdropFilter: 'blur(5px)',
+            WebkitBackdropFilter: 'blur(5px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '16px',
+            overflowY: 'auto',
+          }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setCurrentStep('discover');
+              setSelectedService(null);
+            }
+          }}
+        >
+          <div
+            style={{
+              width: '100%',
+              maxWidth: currentStep === 'review' || currentStep === 'confirmed_details' ? '540px' : '480px',
+              maxHeight: '90vh',
+              overflowY: 'auto',
+              borderRadius: '24px',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* ── FLOW VIEW 2: SERVICE DETAILS ── */}
+            {currentStep === 'details' && selectedService && (
         <div style={{ maxWidth: '480px', margin: '0 auto' }}>
           <div style={{ background: '#fff', borderRadius: '20px', border: '1px solid #e2e8f0', padding: '20px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.03)' }}>
             {/* Header */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+              <h2 style={{ fontSize: '18px', fontWeight: 800, margin: 0, color: '#0f172a' }}>Service Details</h2>
               <button
                 type="button"
-                onClick={() => setCurrentStep('discover')}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#0f172a', padding: 0 }}
+                onClick={() => {
+                  setCurrentStep('discover');
+                  setSelectedService(null);
+                }}
+                style={{
+                  background: '#f1f5f9',
+                  border: 'none',
+                  borderRadius: '50%',
+                  width: '32px',
+                  height: '32px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  color: '#64748b',
+                }}
+                title="Close modal"
               >
-                <ArrowLeft size={18} />
+                <X size={16} />
               </button>
-              <h2 style={{ fontSize: '17px', fontWeight: 800, margin: 0, color: '#0f172a' }}>Service Details</h2>
             </div>
 
             {/* Studio Hero Image */}
@@ -775,19 +826,44 @@ export default function BookingMarketplace({
       {/* ─────────────────────────────────────────────────────────────
           FLOW VIEW 3: CHOOSE A TIME
           ───────────────────────────────────────────────────────────── */}
-      {activeSubTab === 'discover' && currentStep === 'schedule' && selectedService && (
+      {currentStep === 'schedule' && selectedService && (
         <div style={{ maxWidth: '480px', margin: '0 auto' }}>
           <div style={{ background: '#fff', borderRadius: '20px', border: '1px solid #e2e8f0', padding: '20px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.03)' }}>
             {/* Header */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <button
+                  type="button"
+                  onClick={() => setCurrentStep('details')}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#0f172a', padding: 0 }}
+                  title="Back to Service Details"
+                >
+                  <ArrowLeft size={18} />
+                </button>
+                <h2 style={{ fontSize: '18px', fontWeight: 800, margin: 0, color: '#0f172a' }}>Choose a Time</h2>
+              </div>
               <button
                 type="button"
-                onClick={() => setCurrentStep('details')}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#0f172a', padding: 0 }}
+                onClick={() => {
+                  setCurrentStep('discover');
+                  setSelectedService(null);
+                }}
+                style={{
+                  background: '#f1f5f9',
+                  border: 'none',
+                  borderRadius: '50%',
+                  width: '32px',
+                  height: '32px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  color: '#64748b',
+                }}
+                title="Close modal"
               >
-                <ArrowLeft size={18} />
+                <X size={16} />
               </button>
-              <h2 style={{ fontSize: '17px', fontWeight: 800, margin: 0, color: '#0f172a' }}>Choose a Time</h2>
             </div>
 
             {/* Select a date */}
@@ -929,19 +1005,44 @@ export default function BookingMarketplace({
       {/* ─────────────────────────────────────────────────────────────
           FLOW VIEW 4: REVIEW BOOKING
           ───────────────────────────────────────────────────────────── */}
-      {activeSubTab === 'discover' && currentStep === 'review' && selectedService && (
+      {currentStep === 'review' && selectedService && (
         <div style={{ maxWidth: '480px', margin: '0 auto' }}>
           <div style={{ background: '#fff', borderRadius: '20px', border: '1px solid #e2e8f0', padding: '20px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.03)' }}>
             {/* Header */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <button
+                  type="button"
+                  onClick={() => setCurrentStep('schedule')}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#0f172a', padding: 0 }}
+                  title="Back to Schedule"
+                >
+                  <ArrowLeft size={18} />
+                </button>
+                <h2 style={{ fontSize: '18px', fontWeight: 800, margin: 0, color: '#0f172a' }}>Review Booking</h2>
+              </div>
               <button
                 type="button"
-                onClick={() => setCurrentStep('schedule')}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#0f172a', padding: 0 }}
+                onClick={() => {
+                  setCurrentStep('discover');
+                  setSelectedService(null);
+                }}
+                style={{
+                  background: '#f1f5f9',
+                  border: 'none',
+                  borderRadius: '50%',
+                  width: '32px',
+                  height: '32px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  color: '#64748b',
+                }}
+                title="Close modal"
               >
-                <ArrowLeft size={18} />
+                <X size={16} />
               </button>
-              <h2 style={{ fontSize: '17px', fontWeight: 800, margin: 0, color: '#0f172a' }}>Review Booking</h2>
             </div>
 
             {/* Provider Card */}
@@ -1488,9 +1589,34 @@ export default function BookingMarketplace({
       {/* ─────────────────────────────────────────────────────────────
           FLOW VIEW 5: BOOKING REQUEST CREATED
           ───────────────────────────────────────────────────────────── */}
-      {activeSubTab === 'discover' && currentStep === 'created' && (
+      {currentStep === 'created' && (
         <div style={{ maxWidth: '440px', margin: '0 auto' }}>
           <div style={{ background: '#fff', borderRadius: '24px', border: '1px solid #e2e8f0', padding: '32px 24px', textAlign: 'center', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.05)' }}>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '4px' }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setCurrentStep('discover');
+                  setSelectedService(null);
+                }}
+                style={{
+                  background: '#f1f5f9',
+                  border: 'none',
+                  borderRadius: '50%',
+                  width: '32px',
+                  height: '32px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  color: '#64748b',
+                }}
+                title="Close modal"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
             {/* Green Radiating Checkmark Icon */}
             <div
               style={{
@@ -1594,41 +1720,58 @@ export default function BookingMarketplace({
       {/* ─────────────────────────────────────────────────────────────
           FLOW VIEW 6: BOOKING DETAILS (CONFIRMED)
           ───────────────────────────────────────────────────────────── */}
-      {activeSubTab === 'discover' && currentStep === 'confirmed_details' && (
+      {currentStep === 'confirmed_details' && (
         <div style={{ maxWidth: '540px', margin: '0 auto' }}>
           <div style={{ background: '#fff', borderRadius: '20px', border: '1px solid #e2e8f0', padding: '24px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.03)' }}>
             {/* Header */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <h2 style={{ fontSize: '18px', fontWeight: 800, margin: 0, color: '#0f172a' }}>Booking Details</h2>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <button
                   type="button"
-                  onClick={() => setCurrentStep('discover')}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#0f172a', padding: 0 }}
+                  onClick={() => alert('Booking link copied to clipboard!')}
+                  style={{
+                    background: '#f8fafc',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '8px',
+                    padding: '6px 12px',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    color: '#0f172a',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    cursor: 'pointer',
+                  }}
                 >
-                  <ArrowLeft size={18} />
+                  <Share2 size={13} />
+                  <span>Share</span>
                 </button>
-                <h2 style={{ fontSize: '17px', fontWeight: 800, margin: 0, color: '#0f172a' }}>Booking Details</h2>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCurrentStep('discover');
+                    setSelectedService(null);
+                  }}
+                  style={{
+                    background: '#f1f5f9',
+                    border: 'none',
+                    borderRadius: '50%',
+                    width: '32px',
+                    height: '32px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    color: '#64748b',
+                  }}
+                  title="Close modal"
+                >
+                  <X size={16} />
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={() => alert('Booking link copied to clipboard!')}
-                style={{
-                  background: '#f8fafc',
-                  border: '1px solid #e2e8f0',
-                  borderRadius: '8px',
-                  padding: '6px 12px',
-                  fontSize: '12px',
-                  fontWeight: 600,
-                  color: '#0f172a',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '5px',
-                  cursor: 'pointer',
-                }}
-              >
-                <Share2 size={13} />
-                <span>Share</span>
-              </button>
             </div>
 
             {/* Provider Card */}
@@ -1817,6 +1960,9 @@ export default function BookingMarketplace({
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+      )}
           </div>
         </div>
       )}

@@ -165,7 +165,7 @@ export function validateSlotAvailability(service, slotStartTime, slotEndTime, ex
   });
 
   if (collision) {
-    throw new Error(`Slot collision: This slot is already reserved by booking ${collision.id}`);
+    throw new Error(`Slot collision conflict / overlap: This slot is already reserved by booking ${collision.id}`);
   }
 
   return true;

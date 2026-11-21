@@ -1,10 +1,10 @@
 /**
  * @file bookingService.js
  * @description Master Booking Lifecycle Engine with Atomic Double-Booking Prevention,
- * Range-Aware Concurrency Mutex, Reservation Expiry, and Provider Acceptance Workflow.
+ * Reservation Expiry, and Provider Acceptance Workflow.
  * 
  * Strict Guarantees:
- * 1. Double-Booking Prevention: Concurrency mutex locks on (serviceId, [startMs, endMs]) prevent concurrent range collision.
+ * 1. Double-Booking Prevention: Concurrency mutex locks on (serviceId, slotStartTime) prevent concurrent collision.
  * 2. Unpaid Reservation Auto-Expiry: Releases locked slots if payment is not received within TTL.
  * 3. State Machine Transitions: Validates permitted state transitions strictly.
  * 4. Dual-Actor Support: Distinguishes between human-created and autonomous agent-created bookings.
@@ -45,9 +45,10 @@ const bookingsStore = new Map();
 // Initialize durable persistence
 loadDurableEntityStore('bookings', bookingsStore).catch(() => {});
 
-// Active range-aware mutex locks to prevent concurrent double-booking
+// Active mutex locks with range support to prevent concurrent double-booking
 // Each entry: { serviceId, startMs, endMs, expiresAtMs }
 const activeSlotLocks = [];
+const slotReservationLocks = new Set();
 
 /**
  * Checks and locks a time slot range atomically.
@@ -101,21 +102,15 @@ export function sweepExpiredReservations() {
   let count = 0;
   for (const booking of bookingsStore.values()) {
     if (
-      (booking.status === BOOKING_STATUS.PENDING_PAYMENT ||
-        booking.status === BOOKING_STATUS.PENDING_PROVIDER_APPROVAL ||
-        booking.status === BOOKING_STATUS.DRAFT) &&
+      (booking.status === BOOKING_STATUS.PENDING_PAYMENT || booking.status === BOOKING_STATUS.DRAFT) &&
       booking.expiresAt &&
       new Date(booking.expiresAt).getTime() < now
     ) {
       booking.status = BOOKING_STATUS.EXPIRED;
       booking.updatedAt = new Date().toISOString();
-      booking.expiredReason = 'Payment or approval window expired without confirmation';
+      booking.expiredReason = 'Payment window expired without confirmed settlement';
       // Release mutex lock
-      releaseSlotLock(
-        booking.serviceId,
-        new Date(booking.slotStartTime).getTime(),
-        new Date(booking.slotEndTime).getTime()
-      );
+      slotReservationLocks.delete(`${booking.serviceId}:${booking.slotStartTime}`);
       count++;
     }
   }
@@ -152,20 +147,20 @@ export async function createBookingRequest({
     throw new Error(`Provider ₦${service.agentTag.toUpperCase()} does not accept automated agent bookings for this service.`);
   }
 
-  const startMs = new Date(slotStartTime).getTime();
-  const endMs = new Date(slotEndTime).getTime();
-  if (isNaN(startMs) || isNaN(endMs) || endMs <= startMs) {
-    throw new Error('Invalid slot time range.');
+  // Concurrency Mutex Check: Double-booking atomic lock
+  const lockKey = `${serviceId}:${slotStartTime}`;
+  if (slotReservationLocks.has(lockKey)) {
+    throw new Error('DOUBLE_BOOKING_PREVENTED: Another reservation is currently in progress for this slot.');
   }
 
-  // Concurrency Mutex Check: Double-booking atomic lock
-  acquireSlotLock(serviceId, startMs, endMs);
+  // Check collision against all existing active bookings for this service
+  const existingForService = Array.from(bookingsStore.values()).filter((b) => b.serviceId === serviceId);
+  validateSlotAvailability(service, slotStartTime, slotEndTime, existingForService);
+
+  // Acquire concurrency lock
+  slotReservationLocks.add(lockKey);
 
   try {
-    // Check collision against all existing active bookings for this service
-    const existingForService = Array.from(bookingsStore.values()).filter((b) => b.serviceId === serviceId);
-    validateSlotAvailability(service, slotStartTime, slotEndTime, existingForService);
-
     const bookingId = `book_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
     const now = new Date();
     const expiresAt = new Date(now.getTime() + RESERVATION_TTL_MS).toISOString();
@@ -217,8 +212,8 @@ export async function createBookingRequest({
 
     return booking;
   } catch (err) {
-    // Release concurrency lock on validation failure
-    releaseSlotLock(serviceId, startMs, endMs);
+    // Release concurrency lock on failure
+    slotReservationLocks.delete(lockKey);
     throw err;
   }
 }
@@ -227,7 +222,6 @@ export async function createBookingRequest({
  * Provider accepts a pending approval booking, moving it to pending_payment.
  */
 export function providerAcceptBooking(bookingId, providerIdentity = {}) {
-  sweepExpiredReservations();
   const booking = bookingsStore.get(bookingId);
   if (!booking) throw new Error(`Booking not found: ${bookingId}`);
 
@@ -236,8 +230,9 @@ export function providerAcceptBooking(bookingId, providerIdentity = {}) {
     throw new Error('Unauthorized: Only the service provider agent can accept this booking.');
   }
 
-  if (booking.status === BOOKING_STATUS.EXPIRED || new Date(booking.expiresAt).getTime() < Date.now()) {
-    throw new Error('RESERVATION_EXPIRED: Cannot accept an expired reservation.');
+  if (booking.expiresAt && new Date(booking.expiresAt).getTime() < Date.now()) {
+    booking.status = BOOKING_STATUS.EXPIRED;
+    throw new Error('RESERVATION_EXPIRED: The hold on this slot has timed out before provider acceptance.');
   }
 
   if (booking.status !== BOOKING_STATUS.PENDING_PROVIDER_APPROVAL) {
@@ -277,11 +272,7 @@ export function providerRejectBooking(bookingId, reason = '', providerIdentity =
   booking.updatedAt = new Date().toISOString();
 
   // Release mutex lock
-  releaseSlotLock(
-    booking.serviceId,
-    new Date(booking.slotStartTime).getTime(),
-    new Date(booking.slotEndTime).getTime()
-  );
+  slotReservationLocks.delete(`${booking.serviceId}:${booking.slotStartTime}`);
   persistDurableEntityStore('bookings', bookingsStore).catch(() => {});
 
   dispatchBookingNotification({
@@ -305,12 +296,12 @@ export async function confirmBookingPayment({
   humanSelfProof = null,
   isSimulation = false,
 }) {
-  sweepExpiredReservations();
   const booking = bookingsStore.get(bookingId);
   if (!booking) throw new Error(`Booking not found: ${bookingId}`);
 
-  if (booking.status === BOOKING_STATUS.EXPIRED || new Date(booking.expiresAt).getTime() < Date.now()) {
-    throw new Error('RESERVATION_EXPIRED: Booking reservation has expired. Please request a new slot.');
+  if (booking.expiresAt && new Date(booking.expiresAt).getTime() < Date.now()) {
+    booking.status = BOOKING_STATUS.EXPIRED;
+    throw new Error('RESERVATION_EXPIRED: The hold on this slot has timed out.');
   }
 
   if (booking.status !== BOOKING_STATUS.PENDING_PAYMENT) {
@@ -405,11 +396,7 @@ export function cancelBooking(bookingId, reason = '', callerIdentity = {}) {
   booking.updatedAt = new Date().toISOString();
 
   // Release mutex lock
-  releaseSlotLock(
-    booking.serviceId,
-    new Date(booking.slotStartTime).getTime(),
-    new Date(booking.slotEndTime).getTime()
-  );
+  slotReservationLocks.delete(`${booking.serviceId}:${booking.slotStartTime}`);
   persistDurableEntityStore('bookings', bookingsStore).catch(() => {});
 
   dispatchBookingNotification({
@@ -440,14 +427,9 @@ export function rescheduleBooking(bookingId, newStartTime, newEndTime, callerIde
 
   validateSlotAvailability(service, newStartTime, newEndTime, existingForService);
 
-  const oldStartMs = new Date(booking.slotStartTime).getTime();
-  const oldEndMs = new Date(booking.slotEndTime).getTime();
-  const newStartMs = new Date(newStartTime).getTime();
-  const newEndMs = new Date(newEndTime).getTime();
-
   // Release old lock & acquire new lock
-  releaseSlotLock(booking.serviceId, oldStartMs, oldEndMs);
-  acquireSlotLock(booking.serviceId, newStartMs, newEndMs);
+  slotReservationLocks.delete(`${booking.serviceId}:${booking.slotStartTime}`);
+  slotReservationLocks.add(`${booking.serviceId}:${newStartTime}`);
 
   const oldTime = booking.slotStartTime;
   booking.slotStartTime = newStartTime;

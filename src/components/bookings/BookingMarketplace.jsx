@@ -36,7 +36,12 @@ import {
   Wallet,
   MoreVertical,
   Send,
+  AlertTriangle,
+  Fingerprint,
+  FileText,
+  Key,
 } from 'lucide-react';
+import PanoramicWalkthroughView from './PanoramicWalkthroughView.jsx';
 import {
   BOOKING_CATEGORIES,
   searchServices,
@@ -105,6 +110,8 @@ export default function BookingMarketplace({
   const [customerName, setCustomerName] = useState('JD');
   const [customerNotes, setCustomerNotes] = useState('I need a two-hour recording and mixing session.');
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('vault'); // 'vault' | 'direct'
+  const [vaultScenario, setVaultScenario] = useState('active'); // 'active' | 'exceeded' | 'expired' | 'revoked'
+  const [isPasskeyApproved, setIsPasskeyApproved] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [bookingError, setBookingError] = useState('');
   const [activeBookingRecord, setActiveBookingRecord] = useState(null);
@@ -317,7 +324,7 @@ export default function BookingMarketplace({
   };
 
   return (
-    <div style={{ maxWidth: '1040px', margin: '0 auto', width: '100%', fontFamily: 'inherit' }}>
+    <div style={{ maxWidth: currentStep === 'walkthrough' ? '1440px' : '1040px', margin: '0 auto', width: '100%', fontFamily: 'inherit' }}>
       {/* ── Sub Navigation Header ── */}
       <div
         style={{
@@ -356,15 +363,36 @@ export default function BookingMarketplace({
               padding: '6px 14px',
               borderRadius: '9999px',
               border: 'none',
-              background: activeSubTab === 'discover' ? '#fff' : 'transparent',
-              color: activeSubTab === 'discover' ? '#059669' : '#475569',
-              fontWeight: activeSubTab === 'discover' ? 700 : 500,
+              background: (activeSubTab === 'discover' && currentStep !== 'walkthrough') ? '#fff' : 'transparent',
+              color: (activeSubTab === 'discover' && currentStep !== 'walkthrough') ? '#059669' : '#475569',
+              fontWeight: (activeSubTab === 'discover' && currentStep !== 'walkthrough') ? 700 : 500,
               fontSize: '12.5px',
               cursor: 'pointer',
-              boxShadow: activeSubTab === 'discover' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+              boxShadow: (activeSubTab === 'discover' && currentStep !== 'walkthrough') ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
             }}
           >
             Discover Services
+          </button>
+          <button
+            type="button"
+            onClick={() => { setActiveSubTab('discover'); setCurrentStep('walkthrough'); }}
+            style={{
+              padding: '6px 14px',
+              borderRadius: '9999px',
+              border: 'none',
+              background: (activeSubTab === 'discover' && currentStep === 'walkthrough') ? '#fff' : 'transparent',
+              color: (activeSubTab === 'discover' && currentStep === 'walkthrough') ? '#059669' : '#475569',
+              fontWeight: (activeSubTab === 'discover' && currentStep === 'walkthrough') ? 700 : 500,
+              fontSize: '12.5px',
+              cursor: 'pointer',
+              boxShadow: (activeSubTab === 'discover' && currentStep === 'walkthrough') ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '5px',
+            }}
+          >
+            <Sparkles size={13} color={(activeSubTab === 'discover' && currentStep === 'walkthrough') ? '#059669' : '#64748b'} />
+            <span>Walkthrough Grid (7 Views)</span>
           </button>
           <button
             type="button"
@@ -428,6 +456,38 @@ export default function BookingMarketplace({
           </button>
         </div>
       </div>
+
+      {/* ─────────────────────────────────────────────────────────────
+          FLOW VIEW 0: PANORAMIC WALKTHROUGH (ALL 7 VIEWS)
+          ───────────────────────────────────────────────────────────── */}
+      {activeSubTab === 'discover' && currentStep === 'walkthrough' && (
+        <PanoramicWalkthroughView
+          servicesList={servicesList}
+          selectedService={selectedService}
+          setSelectedService={setSelectedService}
+          setCurrentStep={setCurrentStep}
+          selectedDate={selectedDate}
+          setSelectedDate={setSelectedDate}
+          selectedSlotTime={selectedSlotTime}
+          setSelectedSlotTime={setSelectedSlotTime}
+          customerNotes={customerNotes}
+          setCustomerNotes={setCustomerNotes}
+          selectedPaymentMethod={selectedPaymentMethod}
+          setSelectedPaymentMethod={setSelectedPaymentMethod}
+          vaultScenario={vaultScenario}
+          setVaultScenario={setVaultScenario}
+          isPasskeyApproved={isPasskeyApproved}
+          setIsPasskeyApproved={setIsPasskeyApproved}
+          handleRequestBooking={handleRequestBooking}
+          isSubmitting={isSubmitting}
+          bookingError={bookingError}
+          activeBookingRecord={activeBookingRecord}
+          chatMessages={chatMessages}
+          chatInput={chatInput}
+          setChatInput={setChatInput}
+          handleSendChatMessage={handleSendChatMessage}
+        />
+      )}
 
       {/* ─────────────────────────────────────────────────────────────
           FLOW VIEW 1: DISCOVER SERVICES
@@ -1080,37 +1140,386 @@ export default function BookingMarketplace({
               </div>
             </div>
 
+            {/* Embedded Agent Vault Authorization Panel */}
+            {selectedPaymentMethod === 'vault' && (
+              <div
+                style={{
+                  marginTop: '16px',
+                  marginBottom: '18px',
+                  background: '#f8fafc',
+                  border: '1px solid #cbd5e1',
+                  borderRadius: '14px',
+                  padding: '16px',
+                }}
+              >
+                {/* Header */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <ShieldCheck size={18} color="#059669" />
+                    <span style={{ fontSize: '13px', fontWeight: 800, color: '#0f172a' }}>Agent payment authorization</span>
+                  </div>
+                  <span
+                    style={{
+                      fontSize: '11px',
+                      background: '#e0e7ff',
+                      color: '#4338ca',
+                      padding: '3px 8px',
+                      borderRadius: '9999px',
+                      fontWeight: 700,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                    }}
+                  >
+                    <Key size={11} />
+                    <span>Altana wallet</span>
+                  </span>
+                </div>
+
+                {/* Provider & Service Row */}
+                <div
+                  style={{
+                    background: '#fff',
+                    borderRadius: '10px',
+                    border: '1px solid #e2e8f0',
+                    padding: '10px 12px',
+                    marginBottom: '12px',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                  }}
+                >
+                  <div>
+                    <div style={{ fontWeight: 800, fontSize: '13px', color: '#0f172a' }}>
+                      ₦{selectedService.agentTag?.toUpperCase() || 'MUSIC'}
+                    </div>
+                    <div style={{ fontSize: '11.5px', color: '#64748b' }}>
+                      {selectedService.title || 'Two-hour production session'}
+                    </div>
+                  </div>
+                  <div style={{ fontSize: '16px', fontWeight: 800, color: '#0f172a' }}>
+                    ₦50,000
+                  </div>
+                </div>
+
+                {/* Authorization Detail Table */}
+                <div
+                  style={{
+                    background: '#fff',
+                    borderRadius: '10px',
+                    border: '1px solid #e2e8f0',
+                    overflow: 'hidden',
+                    marginBottom: '12px',
+                    fontSize: '12px',
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', borderBottom: '1px solid #f1f5f9' }}>
+                    <span style={{ color: '#64748b' }}>Agent wallet</span>
+                    <span style={{ fontWeight: 700, color: '#059669', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#059669' }} />
+                      <span>Connected (0x71C2...b1D)</span>
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', borderBottom: '1px solid #f1f5f9' }}>
+                    <span style={{ color: '#64748b' }}>Spending limit</span>
+                    <span style={{ fontWeight: 700, color: '#0f172a' }}>
+                      {vaultScenario === 'exceeded' && !isPasskeyApproved ? '₦40,000' : '₦60,000'}
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', borderBottom: '1px solid #f1f5f9' }}>
+                    <span style={{ color: '#64748b' }}>Requested payment</span>
+                    <span style={{ fontWeight: 700, color: '#0f172a' }}>₦50,000</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', borderBottom: '1px solid #f1f5f9' }}>
+                    <span style={{ color: '#64748b' }}>Recipient</span>
+                    <span style={{ fontWeight: 700, color: '#0f172a' }}>₦MUSIC provider (0x653f...1693)</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px' }}>
+                    <span style={{ color: '#64748b' }}>Session status</span>
+                    <span
+                      style={{
+                        fontWeight: 700,
+                        color: (vaultScenario === 'expired' || vaultScenario === 'revoked') ? '#dc2626' : '#059669',
+                      }}
+                    >
+                      {vaultScenario === 'expired' ? 'Expired' : vaultScenario === 'revoked' ? 'Revoked' : 'Active'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Status Callout Box */}
+                {vaultScenario === 'active' && (
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      color: '#059669',
+                      background: '#dcfce7',
+                      padding: '8px 12px',
+                      borderRadius: '8px',
+                      fontSize: '12px',
+                      fontWeight: 700,
+                      marginBottom: '12px',
+                    }}
+                  >
+                    <Check size={14} strokeWidth={3} />
+                    <span>Within authorized spending limit</span>
+                  </div>
+                )}
+
+                {vaultScenario === 'exceeded' && !isPasskeyApproved && (
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'flex-start',
+                      gap: '6px',
+                      color: '#b45309',
+                      background: '#fef3c7',
+                      padding: '8px 12px',
+                      borderRadius: '8px',
+                      fontSize: '11.5px',
+                      fontWeight: 600,
+                      marginBottom: '12px',
+                    }}
+                  >
+                    <AlertTriangle size={14} style={{ flexShrink: 0, marginTop: '2px' }} />
+                    <span>Requested payment (₦50,000) exceeds session limit (₦40,000). Biometric passkey required.</span>
+                  </div>
+                )}
+
+                {vaultScenario === 'exceeded' && isPasskeyApproved && (
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      color: '#059669',
+                      background: '#dcfce7',
+                      padding: '8px 12px',
+                      borderRadius: '8px',
+                      fontSize: '12px',
+                      fontWeight: 700,
+                      marginBottom: '12px',
+                    }}
+                  >
+                    <Check size={14} strokeWidth={3} />
+                    <span>Biometric passkey verified · One-time limit increased to ₦60,000</span>
+                  </div>
+                )}
+
+                {vaultScenario === 'expired' && (
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      color: '#dc2626',
+                      background: '#fee2e2',
+                      padding: '8px 12px',
+                      borderRadius: '8px',
+                      fontSize: '11.5px',
+                      fontWeight: 600,
+                      marginBottom: '12px',
+                    }}
+                  >
+                    <AlertTriangle size={14} />
+                    <span>Altana session expired. Please renew your session in Wallets tab.</span>
+                  </div>
+                )}
+
+                {vaultScenario === 'revoked' && (
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      color: '#dc2626',
+                      background: '#fee2e2',
+                      padding: '8px 12px',
+                      borderRadius: '8px',
+                      fontSize: '11.5px',
+                      fontWeight: 600,
+                      marginBottom: '12px',
+                    }}
+                  >
+                    <AlertTriangle size={14} />
+                    <span>Altana session key was revoked by user. Autonomous spending blocked.</span>
+                  </div>
+                )}
+
+                {/* Explainer */}
+                <div
+                  style={{
+                    padding: '10px 12px',
+                    background: '#f1f5f9',
+                    borderRadius: '8px',
+                    borderLeft: '3px solid #059669',
+                    marginBottom: '12px',
+                  }}
+                >
+                  <div style={{ fontSize: '11.5px', fontWeight: 700, color: '#0f172a', marginBottom: '2px' }}>
+                    Protected agent spending
+                  </div>
+                  <div style={{ fontSize: '11px', color: '#64748b', lineHeight: 1.4 }}>
+                    The agent can only execute transactions permitted by the user's active authorization. Recipient, amount, token and booking must be validated before execution.
+                  </div>
+                </div>
+
+                {/* Edge State Simulator for Hackathon Judges */}
+                <div style={{ borderTop: '1px dashed #cbd5e1', paddingTop: '10px', marginTop: '6px' }}>
+                  <div style={{ fontSize: '10px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', marginBottom: '6px' }}>
+                    Demo Edge-Case Simulator (Judge Testing)
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                    <button
+                      type="button"
+                      onClick={() => { setVaultScenario('active'); setIsPasskeyApproved(false); }}
+                      style={{
+                        fontSize: '11px',
+                        padding: '4px 8px',
+                        borderRadius: '6px',
+                        border: vaultScenario === 'active' ? '1px solid #059669' : '1px solid #cbd5e1',
+                        background: vaultScenario === 'active' ? '#ecfdf5' : '#fff',
+                        color: vaultScenario === 'active' ? '#059669' : '#475569',
+                        cursor: 'pointer',
+                        fontWeight: vaultScenario === 'active' ? 700 : 500,
+                      }}
+                    >
+                      ✓ Active (Within Limit)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setVaultScenario('exceeded'); setIsPasskeyApproved(false); }}
+                      style={{
+                        fontSize: '11px',
+                        padding: '4px 8px',
+                        borderRadius: '6px',
+                        border: vaultScenario === 'exceeded' ? '1px solid #b45309' : '1px solid #cbd5e1',
+                        background: vaultScenario === 'exceeded' ? '#fef3c7' : '#fff',
+                        color: vaultScenario === 'exceeded' ? '#b45309' : '#475569',
+                        cursor: 'pointer',
+                        fontWeight: vaultScenario === 'exceeded' ? 700 : 500,
+                      }}
+                    >
+                      ⚠️ Over-Limit (Passkey)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setVaultScenario('expired'); setIsPasskeyApproved(false); }}
+                      style={{
+                        fontSize: '11px',
+                        padding: '4px 8px',
+                        borderRadius: '6px',
+                        border: vaultScenario === 'expired' ? '1px solid #dc2626' : '1px solid #cbd5e1',
+                        background: vaultScenario === 'expired' ? '#fee2e2' : '#fff',
+                        color: vaultScenario === 'expired' ? '#dc2626' : '#475569',
+                        cursor: 'pointer',
+                        fontWeight: vaultScenario === 'expired' ? 700 : 500,
+                      }}
+                    >
+                      ⌛ Expired Session
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setVaultScenario('revoked'); setIsPasskeyApproved(false); }}
+                      style={{
+                        fontSize: '11px',
+                        padding: '4px 8px',
+                        borderRadius: '6px',
+                        border: vaultScenario === 'revoked' ? '1px solid #dc2626' : '1px solid #cbd5e1',
+                        background: vaultScenario === 'revoked' ? '#fee2e2' : '#fff',
+                        color: vaultScenario === 'revoked' ? '#dc2626' : '#475569',
+                        cursor: 'pointer',
+                        fontWeight: vaultScenario === 'revoked' ? 700 : 500,
+                      }}
+                    >
+                      🚫 Revoked
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {bookingError && (
               <div style={{ padding: '8px 12px', borderRadius: '8px', background: '#fee2e2', color: '#b91c1c', fontSize: '12px', marginBottom: '12px' }}>
                 {bookingError}
               </div>
             )}
 
-            {/* CTA Request Booking */}
-            <button
-              type="button"
-              disabled={isSubmitting}
-              onClick={handleRequestBooking}
-              style={{
-                width: '100%',
-                background: '#059669',
-                color: '#fff',
-                border: 'none',
-                borderRadius: '12px',
-                padding: '12px',
-                fontSize: '14px',
-                fontWeight: 700,
-                cursor: isSubmitting ? 'not-allowed' : 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '6px',
-                opacity: isSubmitting ? 0.7 : 1,
-              }}
-            >
-              <span>{isSubmitting ? 'Requesting...' : 'Request Booking'}</span>
-              <ArrowRight size={15} />
-            </button>
+            {/* CTA Request Booking / Step-up */}
+            {selectedPaymentMethod === 'vault' && vaultScenario === 'exceeded' && !isPasskeyApproved ? (
+              <button
+                type="button"
+                onClick={() => setIsPasskeyApproved(true)}
+                style={{
+                  width: '100%',
+                  background: '#d97706',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '12px',
+                  padding: '12px',
+                  fontSize: '14px',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px',
+                  boxShadow: '0 4px 6px -1px rgba(217, 119, 6, 0.2)',
+                }}
+              >
+                <Fingerprint size={16} />
+                <span>Approve with Biometric Passkey →</span>
+              </button>
+            ) : selectedPaymentMethod === 'vault' && (vaultScenario === 'expired' || vaultScenario === 'revoked') ? (
+              <button
+                type="button"
+                disabled
+                style={{
+                  width: '100%',
+                  background: '#94a3b8',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '12px',
+                  padding: '12px',
+                  fontSize: '14px',
+                  fontWeight: 700,
+                  cursor: 'not-allowed',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px',
+                }}
+              >
+                <span>Session Inactive — Use Direct Pay</span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                disabled={isSubmitting}
+                onClick={handleRequestBooking}
+                style={{
+                  width: '100%',
+                  background: '#059669',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '12px',
+                  padding: '12px',
+                  fontSize: '14px',
+                  fontWeight: 700,
+                  cursor: isSubmitting ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px',
+                  opacity: isSubmitting ? 0.7 : 1,
+                }}
+              >
+                <span>{isSubmitting ? 'Requesting...' : 'Request Booking'}</span>
+                <ArrowRight size={15} />
+              </button>
+            )}
           </div>
         </div>
       )}
@@ -1388,6 +1797,62 @@ export default function BookingMarketplace({
                 </div>
                 <div style={{ fontSize: '12px', color: '#047857' }}>
                   Authorization complete. Your booking is confirmed.
+                </div>
+              </div>
+            </div>
+
+            {/* Agent Vault Settlement Receipt */}
+            <div
+              style={{
+                marginTop: '16px',
+                background: '#f8fafc',
+                border: '1px solid #cbd5e1',
+                borderRadius: '14px',
+                padding: '16px',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <FileText size={16} color="#059669" />
+                  <span style={{ fontSize: '13px', fontWeight: 800, color: '#0f172a' }}>Payment Settlement Receipt</span>
+                </div>
+                <span style={{ fontSize: '10px', background: '#dcfce7', color: '#15803d', padding: '2px 8px', borderRadius: '9999px', fontWeight: 700 }}>
+                  BOUND_AND_VERIFIED
+                </span>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '12px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748b' }}>
+                  <span>Altana Session Wallet</span>
+                  <span style={{ fontFamily: 'monospace', fontWeight: 600, color: '#0f172a' }}>0x71C22998...b1D (EIP-7702)</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748b' }}>
+                  <span>Transaction Hash</span>
+                  <a
+                    href="https://celoscan.io/tx/0x250e11feca536de2e68722f82643be4dad3568bccc358d356dbf4b843c820436"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ color: '#059669', fontWeight: 600, textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '3px' }}
+                  >
+                    <span>0x250e11fe...0436</span>
+                    <ExternalLink size={11} />
+                  </a>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748b' }}>
+                  <span>Settled Amount</span>
+                  <span style={{ fontWeight: 700, color: '#0f172a' }}>₦50,000 cNGN (34.62 USD₮)</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748b' }}>
+                  <span>Recipient Gateway</span>
+                  <span style={{ fontFamily: 'monospace', fontWeight: 600, color: '#0f172a' }}>0x653f773C...1693</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748b' }}>
+                  <span>Protocol Attribution</span>
+                  <span style={{ fontWeight: 600, color: '#475569' }}>celo_9f7deabd99a6 (ERC-8021)</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748b' }}>
+                  <span>Remaining Session Budget</span>
+                  <span style={{ fontWeight: 700, color: '#059669' }}>₦10,000 cNGN</span>
                 </div>
               </div>
             </div>

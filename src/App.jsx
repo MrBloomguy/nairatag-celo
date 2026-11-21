@@ -1402,7 +1402,7 @@ function ArcAppShell() {
     : null;
 
   // Pay / Send Terminal State
-  const [payMode, setPayMode] = useState('send'); // 'send' | 'altana' | 'vault' | 'self'
+  const [payMode, setPayMode] = useState('send'); // 'send' | 'altana' | 'self'
   const [paySubMode, setPaySubMode] = useState('corridor'); // 'corridor' | 'direct'
   const [recipientInput, setRecipientInput] = useState('');
   const [amountInput, setAmountInput] = useState('10.00');
@@ -3298,17 +3298,7 @@ function ArcAppShell() {
                 <span>Wallets</span>
               </button>
 
-              {/* 3. Vault */}
-              <button
-                type="button"
-                className={`pay-mode-pill-btn pill-vault ${payMode === 'vault' ? 'active' : ''}`}
-                onClick={() => setPayMode('vault')}
-              >
-                <ShoppingCart size={13} />
-                <span>Vault</span>
-              </button>
-
-              {/* 4. Self ID */}
+              {/* 3. Self ID */}
               <button
                 type="button"
                 className={`pay-mode-pill-btn pill-self ${payMode === 'self' ? 'active' : ''}`}
@@ -3319,14 +3309,7 @@ function ArcAppShell() {
               </button>
             </div>
 
-            {payMode === 'vault' ? (
-              <div style={{ maxWidth: '520px', width: '100%', margin: '0 auto' }}>
-                <AgentVaultCard
-                  walletAddress={walletAddress}
-                  onConnectWallet={() => setIsConnectModalOpen(true)}
-                />
-              </div>
-            ) : payMode === 'altana' ? (
+            {payMode === 'altana' ? (
               <div style={{ maxWidth: '480px', width: '100%', margin: '0 auto' }}>
                 <AltanaSessionCard
                   walletAddress={walletAddress}

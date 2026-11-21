@@ -176,6 +176,23 @@ export async function executeBookingX402Settlement({
 }) {
   if (!booking || !authorization) throw new Error('Booking and authorization are required');
 
+  // Strict Parameter Binding Checks at Execution Boundary
+  if (authorization.bookingId !== booking.id) {
+    throw new Error('AUTHORIZATION_MISMATCH: Authorization is not bound to this booking ID.');
+  }
+  if (authorization.amount !== booking.price) {
+    throw new Error('AUTHORIZATION_TAMPERED: Authorization amount does not match authoritative booking price.');
+  }
+  if (authorization.paymentToken !== booking.currency) {
+    throw new Error('AUTHORIZATION_TAMPERED: Authorization payment token does not match booking currency.');
+  }
+  if (authorization.recipient.toLowerCase() !== OFFICIAL_AGENT_WALLET.toLowerCase()) {
+    throw new Error('AUTHORIZATION_TAMPERED: Authorization recipient does not match protocol escrow wallet.');
+  }
+  if (authorization.expiresAt < Math.floor(Date.now() / 1000)) {
+    throw new Error('AUTHORIZATION_EXPIRED: Payment authorization has expired.');
+  }
+
   const paymentDigest = keccak256(
     stringToHex(`BOOKING:${authorization.bookingId}:${authorization.amountAtomic}:${paymentProof?.txHash || Date.now()}`)
   );

@@ -17,6 +17,7 @@ import { CookingPot as CookingPotIcon } from 'lucide-react';
 import { HandCoins as HandCoinsIcon } from 'lucide-react';
 import { Ticket as TicketIcon } from 'lucide-react';
 import {
+  Calendar,
   Wallet,
   ArrowDownUp,
   ShoppingCart,
@@ -2648,6 +2649,14 @@ function ArcAppShell() {
           </button>
           <button
             type="button"
+            className={`nav-tab-btn ${mainTab === 'bookings' ? 'active' : ''}`}
+            onClick={() => setMainTab('bookings')}
+          >
+            <Calendar size={14} />
+            <span>Bookings</span>
+          </button>
+          <button
+            type="button"
             className={`nav-tab-btn ${mainTab === 'agents' ? 'active' : ''}`}
             onClick={() => setMainTab('agents')}
           >
@@ -2949,6 +2958,24 @@ function ArcAppShell() {
                   <span className="mobile-nav-desc">Onchain tasks, milestone rewards & points</span>
                 </div>
                 {mainTab === 'tasks' && <span className="mobile-nav-active-pill">Active</span>}
+              </button>
+
+              <button
+                type="button"
+                className={`mobile-nav-link ${mainTab === 'bookings' ? 'active' : ''}`}
+                onClick={() => {
+                  setMainTab('bookings');
+                  setIsMobileMenuOpen(false);
+                }}
+              >
+                <div className="mobile-nav-icon-box">
+                  <Calendar size={18} />
+                </div>
+                <div className="mobile-nav-text">
+                  <span className="mobile-nav-title">Bookings Marketplace</span>
+                  <span className="mobile-nav-desc">Reserve sessions, providers & agent services</span>
+                </div>
+                {mainTab === 'bookings' && <span className="mobile-nav-active-pill">Active</span>}
               </button>
 
               <button

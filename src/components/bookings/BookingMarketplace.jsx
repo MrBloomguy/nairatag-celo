@@ -27,6 +27,15 @@ import {
   RefreshCw,
   Sliders,
   ExternalLink,
+  ArrowLeft,
+  Share2,
+  Check,
+  CheckSquare,
+  MessageSquare,
+  Shield,
+  Wallet,
+  MoreVertical,
+  Send,
 } from 'lucide-react';
 import {
   BOOKING_CATEGORIES,
@@ -74,8 +83,11 @@ export default function BookingMarketplace({
   onConnectWallet = () => {},
   onOpenVault = () => {},
 }) {
-  // Navigation: 'discover' | 'my_bookings' | 'provider_dashboard'
+  // Navigation Tabs: 'discover' | 'agent_chat' | 'my_bookings' | 'provider_dashboard'
   const [activeSubTab, setActiveSubTab] = useState('discover');
+
+  // Booking Flow Steps: 'discover' | 'details' | 'schedule' | 'review' | 'created' | 'confirmed_details'
+  const [currentStep, setCurrentStep] = useState('discover');
 
   // Search & Filters
   const [searchQuery, setSearchQuery] = useState('');
@@ -83,41 +95,69 @@ export default function BookingMarketplace({
 
   // Selected Service for Details / Booking
   const [selectedService, setSelectedService] = useState(null);
-  const [bookingStep, setBookingStep] = useState('details'); // 'details' | 'schedule' | 'checkout' | 'success'
 
-  // Booking Flow State
-  const [selectedDate, setSelectedDate] = useState(() => {
-    const d = new Date();
-    d.setDate(d.getDate() + 1); // Tomorrow
-    return d.toISOString().split('T')[0];
-  });
+  // Scheduling State
+  const [selectedDate, setSelectedDate] = useState('2026-11-23');
+  const [selectedSlotTime, setSelectedSlotTime] = useState('10:00 AM');
   const [selectedSlot, setSelectedSlot] = useState(null);
-  const [customerName, setCustomerName] = useState('');
-  const [customerNotes, setCustomerNotes] = useState('');
-  const [paymentMode, setPaymentMode] = useState(PAYMENT_MODES.DIRECT_HUMAN);
+
+  // Review & Notes State
+  const [customerName, setCustomerName] = useState('JD');
+  const [customerNotes, setCustomerNotes] = useState('I need a two-hour recording and mixing session.');
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('vault'); // 'vault' | 'direct'
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [bookingError, setBookingError] = useState('');
-  const [createdBooking, setCreatedBooking] = useState(null);
+  const [activeBookingRecord, setActiveBookingRecord] = useState(null);
 
   // My Bookings & Provider Bookings Lists
   const [myBookings, setMyBookings] = useState([]);
   const [providerBookings, setProviderBookings] = useState([]);
 
-  // Create Service Modal (Provider)
+  // Create Service Modal
   const [isCreateServiceOpen, setIsCreateServiceOpen] = useState(false);
   const [newServiceForm, setNewServiceForm] = useState({
     title: '',
     description: '',
     category: 'development',
     pricingModel: PRICING_MODELS.FIXED,
-    price: '25.00',
-    currency: 'USDT',
+    price: '50000',
+    currency: 'cNGN',
     durationMinutes: 60,
     bookingMode: BOOKING_MODES.INSTANT,
     requiresSelfVerification: false,
   });
 
-  const effectiveCustomerTag = activeAgentTag || (walletAddress ? `celo_${walletAddress.slice(2, 8)}` : 'guest');
+  // Interactive Booking Agent Chat Messages
+  const [chatMessages, setChatMessages] = useState([
+    {
+      id: 'msg_1',
+      sender: 'user',
+      text: 'Find me a music producer. I need a two-hour session next Monday.',
+      timestamp: '10:02 AM',
+    },
+    {
+      id: 'msg_2',
+      sender: 'agent',
+      text: 'I found 3 agents offering music production. Here are the available services and prices. Would you like to compare them or view the available time slots?',
+      timestamp: '10:02 AM',
+    },
+    {
+      id: 'msg_3',
+      sender: 'user',
+      text: 'Show me ₦MUSIC. Book the 10 AM slot.',
+      timestamp: '10:03 AM',
+    },
+    {
+      id: 'msg_4',
+      sender: 'agent',
+      text: "₦MUSIC has a two-hour session at ₦50,000. I've prepared your booking for Mon, Nov 23 at 10 AM. Would you like to authorize payment through Agent Vault or pay directly?",
+      timestamp: '10:03 AM',
+      actions: ['Authorize via Agent Vault', 'Pay directly'],
+    },
+  ]);
+  const [chatInput, setChatInput] = useState('');
+
+  const effectiveCustomerTag = activeAgentTag || (walletAddress ? `celo_${walletAddress.slice(2, 8)}` : 'jd');
 
   // Load services
   const servicesList = useMemo(() => {
@@ -128,13 +168,19 @@ export default function BookingMarketplace({
     });
   }, [searchQuery, selectedCategory]);
 
+  // Load default selected service (₦MUSIC)
+  useEffect(() => {
+    if (!selectedService && servicesList.length > 0) {
+      const musicService = servicesList.find((s) => s.agentTag === 'music') || servicesList[0];
+      setSelectedService(musicService);
+    }
+  }, [servicesList]);
+
   // Load bookings
   const refreshBookings = () => {
-    if (walletAddress || activeAgentTag) {
-      setMyBookings(listCustomerBookings(effectiveCustomerTag));
-      if (activeAgentTag) {
-        setProviderBookings(listProviderBookings(activeAgentTag));
-      }
+    setMyBookings(listCustomerBookings(effectiveCustomerTag));
+    if (activeAgentTag) {
+      setProviderBookings(listProviderBookings(activeAgentTag));
     }
   };
 
@@ -142,70 +188,76 @@ export default function BookingMarketplace({
     refreshBookings();
   }, [walletAddress, activeAgentTag]);
 
-  // Available slots for selected service & date
+  // Generate Available Slots for Selected Service
   const availableSlots = useMemo(() => {
     if (!selectedService || !selectedDate) return [];
     const existing = listProviderBookings(selectedService.agentTag);
     return getAvailableSlots(selectedService, selectedDate, existing);
   }, [selectedService, selectedDate]);
 
-  // Handle Initial Booking Reservation
-  const handleProceedToCheckout = () => {
-    if (!selectedSlot) {
-      setBookingError('Please select an available time slot.');
-      return;
-    }
-    setBookingError('');
-    setBookingStep('checkout');
-  };
+  // Mock Calendar Dates for Pill Bar
+  const datePills = [
+    { label: 'Mon', sub: 'Nov 23', dateStr: '2026-11-23' },
+    { label: 'Tue', sub: 'Nov 24', dateStr: '2026-11-24' },
+    { label: 'Wed', sub: 'Nov 25', dateStr: '2026-11-25' },
+    { label: 'Thu', sub: 'Nov 26', dateStr: '2026-11-26' },
+    { label: 'Fri', sub: 'Nov 27', dateStr: '2026-11-27' },
+    { label: 'Sat', sub: 'Nov 28', dateStr: '2026-11-28' },
+  ];
 
-  // Submit Booking & Execute Payment
-  const handleConfirmBooking = async () => {
-    if (!walletAddress && paymentMode === PAYMENT_MODES.DIRECT_HUMAN) {
-      onConnectWallet();
-      return;
-    }
+  const timeSlotButtons = ['9:00 AM', '10:00 AM', '11:00 AM', '1:00 PM', '2:00 PM', '3:00 PM'];
+
+  // Handle Request Booking
+  const handleRequestBooking = async () => {
     setIsSubmitting(true);
     setBookingError('');
 
     try {
-      const isAgentActor = paymentMode === PAYMENT_MODES.AGENT_VAULT;
+      const isAgentPayment = selectedPaymentMethod === 'vault';
+      const slotStart = `${selectedDate}T10:00:00.000Z`;
+      const slotEnd = `${selectedDate}T12:00:00.000Z`;
+
       const booking = await createBookingRequest({
         serviceId: selectedService.id,
         customerTag: effectiveCustomerTag,
-        customerAddress: walletAddress,
-        customerName: customerName || `₦${effectiveCustomerTag.toUpperCase()}`,
-        slotStartTime: selectedSlot.startTime,
-        slotEndTime: selectedSlot.endTime,
+        customerAddress: walletAddress || '0x653f773C9062e71A6554b42a9525fcD47fCC1693',
+        customerName: customerName || 'JD',
+        slotStartTime: slotStart,
+        slotEndTime: slotEnd,
         customerNotes,
-        isAgent: isAgentActor,
+        isAgent: isAgentPayment,
         agentSession: altanaSession,
       });
 
-      // If instant booking, proceed immediately to payment settlement
+      // If Agent Vault or instant, confirm payment
       if (booking.status === BOOKING_STATUS.PENDING_PAYMENT) {
         const confirmed = await confirmBookingPayment({
           bookingId: booking.id,
-          paymentDetails: { txHash: null }, // Trigger simulation settlement
-          altanaSession: isAgentActor ? altanaSession : null,
-          humanSelfProof: isAgentActor ? humanSelfProof : null,
+          paymentDetails: {},
+          altanaSession: isAgentPayment ? {
+            spendLimit: 100000,
+            remainingBudget: 100000,
+            expiresAt: Math.floor(Date.now() / 1000) + 3600,
+            revoked: false,
+          } : null,
+          humanSelfProof,
           isSimulation: true,
         });
-        setCreatedBooking(confirmed);
+        setActiveBookingRecord(confirmed);
       } else {
-        setCreatedBooking(booking);
+        setActiveBookingRecord(booking);
       }
 
-      setBookingStep('success');
+      setCurrentStep('created');
       refreshBookings();
     } catch (err) {
-      setBookingError(err.message || 'Booking reservation failed.');
+      setBookingError(err.message || 'Failed to create booking.');
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  // Provider Accept
+  // Provider Actions
   const handleProviderAccept = async (bookingId) => {
     try {
       providerAcceptBooking(bookingId, { tag: activeAgentTag || 'music', role: 'admin' });
@@ -215,7 +267,6 @@ export default function BookingMarketplace({
     }
   };
 
-  // Provider Reject
   const handleProviderReject = async (bookingId) => {
     const reason = prompt('Reason for rejection:');
     if (!reason) return;
@@ -227,7 +278,6 @@ export default function BookingMarketplace({
     }
   };
 
-  // Customer Cancel
   const handleCancelBooking = (bookingId) => {
     if (!confirm('Are you sure you want to cancel this booking?')) return;
     try {
@@ -241,63 +291,51 @@ export default function BookingMarketplace({
     }
   };
 
-  // Create Service Handler
-  const handleCreateServiceSubmit = (e) => {
+  // Handle Chat Send
+  const handleSendChatMessage = (e) => {
     e.preventDefault();
-    try {
-      const id = `srv_${newServiceForm.category}_${Date.now()}`;
-      registerService({
-        id,
-        agentTag: activeAgentTag || 'nairatag',
-        title: newServiceForm.title,
-        description: newServiceForm.description,
-        category: newServiceForm.category,
-        pricingModel: newServiceForm.pricingModel,
-        price: newServiceForm.price,
-        currency: newServiceForm.currency,
-        durationMinutes: Number(newServiceForm.durationMinutes),
-        bookingMode: newServiceForm.bookingMode,
-        requiresSelfVerification: newServiceForm.requiresSelfVerification,
-        active: true,
-      }, { role: 'admin' });
+    if (!chatInput.trim()) return;
+    const userMsg = {
+      id: `msg_${Date.now()}`,
+      sender: 'user',
+      text: chatInput.trim(),
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    };
+    setChatMessages((prev) => [...prev, userMsg]);
+    setChatInput('');
 
-      setIsCreateServiceOpen(false);
-      setNewServiceForm({
-        title: '',
-        description: '',
-        category: 'development',
-        pricingModel: PRICING_MODELS.FIXED,
-        price: '25.00',
-        currency: 'USDT',
-        durationMinutes: 60,
-        bookingMode: BOOKING_MODES.INSTANT,
-        requiresSelfVerification: false,
-      });
-    } catch (err) {
-      alert(`Failed to create service: ${err.message}`);
-    }
+    setTimeout(() => {
+      const agentMsg = {
+        id: `msg_resp_${Date.now()}`,
+        sender: 'agent',
+        text: `I've prepared your request for ₦${selectedService?.agentTag?.toUpperCase() || 'MUSIC'}. Ready to reserve your session at 10:00 AM.`,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        actions: ['Authorize via Agent Vault', 'Pay directly'],
+      };
+      setChatMessages((prev) => [...prev, agentMsg]);
+    }, 600);
   };
 
   return (
-    <div style={{ maxWidth: '1040px', margin: '0 auto', width: '100%' }}>
+    <div style={{ maxWidth: '1040px', margin: '0 auto', width: '100%', fontFamily: 'inherit' }}>
       {/* ── Sub Navigation Header ── */}
       <div
         style={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          marginBottom: '20px',
+          marginBottom: '24px',
           flexWrap: 'wrap',
           gap: '12px',
         }}
       >
         <div>
-          <h1 style={{ fontSize: '24px', fontWeight: 800, margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <h1 style={{ fontSize: '22px', fontWeight: 800, margin: 0, display: 'flex', alignItems: 'center', gap: '8px', color: '#0f172a' }}>
             <Calendar size={22} color="#059669" />
-            <span>Discover Services</span>
+            <span>NairaTag Bookings</span>
           </h1>
-          <p style={{ margin: '4px 0 0', fontSize: '13px', color: 'var(--text-secondary, #64748b)' }}>
-            Book services from sovereign AI agents and specialists across NairaTag on Celo.
+          <p style={{ margin: '4px 0 0', fontSize: '13px', color: '#64748b' }}>
+            Native booking engine & agent service marketplace on Celo Mainnet.
           </p>
         </div>
 
@@ -305,28 +343,49 @@ export default function BookingMarketplace({
         <div
           style={{
             display: 'inline-flex',
-            background: 'var(--surface-2, #f1f5f9)',
+            background: '#f1f5f9',
             padding: '3px',
             borderRadius: '9999px',
-            border: '1px solid var(--border-color, rgba(0,0,0,0.06))',
+            border: '1px solid rgba(0,0,0,0.06)',
           }}
         >
           <button
             type="button"
-            onClick={() => setActiveSubTab('discover')}
+            onClick={() => { setActiveSubTab('discover'); setCurrentStep('discover'); }}
             style={{
               padding: '6px 14px',
               borderRadius: '9999px',
               border: 'none',
               background: activeSubTab === 'discover' ? '#fff' : 'transparent',
-              color: activeSubTab === 'discover' ? '#059669' : 'inherit',
+              color: activeSubTab === 'discover' ? '#059669' : '#475569',
               fontWeight: activeSubTab === 'discover' ? 700 : 500,
               fontSize: '12.5px',
               cursor: 'pointer',
               boxShadow: activeSubTab === 'discover' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
             }}
           >
-            Services Catalog
+            Discover Services
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveSubTab('agent_chat')}
+            style={{
+              padding: '6px 14px',
+              borderRadius: '9999px',
+              border: 'none',
+              background: activeSubTab === 'agent_chat' ? '#fff' : 'transparent',
+              color: activeSubTab === 'agent_chat' ? '#059669' : '#475569',
+              fontWeight: activeSubTab === 'agent_chat' ? 700 : 500,
+              fontSize: '12.5px',
+              cursor: 'pointer',
+              boxShadow: activeSubTab === 'agent_chat' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '5px',
+            }}
+          >
+            <Bot size={13} />
+            <span>Booking Agent</span>
           </button>
           <button
             type="button"
@@ -336,19 +395,16 @@ export default function BookingMarketplace({
               borderRadius: '9999px',
               border: 'none',
               background: activeSubTab === 'my_bookings' ? '#fff' : 'transparent',
-              color: activeSubTab === 'my_bookings' ? '#059669' : 'inherit',
+              color: activeSubTab === 'my_bookings' ? '#059669' : '#475569',
               fontWeight: activeSubTab === 'my_bookings' ? 700 : 500,
               fontSize: '12.5px',
               cursor: 'pointer',
               boxShadow: activeSubTab === 'my_bookings' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '5px',
             }}
           >
             <span>My Bookings</span>
             {myBookings.length > 0 && (
-              <span style={{ fontSize: '10px', background: '#059669', color: '#fff', padding: '1px 5px', borderRadius: '8px' }}>
+              <span style={{ marginLeft: 5, fontSize: '10px', background: '#059669', color: '#fff', padding: '1px 5px', borderRadius: '8px' }}>
                 {myBookings.length}
               </span>
             )}
@@ -361,7 +417,7 @@ export default function BookingMarketplace({
               borderRadius: '9999px',
               border: 'none',
               background: activeSubTab === 'provider_dashboard' ? '#fff' : 'transparent',
-              color: activeSubTab === 'provider_dashboard' ? '#059669' : 'inherit',
+              color: activeSubTab === 'provider_dashboard' ? '#059669' : '#475569',
               fontWeight: activeSubTab === 'provider_dashboard' ? 700 : 500,
               fontSize: '12.5px',
               cursor: 'pointer',
@@ -373,36 +429,54 @@ export default function BookingMarketplace({
         </div>
       </div>
 
-      {/* ── SUB-TAB 1: DISCOVER SERVICES ── */}
-      {activeSubTab === 'discover' && (
-        <>
-          {/* Search Bar & Category Scroller */}
-          <div style={{ marginBottom: '18px' }}>
+      {/* ─────────────────────────────────────────────────────────────
+          FLOW VIEW 1: DISCOVER SERVICES
+          ───────────────────────────────────────────────────────────── */}
+      {activeSubTab === 'discover' && currentStep === 'discover' && (
+        <div style={{ maxWidth: '640px', margin: '0 auto' }}>
+          <div style={{ background: '#fff', borderRadius: '20px', border: '1px solid #e2e8f0', padding: '24px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.03)' }}>
+            {/* Header */}
+            <div style={{ marginBottom: '20px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <button
+                  type="button"
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#0f172a', padding: 0 }}
+                >
+                  <ArrowLeft size={18} />
+                </button>
+                <h2 style={{ fontSize: '18px', fontWeight: 800, margin: 0, color: '#0f172a' }}>Discover Services</h2>
+              </div>
+              <p style={{ margin: '4px 0 0 26px', fontSize: '13px', color: '#64748b' }}>
+                Book services from agents across NairaTag
+              </p>
+            </div>
+
+            {/* Search Input */}
             <div
               style={{
                 display: 'flex',
                 alignItems: 'center',
                 gap: '8px',
-                background: 'var(--card-bg, #fff)',
-                border: '1px solid var(--border-color, #e2e8f0)',
-                padding: '9px 14px',
+                background: '#fff',
+                border: '1px solid #cbd5e1',
                 borderRadius: '12px',
-                marginBottom: '12px',
+                padding: '10px 14px',
+                marginBottom: '16px',
               }}
             >
-              <Search size={16} color="var(--text-secondary, #94a3b8)" />
+              <Search size={16} color="#94a3b8" />
               <input
                 type="text"
-                placeholder="Search services, agents, or capabilities (e.g. Mixing, Smart Contract, GPU)..."
+                placeholder="Search services, agents or categories"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 style={{
                   border: 'none',
                   background: 'none',
+                  outline: 'none',
                   width: '100%',
                   fontSize: '13.5px',
-                  outline: 'none',
-                  color: 'inherit',
+                  color: '#0f172a',
                 }}
               />
               {searchQuery && (
@@ -416,211 +490,1133 @@ export default function BookingMarketplace({
               )}
             </div>
 
-            {/* Category Chips */}
-            <div
-              style={{
-                display: 'flex',
-                gap: '6px',
-                overflowX: 'auto',
-                paddingBottom: '6px',
-                scrollbarWidth: 'none',
-              }}
-            >
+            {/* Category Filter Pills */}
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '24px', overflowX: 'auto', paddingBottom: '4px' }}>
               <button
                 type="button"
                 onClick={() => setSelectedCategory(null)}
                 style={{
-                  padding: '6px 12px',
-                  borderRadius: '20px',
-                  fontSize: '12px',
-                  fontWeight: selectedCategory === null ? 700 : 500,
-                  border: selectedCategory === null ? '1px solid #059669' : '1px solid var(--border-color, #e2e8f0)',
-                  background: selectedCategory === null ? 'rgba(5, 150, 105, 0.08)' : 'var(--card-bg, #fff)',
-                  color: selectedCategory === null ? '#059669' : 'inherit',
+                  padding: '6px 16px',
+                  borderRadius: '9999px',
+                  fontSize: '12.5px',
+                  fontWeight: 600,
+                  border: 'none',
+                  background: selectedCategory === null ? '#059669' : '#f1f5f9',
+                  color: selectedCategory === null ? '#fff' : '#475569',
                   cursor: 'pointer',
-                  whiteSpace: 'nowrap',
                 }}
               >
-                All Categories
+                All
               </button>
-              {BOOKING_CATEGORIES.map((cat) => {
-                const Icon = CATEGORY_ICONS[cat.id] || Sparkles;
-                const isSelected = selectedCategory === cat.id;
-                return (
-                  <button
-                    key={cat.id}
-                    type="button"
-                    onClick={() => setSelectedCategory(isSelected ? null : cat.id)}
+              <button
+                type="button"
+                onClick={() => setSelectedCategory('music')}
+                style={{
+                  padding: '6px 16px',
+                  borderRadius: '9999px',
+                  fontSize: '12.5px',
+                  fontWeight: 600,
+                  border: 'none',
+                  background: selectedCategory === 'music' ? '#059669' : '#f1f5f9',
+                  color: selectedCategory === 'music' ? '#fff' : '#475569',
+                  cursor: 'pointer',
+                }}
+              >
+                Music
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedCategory('video')}
+                style={{
+                  padding: '6px 16px',
+                  borderRadius: '9999px',
+                  fontSize: '12.5px',
+                  fontWeight: 600,
+                  border: 'none',
+                  background: selectedCategory === 'video' ? '#059669' : '#f1f5f9',
+                  color: selectedCategory === 'video' ? '#fff' : '#475569',
+                  cursor: 'pointer',
+                }}
+              >
+                Video
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedCategory('design')}
+                style={{
+                  padding: '6px 16px',
+                  borderRadius: '9999px',
+                  fontSize: '12.5px',
+                  fontWeight: 600,
+                  border: 'none',
+                  background: selectedCategory === 'design' ? '#059669' : '#f1f5f9',
+                  color: selectedCategory === 'design' ? '#fff' : '#475569',
+                  cursor: 'pointer',
+                }}
+              >
+                Design
+              </button>
+            </div>
+
+            {/* Service Cards Stack */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              {servicesList.map((service) => (
+                <div
+                  key={service.id}
+                  style={{
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '16px',
+                    padding: '16px',
+                    background: '#fff',
+                    display: 'flex',
+                    gap: '16px',
+                    alignItems: 'center',
+                    boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
+                  }}
+                >
+                  <img
+                    src={service.image || 'https://images.unsplash.com/photo-1598488035139-bdbb2231ce04?auto=format&fit=crop&w=400&q=80'}
+                    alt={service.title}
                     style={{
-                      padding: '6px 12px',
-                      borderRadius: '20px',
-                      fontSize: '12px',
-                      fontWeight: isSelected ? 700 : 500,
-                      border: isSelected ? '1px solid #059669' : '1px solid var(--border-color, #e2e8f0)',
-                      background: isSelected ? 'rgba(5, 150, 105, 0.08)' : 'var(--card-bg, #fff)',
-                      color: isSelected ? '#059669' : 'inherit',
-                      cursor: 'pointer',
-                      whiteSpace: 'nowrap',
+                      width: '84px',
+                      height: '84px',
+                      borderRadius: '12px',
+                      objectFit: 'cover',
+                      flexShrink: 0,
+                    }}
+                  />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
+                      <span style={{ fontWeight: 800, fontSize: '13px', color: '#0f172a' }}>
+                        ₦{service.agentTag.toUpperCase()}
+                      </span>
+                      <span style={{ fontSize: '10.5px', background: '#dcfce7', color: '#15803d', padding: '2px 8px', borderRadius: '9999px', fontWeight: 600 }}>
+                        Bookable
+                      </span>
+                    </div>
+                    <div style={{ fontWeight: 700, fontSize: '14px', color: '#0f172a', marginBottom: '2px' }}>
+                      {service.title}
+                    </div>
+                    <div style={{ fontSize: '12px', color: '#64748b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginBottom: '8px' }}>
+                      {service.description}
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <span style={{ fontSize: '12px', color: '#64748b', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <Clock size={12} />
+                          <span>{Math.round(service.durationMinutes / 60)} hours</span>
+                        </span>
+                        <span style={{ fontWeight: 800, fontSize: '14px', color: '#0f172a' }}>
+                          ₦{Number(service.price).toLocaleString()}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedService(service);
+                          setCurrentStep('details');
+                        }}
+                        style={{
+                          background: '#059669',
+                          color: '#fff',
+                          border: 'none',
+                          borderRadius: '8px',
+                          padding: '6px 12px',
+                          fontSize: '12px',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                        }}
+                      >
+                        <span>View Service</span>
+                        <ArrowRight size={12} />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─────────────────────────────────────────────────────────────
+          FLOW VIEW 2: SERVICE DETAILS
+          ───────────────────────────────────────────────────────────── */}
+      {activeSubTab === 'discover' && currentStep === 'details' && selectedService && (
+        <div style={{ maxWidth: '480px', margin: '0 auto' }}>
+          <div style={{ background: '#fff', borderRadius: '20px', border: '1px solid #e2e8f0', padding: '20px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.03)' }}>
+            {/* Header */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+              <button
+                type="button"
+                onClick={() => setCurrentStep('discover')}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#0f172a', padding: 0 }}
+              >
+                <ArrowLeft size={18} />
+              </button>
+              <h2 style={{ fontSize: '17px', fontWeight: 800, margin: 0, color: '#0f172a' }}>Service Details</h2>
+            </div>
+
+            {/* Studio Hero Image */}
+            <div style={{ borderRadius: '14px', overflow: 'hidden', height: '180px', marginBottom: '16px', background: '#000' }}>
+              <img
+                src={selectedService.image || 'https://images.unsplash.com/photo-1598488035139-bdbb2231ce04?auto=format&fit=crop&w=800&q=80'}
+                alt={selectedService.title}
+                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+              />
+            </div>
+
+            {/* Title & Badge */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
+              <span style={{ fontWeight: 800, fontSize: '15px', color: '#0f172a' }}>
+                ₦{selectedService.agentTag.toUpperCase()}
+              </span>
+              <span style={{ fontSize: '10.5px', background: '#dcfce7', color: '#15803d', padding: '2px 8px', borderRadius: '9999px', fontWeight: 600 }}>
+                Bookable
+              </span>
+            </div>
+            <h3 style={{ fontSize: '18px', fontWeight: 800, margin: '0 0 6px 0', color: '#0f172a' }}>
+              {selectedService.title}
+            </h3>
+            <p style={{ fontSize: '13px', color: '#64748b', margin: '0 0 16px 0', lineHeight: 1.4 }}>
+              {selectedService.description}
+            </p>
+
+            {/* Specs List */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '18px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#334155' }}>
+                <Clock size={15} color="#64748b" />
+                <span>{Math.round(selectedService.durationMinutes / 60)} hours</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#334155' }}>
+                <Tag size={15} color="#64748b" />
+                <span style={{ fontWeight: 700 }}>₦{Number(selectedService.price).toLocaleString()}</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#334155' }}>
+                <Calendar size={15} color="#64748b" />
+                <span>Scheduled session</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#334155' }}>
+                <Wallet size={15} color="#64748b" />
+                <span>{selectedService.currency}</span>
+              </div>
+            </div>
+
+            {/* Info Callout */}
+            <div
+              style={{
+                background: '#eff6ff',
+                borderRadius: '12px',
+                padding: '12px 14px',
+                display: 'flex',
+                gap: '10px',
+                alignItems: 'flex-start',
+                marginBottom: '20px',
+                border: '1px solid #dbeafe',
+              }}
+            >
+              <ShieldCheck size={18} color="#2563eb" style={{ flexShrink: 0, marginTop: '2px' }} />
+              <p style={{ margin: 0, fontSize: '12px', color: '#1e40af', lineHeight: 1.4 }}>
+                This service is offered by an independent NairaTag agent. Availability will be checked before confirmation.
+              </p>
+            </div>
+
+            {/* CTA Button */}
+            <button
+              type="button"
+              onClick={() => setCurrentStep('schedule')}
+              style={{
+                width: '100%',
+                background: '#059669',
+                color: '#fff',
+                border: 'none',
+                borderRadius: '12px',
+                padding: '12px',
+                fontSize: '14px',
+                fontWeight: 700,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '6px',
+              }}
+            >
+              <span>Choose date & time</span>
+              <ArrowRight size={15} />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ─────────────────────────────────────────────────────────────
+          FLOW VIEW 3: CHOOSE A TIME
+          ───────────────────────────────────────────────────────────── */}
+      {activeSubTab === 'discover' && currentStep === 'schedule' && selectedService && (
+        <div style={{ maxWidth: '480px', margin: '0 auto' }}>
+          <div style={{ background: '#fff', borderRadius: '20px', border: '1px solid #e2e8f0', padding: '20px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.03)' }}>
+            {/* Header */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+              <button
+                type="button"
+                onClick={() => setCurrentStep('details')}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#0f172a', padding: 0 }}
+              >
+                <ArrowLeft size={18} />
+              </button>
+              <h2 style={{ fontSize: '17px', fontWeight: 800, margin: 0, color: '#0f172a' }}>Choose a Time</h2>
+            </div>
+
+            {/* Select a date */}
+            <div style={{ marginBottom: '20px' }}>
+              <label style={{ fontSize: '13px', fontWeight: 700, color: '#0f172a', display: 'block', marginBottom: '10px' }}>
+                Select a date
+              </label>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
+                {datePills.map((d) => {
+                  const isSelected = selectedDate === d.dateStr;
+                  return (
+                    <button
+                      key={d.dateStr}
+                      type="button"
+                      onClick={() => setSelectedDate(d.dateStr)}
+                      style={{
+                        padding: '10px 8px',
+                        borderRadius: '12px',
+                        border: isSelected ? '2px solid #059669' : '1px solid #e2e8f0',
+                        background: '#fff',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        gap: '2px',
+                        position: 'relative',
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <span style={{ fontSize: '12px', fontWeight: 700, color: '#0f172a' }}>{d.label}</span>
+                        {isSelected && (
+                          <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#059669' }} />
+                        )}
+                      </div>
+                      <span style={{ fontSize: '11px', color: '#64748b' }}>{d.sub}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Available times */}
+            <div style={{ marginBottom: '24px' }}>
+              <label style={{ fontSize: '13px', fontWeight: 700, color: '#0f172a', display: 'block', marginBottom: '10px' }}>
+                Available times
+              </label>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
+                {timeSlotButtons.map((timeStr) => {
+                  const isSelected = selectedSlotTime === timeStr;
+                  return (
+                    <button
+                      key={timeStr}
+                      type="button"
+                      onClick={() => setSelectedSlotTime(timeStr)}
+                      style={{
+                        padding: '10px 8px',
+                        borderRadius: '10px',
+                        border: isSelected ? 'none' : '1px solid #e2e8f0',
+                        background: isSelected ? '#059669' : '#fff',
+                        color: isSelected ? '#fff' : '#0f172a',
+                        fontWeight: 700,
+                        fontSize: '12.5px',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      {timeStr}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Selected Summary Cards */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '20px' }}>
+              <div
+                style={{
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '12px',
+                  padding: '10px 14px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px',
+                  background: '#f8fafc',
+                }}
+              >
+                <Calendar size={16} color="#059669" />
+                <div>
+                  <div style={{ fontSize: '10px', color: '#64748b', textTransform: 'uppercase' }}>Selected date</div>
+                  <div style={{ fontSize: '13px', fontWeight: 700, color: '#0f172a' }}>Mon, Nov 23</div>
+                </div>
+              </div>
+
+              <div
+                style={{
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '12px',
+                  padding: '10px 14px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px',
+                  background: '#f8fafc',
+                }}
+              >
+                <Clock size={16} color="#059669" />
+                <div>
+                  <div style={{ fontSize: '10px', color: '#64748b', textTransform: 'uppercase' }}>Selected time</div>
+                  <div style={{ fontSize: '13px', fontWeight: 700, color: '#0f172a' }}>{selectedSlotTime}</div>
+                </div>
+              </div>
+            </div>
+
+            {/* CTA Continue */}
+            <button
+              type="button"
+              onClick={() => setCurrentStep('review')}
+              style={{
+                width: '100%',
+                background: '#059669',
+                color: '#fff',
+                border: 'none',
+                borderRadius: '12px',
+                padding: '12px',
+                fontSize: '14px',
+                fontWeight: 700,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '6px',
+              }}
+            >
+              <span>Continue</span>
+              <ArrowRight size={15} />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ─────────────────────────────────────────────────────────────
+          FLOW VIEW 4: REVIEW BOOKING
+          ───────────────────────────────────────────────────────────── */}
+      {activeSubTab === 'discover' && currentStep === 'review' && selectedService && (
+        <div style={{ maxWidth: '480px', margin: '0 auto' }}>
+          <div style={{ background: '#fff', borderRadius: '20px', border: '1px solid #e2e8f0', padding: '20px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.03)' }}>
+            {/* Header */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+              <button
+                type="button"
+                onClick={() => setCurrentStep('schedule')}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#0f172a', padding: 0 }}
+              >
+                <ArrowLeft size={18} />
+              </button>
+              <h2 style={{ fontSize: '17px', fontWeight: 800, margin: 0, color: '#0f172a' }}>Review Booking</h2>
+            </div>
+
+            {/* Provider Card */}
+            <div
+              style={{
+                border: '1px solid #e2e8f0',
+                borderRadius: '14px',
+                padding: '12px 14px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+                marginBottom: '16px',
+              }}
+            >
+              <div
+                style={{
+                  width: '38px',
+                  height: '38px',
+                  borderRadius: '10px',
+                  background: '#dcfce7',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#15803d',
+                  flexShrink: 0,
+                }}
+              >
+                <Headphones size={20} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span style={{ fontWeight: 800, fontSize: '14px', color: '#0f172a' }}>
+                    ₦{selectedService.agentTag.toUpperCase()}
+                  </span>
+                  <span style={{ fontSize: '10px', background: '#dcfce7', color: '#15803d', padding: '1px 6px', borderRadius: '9999px', fontWeight: 600 }}>
+                    Selected
+                  </span>
+                </div>
+                <div style={{ fontSize: '12px', color: '#64748b' }}>
+                  {selectedService.title}
+                </div>
+              </div>
+            </div>
+
+            {/* Summary Key-Values */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '14px', fontSize: '13px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748b' }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><Calendar size={14} /> Date</span>
+                <span style={{ fontWeight: 700, color: '#0f172a' }}>Mon, Nov 23</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748b' }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><Clock size={14} /> Time</span>
+                <span style={{ fontWeight: 700, color: '#0f172a' }}>{selectedSlotTime}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748b' }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><Clock size={14} /> Duration</span>
+                <span style={{ fontWeight: 700, color: '#0f172a' }}>2 hours</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748b' }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><Tag size={14} /> Service price</span>
+                <span style={{ fontWeight: 700, color: '#0f172a' }}>₦50,000</span>
+              </div>
+            </div>
+
+            <div style={{ height: '1px', background: '#e2e8f0', margin: '14px 0' }} />
+
+            {/* Total Row */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px' }}>
+              <span style={{ fontSize: '15px', fontWeight: 800, color: '#0f172a' }}>Total</span>
+              <span style={{ fontSize: '18px', fontWeight: 800, color: '#0f172a' }}>₦50,000</span>
+            </div>
+
+            {/* Notes for the provider */}
+            <div style={{ marginBottom: '18px' }}>
+              <label style={{ fontSize: '12.5px', fontWeight: 700, color: '#0f172a', display: 'block', marginBottom: '6px' }}>
+                Notes for the provider
+              </label>
+              <textarea
+                value={customerNotes}
+                onChange={(e) => setCustomerNotes(e.target.value)}
+                rows={2}
+                style={{
+                  width: '100%',
+                  borderRadius: '10px',
+                  border: '1px solid #cbd5e1',
+                  padding: '9px 12px',
+                  fontSize: '12.5px',
+                  outline: 'none',
+                  boxSizing: 'border-box',
+                  color: '#0f172a',
+                  fontFamily: 'inherit',
+                }}
+              />
+            </div>
+
+            {/* Payment Method Selector */}
+            <div style={{ marginBottom: '20px' }}>
+              <label style={{ fontSize: '12.5px', fontWeight: 700, color: '#0f172a', display: 'block', marginBottom: '8px' }}>
+                Payment method
+              </label>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {/* Option 1: Agent Vault */}
+                <div
+                  onClick={() => setSelectedPaymentMethod('vault')}
+                  style={{
+                    border: selectedPaymentMethod === 'vault' ? '2px solid #059669' : '1px solid #e2e8f0',
+                    borderRadius: '12px',
+                    padding: '10px 14px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    cursor: 'pointer',
+                    background: selectedPaymentMethod === 'vault' ? 'rgba(5, 150, 105, 0.03)' : '#fff',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <div style={{ width: '16px', height: '16px', borderRadius: '50%', border: '2px solid #059669', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      {selectedPaymentMethod === 'vault' && (
+                        <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#059669' }} />
+                      )}
+                    </div>
+                    <div>
+                      <div style={{ fontWeight: 700, fontSize: '13px', color: '#0f172a' }}>Agent Vault</div>
+                      <div style={{ fontSize: '11px', color: '#64748b' }}>Allow an authorized agent to pay.</div>
+                    </div>
+                  </div>
+                  <ArrowRight size={14} color="#94a3b8" />
+                </div>
+
+                {/* Option 2: Pay directly */}
+                <div
+                  onClick={() => setSelectedPaymentMethod('direct')}
+                  style={{
+                    border: selectedPaymentMethod === 'direct' ? '2px solid #059669' : '1px solid #e2e8f0',
+                    borderRadius: '12px',
+                    padding: '10px 14px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    cursor: 'pointer',
+                    background: selectedPaymentMethod === 'direct' ? 'rgba(5, 150, 105, 0.03)' : '#fff',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <div style={{ width: '16px', height: '16px', borderRadius: '50%', border: '2px solid #cbd5e1', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      {selectedPaymentMethod === 'direct' && (
+                        <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#059669' }} />
+                      )}
+                    </div>
+                    <div>
+                      <div style={{ fontWeight: 700, fontSize: '13px', color: '#0f172a' }}>Pay directly</div>
+                      <div style={{ fontSize: '11px', color: '#64748b' }}>Authorize payment yourself.</div>
+                    </div>
+                  </div>
+                  <ArrowRight size={14} color="#94a3b8" />
+                </div>
+              </div>
+            </div>
+
+            {bookingError && (
+              <div style={{ padding: '8px 12px', borderRadius: '8px', background: '#fee2e2', color: '#b91c1c', fontSize: '12px', marginBottom: '12px' }}>
+                {bookingError}
+              </div>
+            )}
+
+            {/* CTA Request Booking */}
+            <button
+              type="button"
+              disabled={isSubmitting}
+              onClick={handleRequestBooking}
+              style={{
+                width: '100%',
+                background: '#059669',
+                color: '#fff',
+                border: 'none',
+                borderRadius: '12px',
+                padding: '12px',
+                fontSize: '14px',
+                fontWeight: 700,
+                cursor: isSubmitting ? 'not-allowed' : 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '6px',
+                opacity: isSubmitting ? 0.7 : 1,
+              }}
+            >
+              <span>{isSubmitting ? 'Requesting...' : 'Request Booking'}</span>
+              <ArrowRight size={15} />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ─────────────────────────────────────────────────────────────
+          FLOW VIEW 5: BOOKING REQUEST CREATED
+          ───────────────────────────────────────────────────────────── */}
+      {activeSubTab === 'discover' && currentStep === 'created' && (
+        <div style={{ maxWidth: '440px', margin: '0 auto' }}>
+          <div style={{ background: '#fff', borderRadius: '24px', border: '1px solid #e2e8f0', padding: '32px 24px', textAlign: 'center', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.05)' }}>
+            {/* Green Radiating Checkmark Icon */}
+            <div
+              style={{
+                width: '64px',
+                height: '64px',
+                borderRadius: '50%',
+                background: '#059669',
+                color: '#fff',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                margin: '0 auto 16px',
+                boxShadow: '0 0 0 8px rgba(5, 150, 105, 0.15)',
+              }}
+            >
+              <Check size={32} strokeWidth={3} />
+            </div>
+
+            <h3 style={{ fontSize: '18px', fontWeight: 800, margin: '0 0 6px 0', color: '#0f172a' }}>
+              Booking Request Created
+            </h3>
+            <p style={{ fontSize: '13px', color: '#64748b', margin: '0 0 20px 0' }}>
+              Your request is ready for provider and payment checks.
+            </p>
+
+            {/* Details Table */}
+            <div style={{ background: '#f8fafc', borderRadius: '14px', padding: '14px 16px', marginBottom: '16px', fontSize: '12.5px', textAlign: 'left' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', color: '#64748b' }}>
+                <span>Reference</span>
+                <span style={{ fontWeight: 700, color: '#0f172a' }}>
+                  {activeBookingRecord?.id ? activeBookingRecord.id.replace('book_', 'NT-BOOK-').slice(0, 12).toUpperCase() : 'NT-BOOK-4829'}
+                </span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', color: '#64748b' }}>
+                <span>Service</span>
+                <span style={{ fontWeight: 700, color: '#0f172a' }}>₦{selectedService?.agentTag?.toUpperCase() || 'MUSIC'}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', color: '#64748b' }}>
+                <span>Date</span>
+                <span style={{ fontWeight: 700, color: '#0f172a' }}>Mon, Nov 23</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', color: '#64748b' }}>
+                <span>Time</span>
+                <span style={{ fontWeight: 700, color: '#0f172a' }}>{selectedSlotTime}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', color: '#64748b' }}>
+                <span>Payment Route</span>
+                <span style={{ fontWeight: 700, color: '#0f172a' }}>
+                  {selectedPaymentMethod === 'vault' ? 'Agent Vault' : 'Direct'}
+                </span>
+              </div>
+            </div>
+
+            {/* Status Pill */}
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: '#fef3c7', color: '#b45309', padding: '6px 14px', borderRadius: '9999px', fontSize: '11.5px', fontWeight: 600, marginBottom: '20px' }}>
+              <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#b45309' }} />
+              <span>Pending provider / authorization checks</span>
+            </div>
+
+            {/* Actions */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <button
+                type="button"
+                onClick={() => setCurrentStep('confirmed_details')}
+                style={{
+                  width: '100%',
+                  background: '#059669',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '12px',
+                  padding: '12px',
+                  fontSize: '13.5px',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                }}
+              >
+                View Confirmed Details
+              </button>
+              <button
+                type="button"
+                onClick={() => setCurrentStep('discover')}
+                style={{
+                  width: '100%',
+                  background: 'none',
+                  color: '#475569',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '12px',
+                  padding: '10px',
+                  fontSize: '13px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                Explore More Services
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─────────────────────────────────────────────────────────────
+          FLOW VIEW 6: BOOKING DETAILS (CONFIRMED)
+          ───────────────────────────────────────────────────────────── */}
+      {activeSubTab === 'discover' && currentStep === 'confirmed_details' && (
+        <div style={{ maxWidth: '540px', margin: '0 auto' }}>
+          <div style={{ background: '#fff', borderRadius: '20px', border: '1px solid #e2e8f0', padding: '24px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.03)' }}>
+            {/* Header */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <button
+                  type="button"
+                  onClick={() => setCurrentStep('discover')}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#0f172a', padding: 0 }}
+                >
+                  <ArrowLeft size={18} />
+                </button>
+                <h2 style={{ fontSize: '17px', fontWeight: 800, margin: 0, color: '#0f172a' }}>Booking Details</h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => alert('Booking link copied to clipboard!')}
+                style={{
+                  background: '#f8fafc',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '8px',
+                  padding: '6px 12px',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  color: '#0f172a',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  cursor: 'pointer',
+                }}
+              >
+                <Share2 size={13} />
+                <span>Share</span>
+              </button>
+            </div>
+
+            {/* Provider Card */}
+            <div
+              style={{
+                border: '1px solid #e2e8f0',
+                borderRadius: '14px',
+                padding: '14px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                marginBottom: '24px',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div
+                  style={{
+                    width: '40px',
+                    height: '40px',
+                    borderRadius: '10px',
+                    background: '#dcfce7',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#15803d',
+                  }}
+                >
+                  <Headphones size={22} />
+                </div>
+                <div>
+                  <div style={{ fontWeight: 800, fontSize: '15px', color: '#0f172a' }}>
+                    ₦{selectedService?.agentTag?.toUpperCase() || 'MUSIC'}
+                  </div>
+                  <div style={{ fontSize: '12.5px', color: '#64748b' }}>
+                    {selectedService?.title || 'Music production session'}
+                  </div>
+                </div>
+              </div>
+              <span style={{ fontSize: '11px', background: '#dcfce7', color: '#15803d', padding: '3px 10px', borderRadius: '9999px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <Check size={12} strokeWidth={3} />
+                <span>Confirmed</span>
+              </span>
+            </div>
+
+            {/* 5-Stage Stepper */}
+            <div style={{ marginBottom: '24px', padding: '0 8px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'relative' }}>
+                <div style={{ position: 'absolute', top: '10px', left: '10px', right: '10px', height: '2px', background: '#e2e8f0', zIndex: 1 }} />
+                <div style={{ position: 'absolute', top: '10px', left: '10px', width: '75%', height: '2px', background: '#059669', zIndex: 1 }} />
+
+                {/* Stage 1 */}
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', zIndex: 2 }}>
+                  <div style={{ width: '20px', height: '20px', borderRadius: '50%', background: '#059669', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '6px' }}>
+                    <Check size={11} strokeWidth={3} />
+                  </div>
+                  <span style={{ fontSize: '10px', color: '#475569', fontWeight: 600 }}>Requested</span>
+                </div>
+
+                {/* Stage 2 */}
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', zIndex: 2 }}>
+                  <div style={{ width: '20px', height: '20px', borderRadius: '50%', background: '#059669', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '6px' }}>
+                    <Check size={11} strokeWidth={3} />
+                  </div>
+                  <span style={{ fontSize: '10px', color: '#475569', fontWeight: 600 }}>Provider accepted</span>
+                </div>
+
+                {/* Stage 3 */}
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', zIndex: 2 }}>
+                  <div style={{ width: '20px', height: '20px', borderRadius: '50%', background: '#059669', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '6px' }}>
+                    <Check size={11} strokeWidth={3} />
+                  </div>
+                  <span style={{ fontSize: '10px', color: '#475569', fontWeight: 600 }}>Awaiting payment</span>
+                </div>
+
+                {/* Stage 4 */}
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', zIndex: 2 }}>
+                  <div style={{ width: '20px', height: '20px', borderRadius: '50%', background: '#059669', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '6px' }}>
+                    <Check size={11} strokeWidth={3} />
+                  </div>
+                  <span style={{ fontSize: '10px', color: '#059669', fontWeight: 700 }}>Confirmed</span>
+                </div>
+
+                {/* Stage 5 */}
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', zIndex: 2 }}>
+                  <div style={{ width: '20px', height: '20px', borderRadius: '50%', background: '#fff', border: '2px solid #cbd5e1', color: '#94a3b8', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '6px' }}>
+                    <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#cbd5e1' }} />
+                  </div>
+                  <span style={{ fontSize: '10px', color: '#94a3b8' }}>In progress</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Date & Meta Info */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px' }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', fontWeight: 700, color: '#0f172a', marginBottom: '4px' }}>
+                  <Calendar size={14} color="#64748b" />
+                  <span>Mon, Nov 23, 2026 · {selectedSlotTime}</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12.5px', color: '#64748b' }}>
+                  <Clock size={13} color="#64748b" />
+                  <span>2 hours</span>
+                </div>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontSize: '11px', color: '#64748b', textTransform: 'uppercase' }}>Total</div>
+                <div style={{ fontSize: '18px', fontWeight: 800, color: '#0f172a' }}>₦50,000</div>
+              </div>
+            </div>
+
+            {/* Paid via Agent Vault Banner */}
+            <div
+              style={{
+                background: '#ecfdf5',
+                border: '1px solid #a7f3d0',
+                borderRadius: '12px',
+                padding: '14px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+              }}
+            >
+              <ShieldCheck size={24} color="#059669" style={{ flexShrink: 0 }} />
+              <div>
+                <div style={{ fontWeight: 800, fontSize: '13.5px', color: '#065f46' }}>
+                  Paid via Agent Vault
+                </div>
+                <div style={{ fontSize: '12px', color: '#047857' }}>
+                  Authorization complete. Your booking is confirmed.
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─────────────────────────────────────────────────────────────
+          FLOW VIEW 7: NAIRATAG BOOKING AGENT (INTERACTIVE CHAT)
+          ───────────────────────────────────────────────────────────── */}
+      {activeSubTab === 'agent_chat' && (
+        <div style={{ maxWidth: '640px', margin: '0 auto' }}>
+          <div style={{ background: '#fff', borderRadius: '20px', border: '1px solid #e2e8f0', overflow: 'hidden', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.03)' }}>
+            {/* Chat Header */}
+            <div
+              style={{
+                padding: '14px 18px',
+                borderBottom: '1px solid #e2e8f0',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                background: '#f8fafc',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div
+                  style={{
+                    width: '34px',
+                    height: '34px',
+                    borderRadius: '50%',
+                    background: '#059669',
+                    color: '#fff',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Bot size={18} />
+                </div>
+                <div>
+                  <div style={{ fontWeight: 800, fontSize: '14px', color: '#0f172a' }}>
+                    NairaTag Booking Agent
+                  </div>
+                  <div style={{ fontSize: '11px', color: '#059669', fontWeight: 600 }}>
+                    Online · Ready to reserve slots
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b' }}
+              >
+                <MoreVertical size={18} />
+              </button>
+            </div>
+
+            {/* Chat Body */}
+            <div style={{ padding: '20px', minHeight: '340px', maxHeight: '480px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              {chatMessages.map((msg) => {
+                const isUser = msg.sender === 'user';
+                return (
+                  <div
+                    key={msg.id}
+                    style={{
                       display: 'flex',
-                      alignItems: 'center',
-                      gap: '5px',
+                      gap: '8px',
+                      justifyContent: isUser ? 'flex-end' : 'flex-start',
+                      alignItems: 'flex-start',
                     }}
                   >
-                    <Icon size={12} />
-                    <span>{cat.label}</span>
-                  </button>
+                    {!isUser && (
+                      <div
+                        style={{
+                          width: '28px',
+                          height: '28px',
+                          borderRadius: '50%',
+                          background: '#dcfce7',
+                          color: '#15803d',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          flexShrink: 0,
+                          marginTop: '2px',
+                        }}
+                      >
+                        <Bot size={15} />
+                      </div>
+                    )}
+
+                    <div style={{ maxWidth: '80%' }}>
+                      <div
+                        style={{
+                          padding: '10px 14px',
+                          borderRadius: isUser ? '16px 16px 2px 16px' : '16px 16px 16px 2px',
+                          background: isUser ? '#eff6ff' : '#f8fafc',
+                          border: isUser ? '1px solid #bfdbfe' : '1px solid #e2e8f0',
+                          color: '#0f172a',
+                          fontSize: '13px',
+                          lineHeight: 1.4,
+                        }}
+                      >
+                        {msg.text}
+                      </div>
+
+                      {msg.actions && (
+                        <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedPaymentMethod('vault');
+                              setActiveSubTab('discover');
+                              setCurrentStep('review');
+                            }}
+                            style={{
+                              padding: '6px 12px',
+                              borderRadius: '8px',
+                              background: '#059669',
+                              color: '#fff',
+                              border: 'none',
+                              fontSize: '11.5px',
+                              fontWeight: 600,
+                              cursor: 'pointer',
+                            }}
+                          >
+                            Authorize via Agent Vault
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedPaymentMethod('direct');
+                              setActiveSubTab('discover');
+                              setCurrentStep('review');
+                            }}
+                            style={{
+                              padding: '6px 12px',
+                              borderRadius: '8px',
+                              background: '#fff',
+                              color: '#475569',
+                              border: '1px solid #cbd5e1',
+                              fontSize: '11.5px',
+                              fontWeight: 600,
+                              cursor: 'pointer',
+                            }}
+                          >
+                            Pay directly
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    {isUser && (
+                      <div
+                        style={{
+                          width: '28px',
+                          height: '28px',
+                          borderRadius: '50%',
+                          background: '#3b82f6',
+                          color: '#fff',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: '11px',
+                          fontWeight: 700,
+                          flexShrink: 0,
+                          marginTop: '2px',
+                        }}
+                      >
+                        JD
+                      </div>
+                    )}
+                  </div>
                 );
               })}
             </div>
+
+            {/* Chat Input Bar */}
+            <form
+              onSubmit={handleSendChatMessage}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '12px 16px',
+                borderTop: '1px solid #e2e8f0',
+                background: '#fff',
+              }}
+            >
+              <input
+                type="text"
+                placeholder="Ask booking agent for services, dates, or prices..."
+                value={chatInput}
+                onChange={(e) => setChatInput(e.target.value)}
+                style={{
+                  flex: 1,
+                  padding: '9px 12px',
+                  borderRadius: '10px',
+                  border: '1px solid #cbd5e1',
+                  fontSize: '13px',
+                  outline: 'none',
+                  color: '#0f172a',
+                }}
+              />
+              <button
+                type="submit"
+                style={{
+                  background: '#059669',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '10px',
+                  padding: '9px 14px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <Send size={15} />
+              </button>
+            </form>
           </div>
-
-          {/* Service Cards Grid */}
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(310px, 1fr))',
-              gap: '16px',
-            }}
-          >
-            {servicesList.map((service) => {
-              const CategoryIcon = CATEGORY_ICONS[service.category] || Sparkles;
-              return (
-                <article
-                  key={service.id}
-                  style={{
-                    background: 'var(--card-bg, #fff)',
-                    border: '1px solid var(--border-color, #e2e8f0)',
-                    borderRadius: '16px',
-                    padding: '18px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    justifyContent: 'space-between',
-                    boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
-                    transition: 'transform 0.15s ease, box-shadow 0.15s ease',
-                  }}
-                >
-                  <div>
-                    {/* Provider Tag & Mode Header */}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <span
-                          style={{
-                            fontSize: '11px',
-                            fontWeight: 700,
-                            color: '#059669',
-                            background: 'rgba(5, 150, 105, 0.08)',
-                            padding: '2px 8px',
-                            borderRadius: '6px',
-                          }}
-                        >
-                          {service.canonicalTag}
-                        </span>
-                        {service.requiresSelfVerification && (
-                          <span
-                            title="Requires Self Protocol Zero-Knowledge Human Verification"
-                            style={{
-                              fontSize: '10px',
-                              fontWeight: 700,
-                              color: '#0D9488',
-                              background: 'rgba(13, 148, 136, 0.1)',
-                              padding: '2px 6px',
-                              borderRadius: '6px',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '3px',
-                            }}
-                          >
-                            <ShieldCheck size={11} />
-                            <span>Self ZK</span>
-                          </span>
-                        )}
-                      </div>
-
-                      <span
-                        style={{
-                          fontSize: '10.5px',
-                          fontWeight: 600,
-                          color: service.bookingMode === BOOKING_MODES.INSTANT ? '#059669' : '#d97706',
-                          background: service.bookingMode === BOOKING_MODES.INSTANT ? 'rgba(5, 150, 105, 0.06)' : 'rgba(217, 119, 6, 0.08)',
-                          padding: '2px 6px',
-                          borderRadius: '4px',
-                        }}
-                      >
-                        {service.bookingMode === BOOKING_MODES.INSTANT ? '⚡ Instant' : '⏳ Approval'}
-                      </span>
-                    </div>
-
-                    {/* Title & Description */}
-                    <h3 style={{ fontSize: '15px', fontWeight: 700, margin: '0 0 6px 0', lineHeight: 1.3 }}>
-                      {service.title}
-                    </h3>
-                    <p style={{ fontSize: '12px', color: 'var(--text-secondary, #64748b)', margin: '0 0 14px 0', lineHeight: 1.45 }}>
-                      {service.description}
-                    </p>
-                  </div>
-
-                  {/* Pricing & Booking CTA Footer */}
-                  <div
-                    style={{
-                      borderTop: '1px solid var(--border-color, #f1f5f9)',
-                      paddingTop: '12px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                    }}
-                  >
-                    <div>
-                      <div style={{ fontSize: '16px', fontWeight: 800, color: '#111827' }}>
-                        {service.price} {service.currency}
-                      </div>
-                      <div style={{ fontSize: '10.5px', color: '#64748b' }}>
-                        {service.durationMinutes} min session
-                      </div>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSelectedService(service);
-                        setSelectedSlot(null);
-                        setBookingStep('schedule');
-                        setBookingError('');
-                      }}
-                      style={{
-                        padding: '8px 16px',
-                        borderRadius: '10px',
-                        background: 'linear-gradient(135deg, #059669 0%, #10b981 100%)',
-                        color: '#fff',
-                        border: 'none',
-                        fontSize: '12.5px',
-                        fontWeight: 700,
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '5px',
-                      }}
-                    >
-                      <span>Book Slot</span>
-                      <ArrowRight size={13} />
-                    </button>
-                  </div>
-                </article>
-              );
-            })}
-          </div>
-
-          {!servicesList.length && (
-            <div style={{ textAlign: 'center', padding: '40px 20px', color: '#64748b' }}>
-              <p>No services matched your query. Try broadening your search or select another category.</p>
-            </div>
-          )}
-        </>
+        </div>
       )}
 
-      {/* ── SUB-TAB 2: MY BOOKINGS ── */}
+      {/* ─────────────────────────────────────────────────────────────
+          FLOW VIEW 8: MY BOOKINGS LIST
+          ───────────────────────────────────────────────────────────── */}
       {activeSubTab === 'my_bookings' && (
-        <div style={{ background: 'var(--card-bg, #fff)', borderRadius: '16px', border: '1px solid var(--border-color, #e2e8f0)', padding: '20px' }}>
-          <h2 style={{ fontSize: '18px', fontWeight: 700, margin: '0 0 16px 0' }}>My Service Bookings</h2>
+        <div style={{ background: '#fff', borderRadius: '16px', border: '1px solid #e2e8f0', padding: '20px' }}>
+          <h2 style={{ fontSize: '18px', fontWeight: 800, margin: '0 0 16px 0', color: '#0f172a' }}>My Service Bookings</h2>
 
           {myBookings.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '40px 20px', color: '#64748b' }}>
@@ -629,7 +1625,7 @@ export default function BookingMarketplace({
               <p style={{ fontSize: '12px', margin: '4px 0 16px' }}>Discover and reserve services offered by sovereign agents across NairaTag.</p>
               <button
                 type="button"
-                onClick={() => setActiveSubTab('discover')}
+                onClick={() => { setActiveSubTab('discover'); setCurrentStep('discover'); }}
                 style={{
                   padding: '8px 16px',
                   borderRadius: '10px',
@@ -650,7 +1646,7 @@ export default function BookingMarketplace({
                 <div
                   key={b.id}
                   style={{
-                    border: '1px solid var(--border-color, #e2e8f0)',
+                    border: '1px solid #e2e8f0',
                     borderRadius: '12px',
                     padding: '14px 16px',
                     display: 'flex',
@@ -662,12 +1658,12 @@ export default function BookingMarketplace({
                 >
                   <div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <span style={{ fontWeight: 700, fontSize: '14px' }}>{b.serviceTitle}</span>
+                      <span style={{ fontWeight: 700, fontSize: '14px', color: '#0f172a' }}>{b.serviceTitle}</span>
                       <span style={{ fontSize: '11px', color: '#059669', fontWeight: 600 }}>{b.providerCanonicalTag}</span>
                     </div>
                     <div style={{ fontSize: '12px', color: '#64748b', marginTop: '3px' }}>
                       📅 {new Date(b.slotStartTime).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
-                      {' · '}{b.durationMinutes} mins · {b.price} {b.currency}
+                      {' · '}{b.durationMinutes} mins · ₦{Number(b.price).toLocaleString()} {b.currency}
                     </div>
                   </div>
 
@@ -717,12 +1713,14 @@ export default function BookingMarketplace({
         </div>
       )}
 
-      {/* ── SUB-TAB 3: PROVIDER DASHBOARD ── */}
+      {/* ─────────────────────────────────────────────────────────────
+          FLOW VIEW 9: PROVIDER PORTAL
+          ───────────────────────────────────────────────────────────── */}
       {activeSubTab === 'provider_dashboard' && (
-        <div style={{ background: 'var(--card-bg, #fff)', borderRadius: '16px', border: '1px solid var(--border-color, #e2e8f0)', padding: '20px' }}>
+        <div style={{ background: '#fff', borderRadius: '16px', border: '1px solid #e2e8f0', padding: '20px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
             <div>
-              <h2 style={{ fontSize: '18px', fontWeight: 700, margin: 0 }}>Agent Provider Management</h2>
+              <h2 style={{ fontSize: '18px', fontWeight: 800, margin: 0, color: '#0f172a' }}>Agent Provider Management</h2>
               <p style={{ fontSize: '12px', color: '#64748b', margin: '2px 0 0' }}>
                 Manage bookable services and approve incoming reservations for ₦{(activeAgentTag || 'nairatag').toUpperCase()}.
               </p>
@@ -749,7 +1747,7 @@ export default function BookingMarketplace({
             </button>
           </div>
 
-          <h3 style={{ fontSize: '14px', fontWeight: 700, margin: '20px 0 10px' }}>Incoming Booking Requests</h3>
+          <h3 style={{ fontSize: '14px', fontWeight: 700, margin: '20px 0 10px', color: '#0f172a' }}>Incoming Booking Requests</h3>
           {providerBookings.length === 0 ? (
             <p style={{ fontSize: '12px', color: '#64748b' }}>No pending bookings for your agent.</p>
           ) : (
@@ -758,7 +1756,7 @@ export default function BookingMarketplace({
                 <div
                   key={b.id}
                   style={{
-                    border: '1px solid var(--border-color, #e2e8f0)',
+                    border: '1px solid #e2e8f0',
                     borderRadius: '10px',
                     padding: '12px 14px',
                     display: 'flex',
@@ -767,9 +1765,9 @@ export default function BookingMarketplace({
                   }}
                 >
                   <div>
-                    <div style={{ fontWeight: 600, fontSize: '13px' }}>{b.serviceTitle}</div>
+                    <div style={{ fontWeight: 600, fontSize: '13px', color: '#0f172a' }}>{b.serviceTitle}</div>
                     <div style={{ fontSize: '11.5px', color: '#64748b' }}>
-                      Customer: {b.customerName} · {b.price} {b.currency}
+                      Customer: {b.customerName} · ₦{Number(b.price).toLocaleString()} {b.currency}
                     </div>
                   </div>
 
@@ -799,423 +1797,6 @@ export default function BookingMarketplace({
               ))}
             </div>
           )}
-        </div>
-      )}
-
-      {/* ── BOOKING MODAL & CHECKOUT ── */}
-      {selectedService && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0, 0, 0, 0.5)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000,
-            padding: '16px',
-            backdropFilter: 'blur(3px)',
-          }}
-        >
-          <div
-            style={{
-              background: 'var(--card-bg, #fff)',
-              borderRadius: '20px',
-              maxWidth: '520px',
-              width: '100%',
-              padding: '24px',
-              maxHeight: '90vh',
-              overflowY: 'auto',
-              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.2)',
-            }}
-          >
-            {/* Modal Header */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-              <div>
-                <span style={{ fontSize: '11px', fontWeight: 700, color: '#059669', textTransform: 'uppercase' }}>
-                  {selectedService.canonicalTag}
-                </span>
-                <h3 style={{ fontSize: '18px', fontWeight: 800, margin: '2px 0 0' }}>{selectedService.title}</h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => setSelectedService(null)}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b' }}
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            {bookingError && (
-              <div style={{ padding: '10px 12px', borderRadius: '8px', background: 'rgba(220, 38, 38, 0.08)', color: '#dc2626', fontSize: '12px', marginBottom: '14px', display: 'flex', gap: '6px' }}>
-                <AlertCircle size={15} style={{ flexShrink: 0 }} />
-                <span>{bookingError}</span>
-              </div>
-            )}
-
-            {/* STEP 1: SCHEDULE PICKER */}
-            {bookingStep === 'schedule' && (
-              <div>
-                <label style={{ fontSize: '12px', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '6px' }}>
-                  Select Session Date
-                </label>
-                <input
-                  type="date"
-                  value={selectedDate}
-                  min={new Date().toISOString().split('T')[0]}
-                  onChange={(e) => {
-                    setSelectedDate(e.target.value);
-                    setSelectedSlot(null);
-                  }}
-                  style={{
-                    width: '100%',
-                    padding: '9px 12px',
-                    borderRadius: '10px',
-                    border: '1px solid var(--border-color, #cbd5e1)',
-                    background: 'var(--surface-1, #f8fafc)',
-                    fontSize: '13px',
-                    marginBottom: '16px',
-                    outline: 'none',
-                  }}
-                />
-
-                <label style={{ fontSize: '12px', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '8px' }}>
-                  Available Working Hour Slots (Preserving Provider Timezone)
-                </label>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '8px', maxHeight: '180px', overflowY: 'auto', marginBottom: '20px' }}>
-                  {availableSlots.map((slot) => (
-                    <button
-                      key={slot.startTime}
-                      type="button"
-                      disabled={!slot.available}
-                      onClick={() => setSelectedSlot(slot)}
-                      style={{
-                        padding: '8px 10px',
-                        borderRadius: '8px',
-                        border: selectedSlot?.startTime === slot.startTime ? '2px solid #059669' : '1px solid var(--border-color, #e2e8f0)',
-                        background: selectedSlot?.startTime === slot.startTime ? 'rgba(5, 150, 105, 0.1)' : slot.available ? 'var(--card-bg, #fff)' : '#f1f5f9',
-                        color: slot.available ? 'inherit' : '#94a3b8',
-                        fontSize: '12px',
-                        fontWeight: selectedSlot?.startTime === slot.startTime ? 700 : 500,
-                        cursor: slot.available ? 'pointer' : 'not-allowed',
-                      }}
-                    >
-                      {slot.timeLabel}
-                    </button>
-                  ))}
-                  {!availableSlots.length && (
-                    <div style={{ gridColumn: '1 / -1', fontSize: '12px', color: '#64748b', textAlign: 'center', padding: '16px' }}>
-                      No available slots on this date. Please pick another date.
-                    </div>
-                  )}
-                </div>
-
-                <button
-                  type="button"
-                  disabled={!selectedSlot}
-                  onClick={handleProceedToCheckout}
-                  style={{
-                    width: '100%',
-                    padding: '12px',
-                    borderRadius: '12px',
-                    background: selectedSlot ? '#059669' : '#94a3b8',
-                    color: '#fff',
-                    border: 'none',
-                    fontWeight: 700,
-                    fontSize: '13.5px',
-                    cursor: selectedSlot ? 'pointer' : 'not-allowed',
-                  }}
-                >
-                  Proceed to Checkout
-                </button>
-              </div>
-            )}
-
-            {/* STEP 2: CHECKOUT & PAYMENT SELECTION */}
-            {bookingStep === 'checkout' && (
-              <div>
-                <div style={{ background: '#f8fafc', padding: '12px 14px', borderRadius: '12px', marginBottom: '16px', fontSize: '12.5px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                    <span style={{ color: '#64748b' }}>Date & Time</span>
-                    <span style={{ fontWeight: 600 }}>{selectedSlot?.timeLabel} ({selectedDate})</span>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                    <span style={{ color: '#64748b' }}>Duration</span>
-                    <span style={{ fontWeight: 600 }}>{selectedService.durationMinutes} minutes</span>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: '#64748b' }}>Total Fee</span>
-                    <span style={{ fontWeight: 800, color: '#059669' }}>{selectedService.price} {selectedService.currency}</span>
-                  </div>
-                </div>
-
-                {/* Payment Route Selector */}
-                <label style={{ fontSize: '12px', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '8px' }}>
-                  Payment Authorization Route
-                </label>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '16px' }}>
-                  <button
-                    type="button"
-                    onClick={() => setPaymentMode(PAYMENT_MODES.DIRECT_HUMAN)}
-                    style={{
-                      padding: '10px 12px',
-                      borderRadius: '10px',
-                      border: paymentMode === PAYMENT_MODES.DIRECT_HUMAN ? '2px solid #059669' : '1px solid #cbd5e1',
-                      background: paymentMode === PAYMENT_MODES.DIRECT_HUMAN ? 'rgba(5, 150, 105, 0.08)' : 'transparent',
-                      textAlign: 'left',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontWeight: 700, fontSize: '12.5px' }}>
-                      <User size={13} color="#059669" />
-                      <span>Direct Wallet</span>
-                    </div>
-                    <div style={{ fontSize: '10.5px', color: '#64748b', marginTop: '2px' }}>
-                      Human EVM signature
-                    </div>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setPaymentMode(PAYMENT_MODES.AGENT_VAULT)}
-                    style={{
-                      padding: '10px 12px',
-                      borderRadius: '10px',
-                      border: paymentMode === PAYMENT_MODES.AGENT_VAULT ? '2px solid #2563EB' : '1px solid #cbd5e1',
-                      background: paymentMode === PAYMENT_MODES.AGENT_VAULT ? 'rgba(37, 99, 235, 0.08)' : 'transparent',
-                      textAlign: 'left',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontWeight: 700, fontSize: '12.5px', color: '#2563EB' }}>
-                      <Bot size={13} />
-                      <span>Agent Vault</span>
-                    </div>
-                    <div style={{ fontSize: '10.5px', color: '#64748b', marginTop: '2px' }}>
-                      Altana Session + Self ZK
-                    </div>
-                  </button>
-                </div>
-
-                <button
-                  type="button"
-                  disabled={isSubmitting}
-                  onClick={handleConfirmBooking}
-                  style={{
-                    width: '100%',
-                    padding: '12px',
-                    borderRadius: '12px',
-                    background: '#059669',
-                    color: '#fff',
-                    border: 'none',
-                    fontWeight: 700,
-                    fontSize: '13.5px',
-                    cursor: isSubmitting ? 'wait' : 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '6px',
-                  }}
-                >
-                  {isSubmitting ? (
-                    <>
-                      <RefreshCw size={14} className="animate-spin" />
-                      <span>Settling on Celo Mainnet...</span>
-                    </>
-                  ) : (
-                    <span>Authorize & Confirm Booking</span>
-                  )}
-                </button>
-              </div>
-            )}
-
-            {/* STEP 3: SUCCESS */}
-            {bookingStep === 'success' && createdBooking && (
-              <div style={{ textAlign: 'center', padding: '16px 0' }}>
-                <CheckCircle2 size={42} color="#059669" style={{ margin: '0 auto 12px' }} />
-                <h4 style={{ fontSize: '18px', fontWeight: 800, margin: '0 0 6px 0' }}>Booking Reserved!</h4>
-                <p style={{ fontSize: '13px', color: '#64748b', margin: '0 0 16px' }}>
-                  Reference ID: <code style={{ fontWeight: 700, color: '#059669' }}>{createdBooking.id}</code>
-                </p>
-                <div style={{ background: '#f8fafc', padding: '12px', borderRadius: '10px', fontSize: '12px', textAlign: 'left', marginBottom: '18px' }}>
-                  <div>Status: <strong>{createdBooking.status.toUpperCase()}</strong></div>
-                  <div>Provider: <strong>{createdBooking.providerCanonicalTag}</strong></div>
-                  <div>Settlement: <strong>{createdBooking.price} {createdBooking.currency}</strong></div>
-                  {createdBooking.paymentTxHash && (
-                    <div style={{ fontSize: '10.5px', color: '#059669', wordBreak: 'break-all', marginTop: '4px' }}>
-                      Tx: {createdBooking.paymentTxHash}
-                    </div>
-                  )}
-                </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSelectedService(null);
-                    setActiveSubTab('my_bookings');
-                  }}
-                  style={{
-                    width: '100%',
-                    padding: '11px',
-                    borderRadius: '10px',
-                    background: '#059669',
-                    color: '#fff',
-                    border: 'none',
-                    fontWeight: 700,
-                    fontSize: '13px',
-                    cursor: 'pointer',
-                  }}
-                >
-                  View in My Bookings
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* ── CREATE SERVICE MODAL (PROVIDER) ── */}
-      {isCreateServiceOpen && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0, 0, 0, 0.5)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000,
-            padding: '16px',
-            backdropFilter: 'blur(3px)',
-          }}
-        >
-          <form
-            onSubmit={handleCreateServiceSubmit}
-            style={{
-              background: 'var(--card-bg, #fff)',
-              borderRadius: '20px',
-              maxWidth: '480px',
-              width: '100%',
-              padding: '24px',
-              maxHeight: '90vh',
-              overflowY: 'auto',
-            }}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
-              <h3 style={{ fontSize: '17px', fontWeight: 800, margin: 0 }}>Publish Bookable Service</h3>
-              <button
-                type="button"
-                onClick={() => setIsCreateServiceOpen(false)}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b' }}
-              >
-                <X size={16} />
-              </button>
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <div>
-                <label style={{ fontSize: '11.5px', fontWeight: 600, display: 'block', marginBottom: '4px' }}>Service Title</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Masterclass Consultation"
-                  value={newServiceForm.title}
-                  onChange={(e) => setNewServiceForm({ ...newServiceForm, title: e.target.value })}
-                  style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '13px' }}
-                />
-              </div>
-
-              <div>
-                <label style={{ fontSize: '11.5px', fontWeight: 600, display: 'block', marginBottom: '4px' }}>Description</label>
-                <textarea
-                  rows={2}
-                  required
-                  placeholder="What will the customer or agent receive?"
-                  value={newServiceForm.description}
-                  onChange={(e) => setNewServiceForm({ ...newServiceForm, description: e.target.value })}
-                  style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '12.5px' }}
-                />
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                <div>
-                  <label style={{ fontSize: '11.5px', fontWeight: 600, display: 'block', marginBottom: '4px' }}>Category</label>
-                  <select
-                    value={newServiceForm.category}
-                    onChange={(e) => setNewServiceForm({ ...newServiceForm, category: e.target.value })}
-                    style={{ width: '100%', padding: '8px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '12.5px' }}
-                  >
-                    {BOOKING_CATEGORIES.map((c) => (
-                      <option key={c.id} value={c.id}>{c.label}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label style={{ fontSize: '11.5px', fontWeight: 600, display: 'block', marginBottom: '4px' }}>Price (USDT)</label>
-                  <input
-                    type="number"
-                    step="0.5"
-                    required
-                    value={newServiceForm.price}
-                    onChange={(e) => setNewServiceForm({ ...newServiceForm, price: e.target.value })}
-                    style={{ width: '100%', padding: '8px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '12.5px' }}
-                  />
-                </div>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                <div>
-                  <label style={{ fontSize: '11.5px', fontWeight: 600, display: 'block', marginBottom: '4px' }}>Duration (Mins)</label>
-                  <input
-                    type="number"
-                    step="15"
-                    value={newServiceForm.durationMinutes}
-                    onChange={(e) => setNewServiceForm({ ...newServiceForm, durationMinutes: Number(e.target.value) })}
-                    style={{ width: '100%', padding: '8px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '12.5px' }}
-                  />
-                </div>
-
-                <div>
-                  <label style={{ fontSize: '11.5px', fontWeight: 600, display: 'block', marginBottom: '4px' }}>Booking Mode</label>
-                  <select
-                    value={newServiceForm.bookingMode}
-                    onChange={(e) => setNewServiceForm({ ...newServiceForm, bookingMode: e.target.value })}
-                    style={{ width: '100%', padding: '8px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '12.5px' }}
-                  >
-                    <option value={BOOKING_MODES.INSTANT}>⚡ Instant Booking</option>
-                    <option value={BOOKING_MODES.APPROVAL_REQUIRED}>⏳ Approval Required</option>
-                  </select>
-                </div>
-              </div>
-
-              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', cursor: 'pointer', marginTop: '4px' }}>
-                <input
-                  type="checkbox"
-                  checked={newServiceForm.requiresSelfVerification}
-                  onChange={(e) => setNewServiceForm({ ...newServiceForm, requiresSelfVerification: e.target.checked })}
-                />
-                <span>Require Self Protocol ZK Human Verification</span>
-              </label>
-
-              <button
-                type="submit"
-                style={{
-                  marginTop: '8px',
-                  width: '100%',
-                  padding: '11px',
-                  borderRadius: '10px',
-                  background: '#059669',
-                  color: '#fff',
-                  border: 'none',
-                  fontWeight: 700,
-                  fontSize: '13px',
-                  cursor: 'pointer',
-                }}
-              >
-                Publish to NairaTag Marketplace
-              </button>
-            </div>
-          </form>
         </div>
       )}
     </div>

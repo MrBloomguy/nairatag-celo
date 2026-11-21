@@ -427,3 +427,204 @@ test('11. Standard Booking Capability Check for Autonomous Agents', () => {
   assert.equal(isBookingCapableAgent(sampleAgent), true);
   assert.equal(isBookingCapableAgent({ tag: 'offline', status: 'offline' }), false);
 });
+
+test('12. Concurrency Range Overlap Collision: Different Start Times Overlapping', async () => {
+  const serviceId = `srv_overlap_${Date.now()}`;
+  registerService({
+    id: serviceId,
+    agentTag: 'overlap_host',
+    title: 'Range Collision Studio',
+    description: 'Testing overlapping time intervals.',
+    category: 'music',
+    pricingModel: PRICING_MODELS.FIXED,
+    price: '20.00',
+    currency: 'USDT',
+    durationMinutes: 120,
+    bookingMode: BOOKING_MODES.INSTANT,
+    requiresSelfVerification: false,
+  }, { tag: 'overlap_host' });
+
+  // First booking: 10:00 to 12:00 UTC
+  await createBookingRequest({
+    serviceId,
+    customerTag: 'user_1',
+    slotStartTime: '2026-11-28T10:00:00.000Z',
+    slotEndTime: '2026-11-28T12:00:00.000Z',
+  });
+
+  // Second booking: 11:00 to 13:00 UTC (overlaps by 1 hour with first booking)
+  await assert.rejects(
+    async () => {
+      await createBookingRequest({
+        serviceId,
+        customerTag: 'user_2',
+        slotStartTime: '2026-11-28T11:00:00.000Z',
+        slotEndTime: '2026-11-28T13:00:00.000Z',
+      });
+    },
+    /DOUBLE_BOOKING_PREVENTED|conflict|overlap/i
+  );
+});
+
+test('13. Expired Reservation Rejects Payment Attempt', async () => {
+  const serviceId = `srv_expired_pay_${Date.now()}`;
+  registerService({
+    id: serviceId,
+    agentTag: 'nairatag',
+    title: 'Expiry Test Service',
+    description: 'Testing expired reservation payment lock.',
+    category: 'music',
+    pricingModel: PRICING_MODELS.FIXED,
+    price: '15.00',
+    currency: 'USDT',
+    durationMinutes: 60,
+    bookingMode: BOOKING_MODES.INSTANT,
+    requiresSelfVerification: false,
+  }, { tag: 'nairatag' });
+
+  const booking = await createBookingRequest({
+    serviceId,
+    customerTag: 'late_payer',
+    slotStartTime: '2026-11-29T14:00:00.000Z',
+    slotEndTime: '2026-11-29T15:00:00.000Z',
+  });
+
+  // Artificially age the reservation beyond TTL
+  booking.expiresAt = new Date(Date.now() - 5000).toISOString();
+
+  await assert.rejects(
+    async () => {
+      await confirmBookingPayment({
+        bookingId: booking.id,
+        paymentDetails: {},
+        isSimulation: true,
+      });
+    },
+    /RESERVATION_EXPIRED/i
+  );
+});
+
+test('14. Provider Cannot Accept Expired Reservation', async () => {
+  const serviceId = `srv_expired_accept_${Date.now()}`;
+  registerService({
+    id: serviceId,
+    agentTag: 'producer_dan',
+    title: 'Studio Session',
+    description: 'Testing expired acceptance rejection.',
+    category: 'music',
+    pricingModel: PRICING_MODELS.FIXED,
+    price: '40.00',
+    currency: 'USDT',
+    durationMinutes: 120,
+    bookingMode: BOOKING_MODES.APPROVAL_REQUIRED,
+    requiresSelfVerification: false,
+  }, { tag: 'producer_dan' });
+
+  const booking = await createBookingRequest({
+    serviceId,
+    customerTag: 'artist_joe',
+    slotStartTime: '2026-11-29T16:00:00.000Z',
+    slotEndTime: '2026-11-29T18:00:00.000Z',
+  });
+
+  // Age the reservation past TTL
+  booking.expiresAt = new Date(Date.now() - 10000).toISOString();
+
+  assert.throws(
+    () => {
+      providerAcceptBooking(booking.id, { tag: 'producer_dan' });
+    },
+    /RESERVATION_EXPIRED/i
+  );
+});
+
+test('15. Execution Boundary Rejects Tampered Authorization Parameters', async () => {
+  const serviceId = `srv_tamper_${Date.now()}`;
+  registerService({
+    id: serviceId,
+    agentTag: 'nairatag',
+    title: 'Tamper Protection Service',
+    description: 'Testing final boundary cryptographic & server-side enforcement.',
+    category: 'development',
+    pricingModel: PRICING_MODELS.FIXED,
+    price: '50.00',
+    currency: 'USDT',
+    durationMinutes: 60,
+    bookingMode: BOOKING_MODES.INSTANT,
+    requiresSelfVerification: false,
+  }, { tag: 'nairatag' });
+
+  const booking = await createBookingRequest({
+    serviceId,
+    customerTag: 'test_user',
+    slotStartTime: '2026-11-29T19:00:00.000Z',
+    slotEndTime: '2026-11-29T20:00:00.000Z',
+  });
+
+  const { executeBookingX402Settlement } = await import('../src/services/bookingPaymentService.js');
+
+  // Attempt 1: Tampered amount (claiming 0.01 instead of 50.00)
+  const tamperedAmountAuth = {
+    bookingId: booking.id,
+    serviceId: booking.serviceId,
+    providerAgentTag: 'nairatag',
+    customerId: 'test_user',
+    paymentToken: 'USDT',
+    amount: '0.01', // Tampered!
+    amountAtomic: '10000',
+    recipient: '0x653f773C9062e71A6554b42a9525fcD47fCC1693',
+    expiresAt: Math.floor(Date.now() / 1000) + 900,
+  };
+
+  await assert.rejects(
+    async () => {
+      await executeBookingX402Settlement({
+        booking,
+        authorization: tamperedAmountAuth,
+        paymentProof: {},
+        isSimulation: true,
+      });
+    },
+    /AUTHORIZATION_TAMPERED: Authorization amount does not match/i
+  );
+
+  // Attempt 2: Tampered recipient (diverting payment to attacker address)
+  const tamperedRecipientAuth = {
+    ...tamperedAmountAuth,
+    amount: '50.00',
+    recipient: '0x000000000000000000000000000000000000dEaD', // Attacker address!
+  };
+
+  await assert.rejects(
+    async () => {
+      await executeBookingX402Settlement({
+        booking,
+        authorization: tamperedRecipientAuth,
+        paymentProof: {},
+        isSimulation: true,
+      });
+    },
+    /AUTHORIZATION_TAMPERED: Authorization recipient does not match/i
+  );
+
+  // Attempt 3: Mismatched booking ID
+  const mismatchedIdAuth = {
+    ...tamperedAmountAuth,
+    amount: '50.00',
+    recipient: '0x653f773C9062e71A6554b42a9525fcD47fCC1693',
+    bookingId: 'book_different_id_9999',
+  };
+
+  await assert.rejects(
+    async () => {
+      await executeBookingX402Settlement({
+        booking,
+        authorization: mismatchedIdAuth,
+        paymentProof: {},
+        isSimulation: true,
+      });
+    },
+    /AUTHORIZATION_MISMATCH/i
+  );
+});
+

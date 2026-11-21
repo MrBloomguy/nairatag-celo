@@ -3478,7 +3478,6 @@ function ArcAppShell() {
                     >
                       <span>{showMemoField ? '− Hide Memo' : '+ Add Memo (Optional)'}</span>
                     </button>
-                    <span style={{ fontSize: '10px', color: 'var(--privy-color-foreground-3)', fontFamily: 'monospace' }}>celo_9f7deabd99a6</span>
                   </div>
                   {showMemoField && (
                     <input
@@ -5226,13 +5225,7 @@ function ArcAppShell() {
                 </span>
                 <span className="details-value">Celo Mainnet (Chain ID 42220)</span>
               </div>
-              <div className="details-row">
-                <span className="details-label">
-                  <ShieldCheck size={12} />
-                  <span>Attribution Tag</span>
-                </span>
-                <span className="details-value" style={{ fontFamily: 'monospace', color: '#059669' }}>celo_9f7deabd99a6</span>
-              </div>
+
               <div className="details-row">
                 <span className="details-label">
                   <Flame size={12} />

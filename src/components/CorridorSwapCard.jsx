@@ -498,12 +498,7 @@ export default function CorridorSwapCard({ walletAddress, onConnectWallet, embed
           </>
         )}
 
-        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-          <span style={{ color: 'var(--text-secondary, #666)' }}>Attribution Tag</span>
-          <span style={{ fontWeight: 600, fontFamily: 'monospace', color: '#059669' }}>
-            {CELO_ATTRIBUTION_TAG}
-          </span>
-        </div>
+
       </div>
 
       {/* Action Buttons */}

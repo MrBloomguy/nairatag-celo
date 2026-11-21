@@ -3256,44 +3256,44 @@ function ArcAppShell() {
                 <span>Send</span>
               </button>
 
-              {/* 2. USD₮ ⇄ cNGN */}
+              {/* 2. Swap */}
               <button
                 type="button"
                 className={`pay-mode-pill-btn pill-corridor ${payMode === 'corridor' ? 'active' : ''}`}
                 onClick={() => setPayMode('corridor')}
               >
                 <TrendingUp size={13} />
-                <span>USD₮ ⇄ cNGN</span>
+                <span>Swap</span>
               </button>
 
-              {/* 3. Agent Wallets */}
+              {/* 3. Wallets */}
               <button
                 type="button"
                 className={`pay-mode-pill-btn pill-altana ${payMode === 'altana' ? 'active' : ''}`}
                 onClick={() => setPayMode('altana')}
               >
                 <Key size={13} />
-                <span>Agent Wallets</span>
+                <span>Wallets</span>
               </button>
 
-              {/* 4. Agent Vault */}
+              {/* 4. Vault */}
               <button
                 type="button"
                 className={`pay-mode-pill-btn pill-vault ${payMode === 'vault' ? 'active' : ''}`}
                 onClick={() => setPayMode('vault')}
               >
                 <ShoppingCart size={13} />
-                <span>Agent Vault</span>
+                <span>Vault</span>
               </button>
 
-              {/* 5. Self Agent ID */}
+              {/* 5. Self ID */}
               <button
                 type="button"
                 className={`pay-mode-pill-btn pill-self ${payMode === 'self' ? 'active' : ''}`}
                 onClick={() => setPayMode('self')}
               >
                 <Fingerprint size={13} />
-                <span>Self Agent ID</span>
+                <span>Self ID</span>
               </button>
             </div>
 

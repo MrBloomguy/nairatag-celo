@@ -259,3 +259,4 @@ export const ARC_MEMO_ABI = [];
 export const CELO_TESTNET_CONFIG = CELO_MAINNET_CONFIG;
 export const CELO_USDC_ADDRESS = CELO_USDT_ADDRESS;
 
+

@@ -1,5 +1,6 @@
 import { keccak256, stringToHex } from 'viem';
 import { getEthereumProvider } from './celoPayment.js';
+import { listAllAgentLifecycleRecords } from './agentLifecycleService.js';
 
 const CELO_AGENTS_API = import.meta.env?.VITE_CELO_AGENTS_API || (import.meta.env?.DEV ? '/api/arc-agents' : 'https://nairatag.ng/api/arc-agents');
 
@@ -18,6 +19,9 @@ export function mapCeloAgentRecord(agent = {}) {
     role: String(agent.description || agent.role || ''),
     avatar: agent.avatarUrl || agent.avatar || `https://api.dicebear.com/7.x/identicon/svg?seed=${encodeURIComponent(tag)}`,
     status: String(agent.status || 'unknown').toLowerCase(),
+    self: agent.self || null,
+    altana: agent.altana || null,
+    erc8004: agent.erc8004 || null,
     points: agent.pointsEarned ?? agent.points_earned ?? agent.earnedPoints ?? agent.earned_points ?? agent.protocolPoints ?? agent.protocol_points ?? agent.totalPoints ?? agent.total_points ?? agent.points ?? stats.pointsEarned ?? stats.points_earned ?? stats.points ?? metrics.pointsEarned ?? metrics.points_earned ?? metrics.points ?? null,
     earnings: agent.earnings ?? agent.totalEarnings ?? agent.total_earnings ?? null,
     earningsCurrency: String(agent.earningsCurrency || agent.earnings_currency || agent.currency || 'USDC'),
@@ -42,17 +46,62 @@ export function mapCeloAgentRecord(agent = {}) {
 }
 
 export async function fetchCeloAgentDirectory({ signal } = {}) {
-  const response = await fetch(CELO_AGENTS_API, {
-    method: 'GET',
-    headers: { Accept: 'application/json' },
-    cache: 'no-store',
-    signal,
-  });
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok || !payload.ok || !Array.isArray(payload.agents)) {
-    throw new Error(payload.error || `Celo agent registry returned ${response.status}.`);
+  let networkAgents = [];
+  try {
+    const response = await fetch(CELO_AGENTS_API, {
+      method: 'GET',
+      headers: { Accept: 'application/json' },
+      cache: 'no-store',
+      signal,
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (response.ok && payload.ok && Array.isArray(payload.agents)) {
+      networkAgents = payload.agents.map(mapCeloAgentRecord).filter(Boolean);
+    }
+  } catch (err) {
+    console.warn('[fetchCeloAgentDirectory] Network fetch error, fallback to durable lifecycle:', err.message);
   }
-  return payload.agents.map(mapCeloAgentRecord).filter(Boolean);
+
+  // Enrich with local/durable lifecycle records
+  const lifecycleRecords = await listAllAgentLifecycleRecords().catch(() => []);
+  const lifecycleMap = new Map(lifecycleRecords.map((r) => [r.tag.toLowerCase(), r]));
+
+  if (networkAgents.length > 0) {
+    return networkAgents.map((agent) => {
+      const enriched = lifecycleMap.get(agent.tag.toLowerCase());
+      if (enriched) {
+        return {
+          ...agent,
+          self: enriched.self,
+          altana: enriched.altana,
+          erc8004: enriched.erc8004,
+          owner: enriched.ownerAddress || agent.owner,
+        };
+      }
+      return agent;
+    });
+  }
+
+  // Fallback to seeded lifecycle records
+  return lifecycleRecords.map((r) => ({
+    id: r.erc8004?.tokenId || '1',
+    tag: r.tag,
+    canonicalTag: r.canonicalTag,
+    name: r.name,
+    owner: r.ownerAddress,
+    category: r.category,
+    role: r.description,
+    avatar: r.avatar,
+    status: r.status,
+    self: r.self,
+    altana: r.altana,
+    erc8004: r.erc8004,
+    points: 100,
+    earnings: 0,
+    earningsCurrency: 'cNGN',
+    capabilities: r.capabilities || ['booking', 'tasks', 'x402_settlement'],
+    callableTools: ['booking', 'task_escrow', 'x402_pay'],
+  }));
 }
 
 async function signAdminPayload({ walletAddress, action, payload }) {

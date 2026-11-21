@@ -43,7 +43,7 @@ export const RESERVATION_TTL_MS = 15 * 60 * 1000;
 const bookingsStore = new Map();
 
 // Initialize durable persistence
-loadDurableEntityStore('bookings', bookingsStore).catch(() => {});
+loadDurableEntityStore('bookings', bookingsStore).catch(() => { });
 
 // Active mutex locks with range support to prevent concurrent double-booking
 // Each entry: { serviceId, startMs, endMs, expiresAtMs }
@@ -200,7 +200,7 @@ export async function createBookingRequest({
     };
 
     bookingsStore.set(bookingId, booking);
-    persistDurableEntityStore('bookings', bookingsStore).catch(() => {});
+    persistDurableEntityStore('bookings', bookingsStore).catch(() => { });
 
     // Notify provider of new request
     dispatchBookingNotification({
@@ -243,7 +243,7 @@ export function providerAcceptBooking(bookingId, providerIdentity = {}) {
   booking.updatedAt = new Date().toISOString();
   // Refresh payment TTL on provider acceptance
   booking.expiresAt = new Date(Date.now() + RESERVATION_TTL_MS).toISOString();
-  persistDurableEntityStore('bookings', bookingsStore).catch(() => {});
+  persistDurableEntityStore('bookings', bookingsStore).catch(() => { });
 
   dispatchBookingNotification({
     event: BOOKING_NOTIFICATION_EVENTS.BOOKING_ACCEPTED,
@@ -273,7 +273,7 @@ export function providerRejectBooking(bookingId, reason = '', providerIdentity =
 
   // Release mutex lock
   slotReservationLocks.delete(`${booking.serviceId}:${booking.slotStartTime}`);
-  persistDurableEntityStore('bookings', bookingsStore).catch(() => {});
+  persistDurableEntityStore('bookings', bookingsStore).catch(() => { });
 
   dispatchBookingNotification({
     event: BOOKING_NOTIFICATION_EVENTS.BOOKING_REJECTED,
@@ -348,7 +348,7 @@ export async function confirmBookingPayment({
     booking.paymentTxHash = settlementResult.txHash;
     booking.settledAt = settlementResult.settledAt;
     booking.updatedAt = new Date().toISOString();
-    persistDurableEntityStore('bookings', bookingsStore).catch(() => {});
+    persistDurableEntityStore('bookings', bookingsStore).catch(() => { });
 
     dispatchBookingNotification({
       event: BOOKING_NOTIFICATION_EVENTS.BOOKING_CONFIRMED,
@@ -397,7 +397,7 @@ export function cancelBooking(bookingId, reason = '', callerIdentity = {}) {
 
   // Release mutex lock
   slotReservationLocks.delete(`${booking.serviceId}:${booking.slotStartTime}`);
-  persistDurableEntityStore('bookings', bookingsStore).catch(() => {});
+  persistDurableEntityStore('bookings', bookingsStore).catch(() => { });
 
   dispatchBookingNotification({
     event: BOOKING_NOTIFICATION_EVENTS.BOOKING_CANCELLED,
@@ -435,7 +435,7 @@ export function rescheduleBooking(bookingId, newStartTime, newEndTime, callerIde
   booking.slotStartTime = newStartTime;
   booking.slotEndTime = newEndTime;
   booking.updatedAt = new Date().toISOString();
-  persistDurableEntityStore('bookings', bookingsStore).catch(() => {});
+  persistDurableEntityStore('bookings', bookingsStore).catch(() => { });
 
   dispatchBookingNotification({
     event: BOOKING_NOTIFICATION_EVENTS.BOOKING_RESCHEDULED,

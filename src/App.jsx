@@ -120,6 +120,7 @@ import {
   resolveTag,
 } from './services/nairatagResolver.js';
 import { checkArcTagAvailability, claimArcNairaTag, getArcTagForWallet } from './services/celoNairaTag.js';
+import { revokeAgentSession, getAgentLifecycleRecord } from './services/agentLifecycleService.js';
 import {
   buildNairaTagAgentMetadataUri,
   findArcAgentForTag,
@@ -455,11 +456,14 @@ function ArcAppShell() {
     setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
   };
 
-  // Navigation: 'chat' (Home) | 'claim' | 'tasks' | 'agents' | 'bookings' | 'pay' | 'faq' | 'rewards'
-  const VALID_TABS = ['claim', 'tasks', 'agents', 'bookings', 'pay', 'chat', 'faq', 'rewards', 'profile'];
+  // Navigation: 'chat' (Home) | 'claim' | 'tasks' | 'agents' | 'pay' | 'chat' | 'faq' | 'rewards'
+  const VALID_TABS = ['claim', 'tasks', 'agents', 'pay', 'chat', 'faq', 'rewards', 'profile'];
   const [mainTab, setMainTabState] = useState(() => {
     try {
       const hash = window.location.hash.replace('#', '').toLowerCase();
+      if (hash === 'bookings' || hash === 'services') {
+        return 'tasks';
+      }
       if (VALID_TABS.includes(hash)) {
         return hash;
       }
@@ -478,7 +482,10 @@ function ArcAppShell() {
     const handleHash = () => {
       try {
         const hash = window.location.hash.replace('#', '').toLowerCase();
-        if (VALID_TABS.includes(hash)) {
+        if (hash === 'bookings' || hash === 'services') {
+          setMainTabState('tasks');
+          setTasksTabSection('bookings');
+        } else if (VALID_TABS.includes(hash)) {
           setMainTabState(hash);
         }
       } catch { }
@@ -2275,9 +2282,15 @@ function ArcAppShell() {
     }
   };
 
-  // Open Agent Profile Modal & Fetch live onchain details from Arc ERC-8004
+  // Open Agent Profile Modal & Fetch live onchain details from Celo ERC-8004 and Lifecycle store
   const handleOpenAgentProfile = async (agent) => {
-    setSelectedAgentProfile(agent);
+    const lifecycle = await getAgentLifecycleRecord(agent.tag).catch(() => null);
+    setSelectedAgentProfile({
+      ...agent,
+      self: lifecycle?.self || agent.self,
+      altana: lifecycle?.altana || agent.altana,
+      erc8004: lifecycle?.erc8004 || agent.erc8004,
+    });
     setAgentProfileLiveLoading(true);
     setAgentProfileLiveData(null);
     try {
@@ -2305,10 +2318,17 @@ function ArcAppShell() {
     }
   };
 
-  const handleOpenPlatformAgentProfile = (agent) => {
+  const handleOpenPlatformAgentProfile = async (agent) => {
     setAgentProfileLiveLoading(false);
     setAgentProfileLiveData(null);
-    setSelectedAgentProfile({ ...agent, profileType: 'platform-agent' });
+    const lifecycle = await getAgentLifecycleRecord(agent.tag).catch(() => null);
+    setSelectedAgentProfile({
+      ...agent,
+      profileType: 'platform-agent',
+      self: lifecycle?.self || agent.self,
+      altana: lifecycle?.altana || agent.altana,
+      erc8004: lifecycle?.erc8004 || agent.erc8004,
+    });
   };
 
   const openDirectoryAgent = (agent) => {
@@ -2650,14 +2670,6 @@ function ArcAppShell() {
           </button>
           <button
             type="button"
-            className={`nav-tab-btn ${mainTab === 'bookings' ? 'active' : ''}`}
-            onClick={() => setMainTab('bookings')}
-          >
-            <Calendar size={14} />
-            <span>Bookings</span>
-          </button>
-          <button
-            type="button"
             className={`nav-tab-btn ${mainTab === 'agents' ? 'active' : ''}`}
             onClick={() => setMainTab('agents')}
           >
@@ -2963,24 +2975,6 @@ function ArcAppShell() {
 
               <button
                 type="button"
-                className={`mobile-nav-link ${mainTab === 'bookings' ? 'active' : ''}`}
-                onClick={() => {
-                  setMainTab('bookings');
-                  setIsMobileMenuOpen(false);
-                }}
-              >
-                <div className="mobile-nav-icon-box">
-                  <Calendar size={18} />
-                </div>
-                <div className="mobile-nav-text">
-                  <span className="mobile-nav-title">Bookings Marketplace</span>
-                  <span className="mobile-nav-desc">Reserve sessions, providers & agent services</span>
-                </div>
-                {mainTab === 'bookings' && <span className="mobile-nav-active-pill">Active</span>}
-              </button>
-
-              <button
-                type="button"
                 className={`mobile-nav-link ${mainTab === 'agents' ? 'active' : ''}`}
                 onClick={() => {
                   setMainTab('agents');
@@ -3009,8 +3003,8 @@ function ArcAppShell() {
                   <Send size={18} />
                 </div>
                 <div className="mobile-nav-text">
-                  <span className="mobile-nav-title">Pay & Vault</span>
-                  <span className="mobile-nav-desc">Send to ₦Tag, USD₮ ⇄ cNGN & Agent Vault</span>
+                  <span className="mobile-nav-title">Pay</span>
+                  <span className="mobile-nav-desc">Send to ₦Tag, USD₮ ⇄ cNGN</span>
                 </div>
                 {mainTab === 'pay' && <span className="mobile-nav-active-pill">Active</span>}
               </button>
@@ -4339,7 +4333,7 @@ function ArcAppShell() {
 
                     <button
                       type="button"
-                      className={`subtoggle-pill ${tasksTabSection === 'services' ? 'active' : ''}`}
+                      className={`subtoggle-pill ${(tasksTabSection === 'services' || tasksTabSection === 'bookings') ? 'active' : ''}`}
                       onClick={() => setTasksTabSection('services')}
                       style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
                     >
@@ -4352,7 +4346,7 @@ function ArcAppShell() {
                   </div>
 
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    {tasksTabSection === 'services' ? (
+                    {(tasksTabSection === 'services' || tasksTabSection === 'bookings') ? (
                       <span style={{ fontSize: '12px', color: '#64748b' }}>
                         Agents offering bookable sessions & services
                       </span>
@@ -4371,7 +4365,7 @@ function ArcAppShell() {
                   </div>
                 </div>
 
-                {tasksTabSection === 'services' ? (
+                {(tasksTabSection === 'services' || tasksTabSection === 'bookings') ? (
                   <div style={{ marginTop: '10px' }}>
                     <BookingMarketplace
                       walletAddress={walletAddress}
@@ -4379,7 +4373,7 @@ function ArcAppShell() {
                       altanaSession={null}
                       humanSelfProof={null}
                       onConnectWallet={() => setIsConnectModalOpen(true)}
-                      onOpenVault={() => { setPayMode('vault'); setMainTab('pay'); }}
+                      onOpenVault={() => { setTasksTabSection('services'); }}
                     />
                   </div>
                 ) : (
@@ -5767,6 +5761,113 @@ function ArcAppShell() {
                   )}
                 </div>
               </div>}
+
+              {/* Trust & Autonomous Rails: Self Protocol & Altana Smart Wallet */}
+              <div
+                style={{
+                  background: 'var(--surface-2, #f8fafc)',
+                  borderRadius: '12px',
+                  padding: '12px 14px',
+                  margin: '12px 0',
+                  border: '1px solid var(--border-color, rgba(0,0,0,0.08))',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '8px',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <ShieldCheck size={14} color="#059669" />
+                    <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--privy-color-foreground-2)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                      Self Agent ID & Altana Rails
+                    </span>
+                  </div>
+                  <span style={{ fontSize: '10px', background: '#ecfdf5', color: '#059669', padding: '1px 7px', borderRadius: '8px', fontWeight: 700, border: '1px solid #a7f3d0' }}>
+                    Celo Mainnet (42220)
+                  </span>
+                </div>
+
+                {/* Self Verification Line */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '12px' }}>
+                  <span style={{ color: 'var(--privy-color-foreground-2)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <Fingerprint size={12} color="#059669" />
+                    <span>Human Owner (Self ID)</span>
+                  </span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                    <span style={{ fontWeight: 600, color: selectedAgentProfile.self?.verified !== false ? '#059669' : '#eab308' }}>
+                      {selectedAgentProfile.self?.verified !== false ? '✓ Verified Human' : 'Unverified'}
+                    </span>
+                    {selectedAgentProfile.self?.nullifierHash && (
+                      <span style={{ fontSize: '10px', color: '#64748b', fontFamily: 'monospace' }}>
+                        ({selectedAgentProfile.self.nullifierHash.slice(0, 8)}…)
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Altana Smart Wallet Line */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '12px' }}>
+                  <span style={{ color: 'var(--privy-color-foreground-2)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <Key size={12} color="#5B4FFF" />
+                    <span>Altana Smart Account</span>
+                  </span>
+                  <span style={{ fontFamily: 'monospace', fontWeight: 600, fontSize: '11px' }}>
+                    {shorten(selectedAgentProfile.altana?.walletAddress || selectedAgentProfile.owner || '0x653f...1693')}
+                  </span>
+                </div>
+
+                {/* Altana Session Status & Limit */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '12px' }}>
+                  <span style={{ color: 'var(--privy-color-foreground-2)' }}>Session Delegation</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span
+                      style={{
+                        fontSize: '10.5px',
+                        padding: '1px 6px',
+                        borderRadius: '6px',
+                        fontWeight: 600,
+                        background: selectedAgentProfile.altana?.sessionStatus === 'revoked' ? '#fee2e2' : '#f1f5f9',
+                        color: selectedAgentProfile.altana?.sessionStatus === 'revoked' ? '#dc2626' : '#475569',
+                      }}
+                    >
+                      {selectedAgentProfile.altana?.sessionStatus === 'revoked' ? 'Revoked' : 'Active (24h Window)'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Owner 1-Click Revoke Button */}
+                {String(selectedAgentProfile.owner || '').toLowerCase() === String(walletAddress || '').toLowerCase() && selectedAgentProfile.altana?.sessionStatus !== 'revoked' && (
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (!confirm(`Revoke autonomous session for ₦${selectedAgentProfile.tag.toUpperCase()}? The agent will no longer be able to spend until a fresh session is granted.`)) return;
+                      await revokeAgentSession({ tag: selectedAgentProfile.tag, reason: 'Owner manual revocation' });
+                      setSelectedAgentProfile((prev) => ({
+                        ...prev,
+                        altana: { ...(prev.altana || {}), sessionStatus: 'revoked' },
+                      }));
+                    }}
+                    style={{
+                      marginTop: '4px',
+                      padding: '5px 10px',
+                      borderRadius: '6px',
+                      border: '1px solid #fecaca',
+                      background: '#fff1f2',
+                      color: '#b91c1c',
+                      fontSize: '11px',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '4px',
+                    }}
+                  >
+                    <AlertTriangle size={12} />
+                    <span>Revoke Altana Session Key</span>
+                  </button>
+                )}
+              </div>
 
               <div className="agent-profile-card-actions">
                 <button

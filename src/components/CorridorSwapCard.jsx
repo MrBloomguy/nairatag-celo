@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   ArrowDownUp,
   RefreshCw,
@@ -9,26 +9,54 @@ import {
   Zap,
   TrendingUp,
   Sparkles,
+  ShieldCheck,
+  Clock,
+  Send,
+  UserCheck,
 } from 'lucide-react';
 import {
   getLiveCorridorRate,
   getCorridorBalances,
+  getIndicativePreview,
+  requestFirmQuote,
   executeCorridorSwap,
+  prepareCorridorPayment,
+  executeCorridorPayment,
+  toAtomicUnits,
 } from '../services/corridorService.js';
-import { CELO_ATTRIBUTION_TAG } from '../config/arc.js';
+import {
+  CELO_ATTRIBUTION_TAG,
+  CELO_USDT_ADDRESS,
+  CELO_CNGN_ADDRESS,
+} from '../config/celo.js';
+import { getEthereumProvider } from '../services/celoPayment.js';
 
 export default function CorridorSwapCard({ walletAddress, onConnectWallet }) {
   const [direction, setDirection] = useState('USDT_TO_CNGN'); // 'USDT_TO_CNGN' | 'CNGN_TO_USDT'
   const [amountIn, setAmountIn] = useState('');
-  const [rates, setRates] = useState({ rateUsdtToCngn: 1438.99, rateCngnToUsdt: 0.000695 });
+  const [rates, setRates] = useState({ rateUsdtToCngn: 1445.50, rateCngnToUsdt: 0.000692 });
   const [balances, setBalances] = useState({ usdt: '0.00', cngn: '0.00', celo: '0.00' });
   const [isLoadingRates, setIsLoadingRates] = useState(false);
-  const [isSwapping, setIsSwapping] = useState(false);
-  const [swapStatus, setSwapStatus] = useState('');
-  const [error, setError] = useState('');
-  const [lastTxHash, setLastTxHash] = useState('');
-  const [copiedTx, setCopiedTx] = useState(false);
+  
+  // Indicative & Firm Quote State
+  const [indicativeData, setIndicativeData] = useState(null);
+  const [firmQuote, setFirmQuote] = useState(null);
+  const [isRequestingFirmQuote, setIsRequestingFirmQuote] = useState(false);
+  const [quoteSecondsLeft, setQuoteSecondsLeft] = useState(null);
 
+  // Recipient Payout Option (Real Job to External Recipient)
+  const [payDirectlyToTag, setPayDirectlyToTag] = useState(false);
+  const [recipientInput, setRecipientInput] = useState('');
+  const [resolvedRecipient, setResolvedRecipient] = useState(null);
+
+  // Execution State
+  const [isExecuting, setIsExecuting] = useState(false);
+  const [statusMessage, setStatusMessage] = useState('');
+  const [error, setError] = useState('');
+  const [completedReceipt, setCompletedReceipt] = useState(null);
+  const [copiedKey, setCopiedKey] = useState(null);
+
+  // Fetch balances and rate
   const fetchRatesAndBalances = useCallback(async () => {
     setIsLoadingRates(true);
     try {
@@ -48,69 +76,208 @@ export default function CorridorSwapCard({ walletAddress, onConnectWallet }) {
 
   useEffect(() => {
     fetchRatesAndBalances();
-    const interval = setInterval(fetchRatesAndBalances, 20000);
+    const interval = setInterval(fetchRatesAndBalances, 25000);
     return () => clearInterval(interval);
   }, [fetchRatesAndBalances]);
 
+  // Debounced Indicative Preview on amount change
+  useEffect(() => {
+    setFirmQuote(null);
+    setQuoteSecondsLeft(null);
+    setError('');
+
+    const clean = String(amountIn).trim();
+    if (!clean || isNaN(Number(clean)) || Number(clean) <= 0) {
+      setIndicativeData(null);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      try {
+        const isUsdt = direction === 'USDT_TO_CNGN';
+        const sellToken = isUsdt ? CELO_USDT_ADDRESS : CELO_CNGN_ADDRESS;
+        const buyToken = isUsdt ? CELO_CNGN_ADDRESS : CELO_USDT_ADDRESS;
+        const sellAmountAtomic = toAtomicUnits(clean, 6);
+
+        const preview = await getIndicativePreview({
+          sellToken,
+          buyToken,
+          sellAmount: sellAmountAtomic,
+        });
+        setIndicativeData(preview);
+      } catch (err) {
+        console.warn('[Indicative preview error]', err.message);
+      }
+    }, 450);
+
+    return () => clearTimeout(timer);
+  }, [amountIn, direction]);
+
+  // Quote Expiry Timer
+  useEffect(() => {
+    if (!firmQuote?.expiresAtTimestamp) return;
+
+    const tick = () => {
+      const msLeft = firmQuote.expiresAtTimestamp - Date.now();
+      const secLeft = Math.max(0, Math.floor(msLeft / 1000));
+      setQuoteSecondsLeft(secLeft);
+      if (secLeft <= 0) {
+        setError('Firm quote expired. Please request a fresh quote.');
+      }
+    };
+
+    tick();
+    const interval = setInterval(tick, 1000);
+    return () => clearInterval(interval);
+  }, [firmQuote]);
+
   const isUsdtIn = direction === 'USDT_TO_CNGN';
-  const currentRate = isUsdtIn ? rates.rateUsdtToCngn : rates.rateCngnToUsdt;
   const inTokenSymbol = isUsdtIn ? 'USD₮' : 'cNGN';
   const outTokenSymbol = isUsdtIn ? 'cNGN' : 'USD₮';
   const inBalance = isUsdtIn ? balances.usdt : balances.cngn;
 
-  // Estimated output
-  const estimatedOut = amountIn && Number(amountIn) > 0 ? (Number(amountIn) * currentRate).toFixed(isUsdtIn ? 2 : 4) : '0.00';
-
   const toggleDirection = () => {
     setDirection((prev) => (prev === 'USDT_TO_CNGN' ? 'CNGN_TO_USDT' : 'USDT_TO_CNGN'));
     setAmountIn('');
+    setIndicativeData(null);
+    setFirmQuote(null);
     setError('');
   };
 
-  const handleSwap = async () => {
+  // Request Firm Quote from Textile FX with EIP-712 TakerControl
+  const handleRequestFirmQuote = async () => {
     if (!walletAddress) {
       if (onConnectWallet) onConnectWallet();
       return;
     }
 
-    if (!amountIn || Number(amountIn) <= 0) {
-      setError('Please enter a valid swap amount.');
+    const clean = String(amountIn).trim();
+    if (!clean || Number(clean) <= 0) {
+      setError('Please enter a valid amount.');
       return;
     }
 
-    setIsSwapping(true);
+    setIsRequestingFirmQuote(true);
     setError('');
-    setSwapStatus('Initializing corridor swap...');
+    setStatusMessage('Sign proof of wallet control in your wallet...');
 
     try {
-      const result = await executeCorridorSwap({
-        fromAddress: walletAddress,
-        direction,
-        amountIn,
-        onStatusUpdate: ({ step, message }) => {
-          setSwapStatus(message);
-        },
+      const provider = getEthereumProvider();
+      if (!provider) throw new Error('No EVM wallet detected.');
+
+      const { createWalletClient, custom } = await import('viem');
+      const { celoMainnet } = await import('../config/celo.js');
+      const walletClient = createWalletClient({
+        chain: celoMainnet,
+        transport: custom(provider),
       });
 
-      setLastTxHash(result.txHash);
-      setSwapStatus('Corridor swap confirmed on Celo Mainnet!');
-      setAmountIn('');
-      await fetchRatesAndBalances();
+      const isUsdt = direction === 'USDT_TO_CNGN';
+      const sellToken = isUsdt ? CELO_USDT_ADDRESS : CELO_CNGN_ADDRESS;
+      const buyToken = isUsdt ? CELO_CNGN_ADDRESS : CELO_USDT_ADDRESS;
+      const sellAmountAtomic = toAtomicUnits(clean, 6);
+
+      const quote = await requestFirmQuote({
+        takerAddress: walletAddress,
+        sellToken,
+        buyToken,
+        sellAmount: sellAmountAtomic,
+        signTypedDataFn: (args) => walletClient.signTypedData({ ...args, account: walletAddress }),
+      });
+
+      if (!quote.isFirm) {
+        setError(`Textile: ${quote.reason}`);
+        setFirmQuote(null);
+      } else {
+        setFirmQuote(quote);
+        setStatusMessage('Firm quote secured from market makers!');
+      }
     } catch (err) {
-      console.error('Corridor swap failed:', err);
-      setError(err.message || 'Swap failed or was rejected.');
-      setSwapStatus('');
+      console.error('Firm quote request failed:', err);
+      setError(err.message || 'Failed to obtain firm quote from Textile FX.');
     } finally {
-      setIsSwapping(false);
+      setIsRequestingFirmQuote(false);
     }
   };
 
-  const copyTx = () => {
-    if (!lastTxHash) return;
-    navigator.clipboard.writeText(lastTxHash);
-    setCopiedTx(true);
-    setTimeout(() => setCopiedTx(false), 2000);
+  // Execute Swap or Direct Recipient Payment
+  const handleAuthorizeAndExecute = async () => {
+    if (!firmQuote || !firmQuote.isFirm) {
+      setError('A valid firm quote is required before authorizing.');
+      return;
+    }
+
+    if (quoteSecondsLeft !== null && quoteSecondsLeft <= 0) {
+      setError('This quote has expired. Please request a new quote.');
+      return;
+    }
+
+    setIsExecuting(true);
+    setError('');
+    setStatusMessage('Authorizing transaction...');
+
+    try {
+      if (payDirectlyToTag && recipientInput.trim()) {
+        // Mode 2: Cross-currency payment to external recipient
+        const prepared = await prepareCorridorPayment({
+          recipientTagOrAddress: recipientInput.trim(),
+          amountInUsdt: firmQuote.formattedSellAmount,
+        });
+
+        const receipt = await executeCorridorPayment({
+          paymentIntent: prepared,
+          firmQuoteRecord: firmQuote,
+          fromAddress: walletAddress,
+          onStatusUpdate: ({ message }) => setStatusMessage(message),
+        });
+
+        setCompletedReceipt(receipt);
+        setStatusMessage('Payment settled to external recipient!');
+      } else {
+        // Mode 1: Self swap
+        const result = await executeCorridorSwap({
+          fromAddress: walletAddress,
+          firmQuoteRecord: firmQuote,
+          onStatusUpdate: ({ message }) => setStatusMessage(message),
+        });
+
+        setCompletedReceipt({
+          receiptId: `swap_${Date.now()}`,
+          status: 'completed',
+          swapTxHash: result.txHash,
+          swapExplorerUrl: result.explorerUrl,
+          amountSentUsdt: firmQuote.formattedSellAmount,
+          amountDeliveredCngn: firmQuote.formattedBuyAmount,
+          attributionTag: CELO_ATTRIBUTION_TAG,
+        });
+        setStatusMessage('Corridor swap finalized on Celo Mainnet!');
+      }
+
+      setFirmQuote(null);
+      setAmountIn('');
+      await fetchRatesAndBalances();
+    } catch (err) {
+      console.error('Execution failed:', err);
+      setError(err.message || 'Transaction failed or was rejected.');
+    } finally {
+      setIsExecuting(false);
+    }
   };
+
+  const copyText = (key, text) => {
+    if (!text) return;
+    navigator.clipboard.writeText(text);
+    setCopiedKey(key);
+    setTimeout(() => setCopiedKey(null), 2000);
+  };
+
+  const estimatedDisplay = firmQuote
+    ? firmQuote.formattedBuyAmount
+    : indicativeData
+    ? indicativeData.formattedBuyAmount
+    : amountIn && Number(amountIn) > 0
+    ? (Number(amountIn) * (isUsdtIn ? rates.rateUsdtToCngn : rates.rateCngnToUsdt)).toFixed(isUsdtIn ? 2 : 4)
+    : '0.00';
 
   return (
     <div
@@ -151,10 +318,10 @@ export default function CorridorSwapCard({ walletAddress, onConnectWallet }) {
           </span>
           <div>
             <div style={{ fontWeight: 700, fontSize: '15px', color: 'var(--text-primary, #111)' }}>
-              Stablecoin Corridor (Track 1)
+              Textile FX Corridor (Track 1)
             </div>
             <div style={{ fontSize: '11px', color: 'var(--text-secondary, #666)' }}>
-              Textile FX & On-Chain Pool · Sub-Cent Settlement
+              USD₮ ⇄ cNGN RFQ v2 · Sub-Cent Celo Settlement
             </div>
           </div>
         </div>
@@ -185,7 +352,7 @@ export default function CorridorSwapCard({ walletAddress, onConnectWallet }) {
               color: '#059669',
             }}
           >
-            Celo Mainnet
+            Celo 42220
           </span>
         </div>
       </div>
@@ -212,7 +379,7 @@ export default function CorridorSwapCard({ walletAddress, onConnectWallet }) {
             placeholder="0.00"
             value={amountIn}
             onChange={(e) => setAmountIn(e.target.value)}
-            disabled={isSwapping}
+            disabled={isExecuting || isRequestingFirmQuote}
             style={{
               border: 'none',
               background: 'none',
@@ -277,11 +444,11 @@ export default function CorridorSwapCard({ walletAddress, onConnectWallet }) {
           background: 'var(--input-bg, #f9fafb)',
           border: '1px solid var(--border-color, #e5e7eb)',
           marginTop: '8px',
-          marginBottom: '14px',
+          marginBottom: '12px',
         }}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: 'var(--text-secondary, #666)', marginBottom: '6px' }}>
-          <span>You Receive (Estimated)</span>
+          <span>You Receive {firmQuote ? '(Firm Quote)' : '(Indicative)'}</span>
           <span>Balance: {isUsdtIn ? balances.cngn : balances.usdt} {outTokenSymbol}</span>
         </div>
 
@@ -290,10 +457,10 @@ export default function CorridorSwapCard({ walletAddress, onConnectWallet }) {
             style={{
               fontSize: '22px',
               fontWeight: 700,
-              color: Number(estimatedOut) > 0 ? 'var(--text-primary, #111)' : 'var(--text-secondary, #999)',
+              color: Number(estimatedDisplay) > 0 ? 'var(--text-primary, #111)' : 'var(--text-secondary, #999)',
             }}
           >
-            {estimatedOut}
+            {estimatedDisplay}
           </div>
 
           <div
@@ -317,7 +484,41 @@ export default function CorridorSwapCard({ walletAddress, onConnectWallet }) {
         </div>
       </div>
 
-      {/* Rate & Corridor Info Box */}
+      {/* Option: Pay directly to external recipient */}
+      {isUsdtIn && (
+        <div style={{ marginBottom: '14px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={payDirectlyToTag}
+                onChange={(e) => setPayDirectlyToTag(e.target.checked)}
+              />
+              <span>Pay directly to external recipient (₦Tag / Phone)</span>
+            </label>
+          </div>
+
+          {payDirectlyToTag && (
+            <input
+              type="text"
+              placeholder="Recipient ₦Tag or address (e.g. ₦editor, +23480...)"
+              value={recipientInput}
+              onChange={(e) => setRecipientInput(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '9px 12px',
+                borderRadius: '8px',
+                border: '1px solid var(--border-color, #d1d5db)',
+                fontSize: '13px',
+                background: 'var(--input-bg, #f9fafb)',
+                outline: 'none',
+              }}
+            />
+          )}
+        </div>
+      )}
+
+      {/* Pricing & Firm Quote Details */}
       <div
         style={{
           padding: '10px 14px',
@@ -332,57 +533,121 @@ export default function CorridorSwapCard({ walletAddress, onConnectWallet }) {
         }}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-          <span style={{ color: 'var(--text-secondary, #666)' }}>Exchange Rate</span>
+          <span style={{ color: 'var(--text-secondary, #666)' }}>Textile RFQ v2 Rate</span>
           <span style={{ fontWeight: 600, color: 'var(--text-primary, #111)' }}>
-            1 USD₮ ≈ {rates.rateUsdtToCngn.toLocaleString()} cNGN
+            1 USD₮ ≈ {(firmQuote?.effectiveRate || rates.rateUsdtToCngn).toLocaleString()} cNGN
           </span>
         </div>
+
+        {indicativeData?.availableSellAmount && (
+          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <span style={{ color: 'var(--text-secondary, #666)' }}>Market Maker Depth</span>
+            <span style={{ fontWeight: 600, color: '#059669' }}>
+              {Number(indicativeData.availableSellAmount).toLocaleString()} {inTokenSymbol}
+            </span>
+          </div>
+        )}
+
+        {firmQuote && (
+          <>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span style={{ color: 'var(--text-secondary, #666)' }}>Quote Expiry</span>
+              <span style={{ fontWeight: 700, color: quoteSecondsLeft && quoteSecondsLeft <= 10 ? '#dc2626' : '#059669' }}>
+                <Clock size={11} style={{ display: 'inline', marginRight: '3px' }} />
+                {quoteSecondsLeft}s remaining
+              </span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span style={{ color: 'var(--text-secondary, #666)' }}>Spender Contract</span>
+              <span style={{ fontFamily: 'monospace', fontSize: '11px' }}>
+                {firmQuote.spender ? `${firmQuote.spender.slice(0, 6)}...${firmQuote.spender.slice(-4)}` : 'Textile Reactor'}
+              </span>
+            </div>
+          </>
+        )}
+
         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-          <span style={{ color: 'var(--text-secondary, #666)' }}>Slippage / Pool Fee</span>
-          <span style={{ fontWeight: 600, color: '#059669' }}>0.01% (Stable Pair)</span>
-        </div>
-        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-          <span style={{ color: 'var(--text-secondary, #666)' }}>Attribution</span>
+          <span style={{ color: 'var(--text-secondary, #666)' }}>Attribution Tag</span>
           <span style={{ fontWeight: 600, fontFamily: 'monospace', color: '#059669' }}>
             {CELO_ATTRIBUTION_TAG}
           </span>
         </div>
       </div>
 
-      {/* Swap Button */}
-      <button
-        type="button"
-        disabled={isSwapping}
-        onClick={handleSwap}
-        style={{
-          width: '100%',
-          padding: '13px 18px',
-          borderRadius: '12px',
-          background: 'linear-gradient(135deg, #35D07F 0%, #10b981 100%)',
-          color: '#042f2e',
-          border: 'none',
-          fontWeight: 700,
-          fontSize: '14px',
-          cursor: isSwapping ? 'wait' : 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: '8px',
-          boxShadow: '0 2px 10px rgba(53, 208, 127, 0.25)',
-        }}
-      >
-        {isSwapping ? (
-          <>
-            <RefreshCw size={16} className="spin" />
-            <span>{swapStatus || 'Executing Corridor Trade...'}</span>
-          </>
-        ) : (
-          <>
-            <Zap size={16} />
-            <span>Swap {inTokenSymbol} for {outTokenSymbol}</span>
-          </>
-        )}
-      </button>
+      {/* Action Buttons */}
+      {!firmQuote ? (
+        <button
+          type="button"
+          disabled={isRequestingFirmQuote || !amountIn || Number(amountIn) <= 0}
+          onClick={handleRequestFirmQuote}
+          style={{
+            width: '100%',
+            padding: '13px 18px',
+            borderRadius: '12px',
+            background: 'linear-gradient(135deg, #35D07F 0%, #10b981 100%)',
+            color: '#042f2e',
+            border: 'none',
+            fontWeight: 700,
+            fontSize: '14px',
+            cursor: isRequestingFirmQuote ? 'wait' : 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '8px',
+            boxShadow: '0 2px 10px rgba(53, 208, 127, 0.25)',
+          }}
+        >
+          {isRequestingFirmQuote ? (
+            <>
+              <RefreshCw size={16} className="spin" />
+              <span>Soliciting Market Maker Quotes (75s)...</span>
+            </>
+          ) : (
+            <>
+              <ShieldCheck size={16} />
+              <span>Request Firm Quote (Textile RFQ)</span>
+            </>
+          )}
+        </button>
+      ) : (
+        <button
+          type="button"
+          disabled={isExecuting || (quoteSecondsLeft !== null && quoteSecondsLeft <= 0)}
+          onClick={handleAuthorizeAndExecute}
+          style={{
+            width: '100%',
+            padding: '13px 18px',
+            borderRadius: '12px',
+            background: quoteSecondsLeft && quoteSecondsLeft <= 0 ? '#9ca3af' : 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+            color: '#ffffff',
+            border: 'none',
+            fontWeight: 700,
+            fontSize: '14px',
+            cursor: isExecuting ? 'wait' : 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '8px',
+            boxShadow: '0 2px 10px rgba(5, 150, 105, 0.25)',
+          }}
+        >
+          {isExecuting ? (
+            <>
+              <RefreshCw size={16} className="spin" />
+              <span>{statusMessage || 'Authorizing Swap...'}</span>
+            </>
+          ) : (
+            <>
+              <Zap size={16} />
+              <span>
+                {payDirectlyToTag
+                  ? `Authorize Swap & Pay ${firmQuote.formattedBuyAmount} cNGN`
+                  : `Authorize Swap (${firmQuote.formattedBuyAmount} ${outTokenSymbol})`}
+              </span>
+            </>
+          )}
+        </button>
+      )}
 
       {/* Error Alert */}
       {error && (
@@ -405,62 +670,59 @@ export default function CorridorSwapCard({ walletAddress, onConnectWallet }) {
         </div>
       )}
 
-      {/* Success Card */}
-      {lastTxHash && (
+      {/* Verifiable Cryptographic Receipt Card */}
+      {completedReceipt && (
         <div
           style={{
-            marginTop: '12px',
-            padding: '10px 14px',
-            borderRadius: '10px',
+            marginTop: '14px',
+            padding: '12px 14px',
+            borderRadius: '12px',
             background: 'rgba(5, 150, 105, 0.08)',
             border: '1px solid rgba(5, 150, 105, 0.3)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
             fontSize: '12px',
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <CheckCircle2 size={15} color="#059669" />
-            <span style={{ fontWeight: 600, color: '#059669' }}>Trade Confirmed!</span>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <CheckCircle2 size={16} color="#059669" />
+              <span style={{ fontWeight: 700, color: '#059669' }}>Payment Receipt</span>
+            </div>
+            <span style={{ fontSize: '10.5px', fontFamily: 'monospace', color: '#059669' }}>
+              {completedReceipt.receiptId}
+            </span>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <button
-              type="button"
-              onClick={copyTx}
-              style={{
-                background: 'none',
-                border: 'none',
-                cursor: 'pointer',
-                color: '#059669',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-                fontSize: '11px',
-                fontWeight: 600,
-              }}
-            >
-              {copiedTx ? <CheckCircle2 size={12} /> : <Copy size={12} />}
-              <span>{copiedTx ? 'Copied' : 'Copy Tx'}</span>
-            </button>
-            <a
-              href={`https://celoscan.io/tx/${lastTxHash}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{
-                color: '#059669',
-                textDecoration: 'none',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '2px',
-                fontWeight: 600,
-                fontSize: '11px',
-              }}
-            >
-              <span>Explorer</span>
-              <ExternalLink size={11} />
-            </a>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '11.5px', color: 'var(--text-secondary, #444)' }}>
+            <div>
+              <strong>Converted:</strong> {completedReceipt.amountSentUsdt} USD₮ → {completedReceipt.amountDeliveredCngn} cNGN
+            </div>
+            {completedReceipt.recipientTag && (
+              <div>
+                <strong>Delivered to:</strong> {completedReceipt.recipientTag} ({completedReceipt.recipientAddress})
+              </div>
+            )}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
+              <a
+                href={completedReceipt.swapExplorerUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ color: '#059669', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '2px', fontWeight: 600 }}
+              >
+                <span>Swap Tx</span>
+                <ExternalLink size={10} />
+              </a>
+              {completedReceipt.payoutExplorerUrl && (
+                <a
+                  href={completedReceipt.payoutExplorerUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ color: '#059669', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '2px', fontWeight: 600 }}
+                >
+                  <span>Payout Tx</span>
+                  <ExternalLink size={10} />
+                </a>
+              )}
+            </div>
           </div>
         </div>
       )}

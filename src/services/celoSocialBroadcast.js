@@ -16,23 +16,23 @@ async function postTelegramAlert(payload) {
   return { sent: true, messageId: result.messageId };
 }
 
-export function broadcastArcClaimToTelegram(claim) {
+export function broadcastCeloClaimToTelegram(claim) {
   return postTelegramAlert({ kind: 'claim', ...claim });
 }
 
-export function broadcastArcTaskToTelegram({ action, taskId, taskTitle, rewardUSDC, points, walletAddress, timestamp, signature }) {
+export function broadcastCeloTaskToTelegram({ action, taskId, taskTitle, rewardUSDC, points, walletAddress, timestamp, signature }) {
   return postTelegramAlert({ kind: 'task', action, taskId, taskTitle, rewardUSDC, points, walletAddress, timestamp, signature });
 }
 
-export function broadcastArcPaidTaskToTelegram({ taskId, walletAddress }) {
+export function broadcastCeloPaidTaskToTelegram({ taskId, walletAddress }) {
   return postTelegramAlert({ kind: 'task_paid', taskId, walletAddress });
 }
 
-export function broadcastArcRewardToTelegram(proof) {
+export function broadcastCeloRewardToTelegram(proof) {
   return postTelegramAlert({ kind: 'reward', ...proof });
 }
 
-export async function broadcastArcVoucherClaimToTelegram({ taskId, walletAddress }) {
+export async function broadcastCeloVoucherClaimToTelegram({ taskId, walletAddress }) {
   const provider = typeof window !== 'undefined' ? window.ethereum : null;
   if (!provider?.request) throw new Error('A compatible wallet is required to sign this voucher alert.');
   const timestamp = Date.now();
@@ -41,7 +41,7 @@ export async function broadcastArcVoucherClaimToTelegram({ taskId, walletAddress
     'Action: voucher_claimed',
     `Task: ${taskId}`,
     `Wallet: ${walletAddress.toLowerCase()}`,
-    'Chain: 5042002',
+    'Chain: 42220',
     `Timestamp: ${timestamp}`,
   ].join('\n');
   const signature = await provider.request({ method: 'personal_sign', params: [message, walletAddress] });
@@ -64,40 +64,40 @@ export function getAgentShareUrl(tag) {
 export function getAgentWhatsAppShareUrl({ tag }) {
   const clean = String(tag || '').replace(/^[$₦@#]/, '').trim().toUpperCase();
   const url = getAgentShareUrl(clean);
-  return `https://wa.me/?text=${encodeURIComponent(`Meet the Arc agent ₦${clean} on NairaTag: ${url}`)}`;
+  return `https://wa.me/?text=${encodeURIComponent(`Meet the Celo agent ₦${clean} on NairaTag: ${url}`)}`;
 }
 
 export function getAgentTwitterShareUrl({ tag }) {
   const clean = String(tag || '').replace(/^[$₦@#]/, '').trim().toUpperCase();
-  const text = `Meet ₦${clean}, an Arc agent on @NairaTaghq. #Arc #NairaTag`;
+  const text = `Meet ₦${clean}, an Celo agent on @NairaTaghq. #Celo #NairaTag`;
   return `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(getAgentShareUrl(clean))}`;
 }
 
 export function getAgentTelegramShareUrl({ tag }) {
   const clean = String(tag || '').replace(/^[$₦@#]/, '').trim().toUpperCase();
   return getTelegramShareIntentUrl({
-    text: `Meet ₦${clean}, an Arc agent on NairaTag.`,
+    text: `Meet ₦${clean}, an Celo agent on NairaTag.`,
     url: getAgentShareUrl(clean),
   });
 }
 
 export function getTwitterShareUrl({ tag, txHash }) {
   const clean = String(tag || '').replace(/^[$₦@#]/, '').toUpperCase();
-  const text = `Just claimed my sovereign ₦${clean} handle on @NairaTaghq on Arc Testnet! Instant USDC payments with sub-second finality.\n\nClaim yours. ${txHash ? `Transaction: ${txHash} ` : ''}#Arc #NairaTag #Crypto`;
+  const text = `Just claimed my sovereign ₦${clean} handle on @NairaTaghq on Celo Mainnet! Instant USDC payments with sub-second finality.\n\nClaim yours. ${txHash ? `Transaction: ${txHash} ` : ''}#Celo #NairaTag #Crypto`;
   return `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(getTagShareUrl(clean))}`;
 }
 
 export function getTelegramShareUrl({ tag }) {
   const clean = String(tag || '').replace(/^[$₦@#]/, '').toUpperCase();
   const url = getTagShareUrl(clean);
-  const text = `Send USDC directly to my sovereign ₦${clean} tag on Arc Testnet.`;
+  const text = `Send USDC directly to my sovereign ₦${clean} tag on Celo Mainnet.`;
   return getTelegramShareIntentUrl({ text, url });
 }
 
 export function getWhatsAppShareUrl({ tag }) {
   const clean = String(tag || '').replace(/^[$₦@#]/, '').toUpperCase();
   const url = getTagShareUrl(clean);
-  const text = `Send USDC directly to my NairaTag ₦${clean} on Arc: ${url}`;
+  const text = `Send USDC directly to my NairaTag ₦${clean} on Celo: ${url}`;
   return `https://wa.me/?text=${encodeURIComponent(text)}`;
 }
 
@@ -106,11 +106,11 @@ export function getTelegramShareIntentUrl({ text, url = 'https://arc.nairatag.ng
 }
 
 export function getTwitterTaskShareUrl({ title, rewardUSDC, points, userTag }) {
-  const taskTitle = String(title || 'an Arc task').slice(0, 130);
+  const taskTitle = String(title || 'an Celo task').slice(0, 130);
   const reward = rewardUSDC ? `$${rewardUSDC} USDC bounty` : '';
   const pointText = points ? `${points} Protocol Points` : '';
   const potential = [reward, pointText].filter(Boolean).join(' and ');
-  const text = `I submitted "${taskTitle}" for review on @NairaTaghq.${potential ? ` Potential reward: ${potential}; pending owner review.` : ''} Explore Arc tasks. #Arc #NairaTag`;
+  const text = `I submitted "${taskTitle}" for review on @NairaTaghq.${potential ? ` Potential reward: ${potential}; pending owner review.` : ''} Explore Celo tasks. #Celo #NairaTag`;
   const url = userTag ? getTagShareUrl(userTag) : 'https://arc.nairatag.ng/#tasks';
   return `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`;
 }
@@ -118,8 +118,16 @@ export function getTwitterTaskShareUrl({ title, rewardUSDC, points, userTag }) {
 export function getTwitterRewardShareUrl({ points, userTag }) {
   const identity = String(userTag || '').replace(/^[$₦@#]/, '').trim();
   const label = identity ? ` as ₦${identity}` : '';
-  const amount = Number(points) > 0 ? ` I now have ${Number(points).toLocaleString()} Protocol Points` : ' I just earned an Arc reward';
-  const text = `${amount}${label} on @NairaTaghq. Explore Arc tasks and rewards. #Arc #NairaTag`;
+  const amount = Number(points) > 0 ? ` I now have ${Number(points).toLocaleString()} Protocol Points` : ' I just earned an Celo reward';
+  const text = `${amount}${label} on @NairaTaghq. Explore Celo tasks and rewards. #Celo #NairaTag`;
   const url = identity ? getTagShareUrl(identity) : 'https://arc.nairatag.ng/#rewards';
   return `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`;
 }
+
+
+// Backward compatibility aliases
+export const broadcastArcClaimToTelegram = broadcastCeloClaimToTelegram;
+export const broadcastArcTaskToTelegram = broadcastCeloTaskToTelegram;
+export const broadcastArcPaidTaskToTelegram = broadcastCeloPaidTaskToTelegram;
+export const broadcastArcRewardToTelegram = broadcastCeloRewardToTelegram;
+export const broadcastArcVoucherClaimToTelegram = broadcastCeloVoucherClaimToTelegram;

@@ -1,25 +1,25 @@
 /**
- * Arc App Kit Integration Service
+ * Celo App Kit Integration Service
  * Based on official Circle App Kit SDK (@circle-fin/swap-kit & @circle-fin/adapter-viem-v2)
  *
- * Arc Capabilities:
- * - Swap: Accepts USDC, EURC, and cirBTC on Arc Testnet and Arc Mainnet.
- * - Same-chain swap (e.g. USDC -> EURC on Arc Testnet)
- * - Crosschain swap (e.g. Arc Testnet <-> Base / Polygon / Sepolia)
+ * Celo Capabilities:
+ * - Swap: Accepts USDC, EURC, and cirBTC on Celo Mainnet and Celo Mainnet.
+ * - Same-chain swap (e.g. USDC -> EURC on Celo Mainnet)
+ * - Crosschain swap (e.g. Celo Mainnet <-> Base / Polygon / Sepolia)
  * - Unified Balance: Cross-chain unified USDC spendable representation
- * - Borrow: Borrow USDC against cirBTC collateral on Arc
+ * - Borrow: Borrow USDC against cirBTC collateral on Celo
  * - Earn: Native USDC yield / vault opportunities
  */
 
-import { ARC_TESTNET_CONFIG } from "../config/arc.js";
+import { CELO_TESTNET_CONFIG } from '../config/celo.js';
 
-// Supported tokens on Arc per Arc documentation
-export const ARC_SUPPORTED_SWAP_TOKENS = [
+// Supported tokens on Celo per Celo documentation
+export const CELO_SUPPORTED_SWAP_TOKENS = [
   {
     symbol: "USDC",
     name: "USD Coin (Native Gas)",
-    address: ARC_TESTNET_CONFIG.contracts.usdcNative,
-    decimals: 18, // Native gas token on Arc uses 18 decimals
+    address: CELO_TESTNET_CONFIG.contracts.usdcNative,
+    decimals: 18, // Native gas token on Celo uses 18 decimals
     erc20Decimals: 6, // Canonical ERC-20 interface uses 6 decimals
     icon: "💵",
     isGas: true,
@@ -27,7 +27,7 @@ export const ARC_SUPPORTED_SWAP_TOKENS = [
   {
     symbol: "EURC",
     name: "Euro Coin",
-    address: ARC_TESTNET_CONFIG.contracts.eurc,
+    address: CELO_TESTNET_CONFIG.contracts.eurc,
     decimals: 6,
     icon: "💶",
     isGas: false,
@@ -35,7 +35,7 @@ export const ARC_SUPPORTED_SWAP_TOKENS = [
   {
     symbol: "cirBTC",
     name: "Circle Bitcoin",
-    address: ARC_TESTNET_CONFIG.contracts.cirBTC,
+    address: CELO_TESTNET_CONFIG.contracts.cirBTC,
     decimals: 8,
     icon: "₿",
     isGas: false,
@@ -45,9 +45,9 @@ export const ARC_SUPPORTED_SWAP_TOKENS = [
 // App Kit Crosschain Target Chains
 export const APP_KIT_CROSSCHAINS = [
   {
-    chain: "Arc_Testnet",
-    name: "Arc Testnet",
-    chainId: 5042002,
+    chain: "Celo_Testnet",
+    name: "Celo Mainnet",
+    chainId: 42220,
     badge: "Native Osaka",
   },
   {
@@ -86,8 +86,8 @@ export async function estimateAppKitSwap({
   tokenIn,
   tokenOut,
   amountIn,
-  fromChain = "Arc_Testnet",
-  toChain = "Arc_Testnet",
+  fromChain = "Celo_Testnet",
+  toChain = "Celo_Testnet",
   slippageBps = 100, // 1%
 }) {
   if (!amountIn || parseFloat(amountIn) <= 0) {
@@ -153,7 +153,7 @@ export async function estimateAppKitSwap({
 }
 
 /**
- * Execute swap using Arc App Kit Viem Adapter or connected wallet
+ * Execute swap using Celo App Kit Viem Adapter or connected wallet
  */
 export async function executeAppKitSwap({
   provider,
@@ -161,12 +161,12 @@ export async function executeAppKitSwap({
   tokenIn,
   tokenOut,
   amountIn,
-  fromChain = "Arc_Testnet",
-  toChain = "Arc_Testnet",
+  fromChain = "Celo_Testnet",
+  toChain = "Celo_Testnet",
   recipientAddress,
   onStepUpdate = () => {},
 }) {
-  onStepUpdate({ step: "init", message: "Preparing Arc App Kit swap parameters..." });
+  onStepUpdate({ step: "init", message: "Preparing Celo App Kit swap parameters..." });
 
   const isCrossChain = fromChain !== toChain;
 
@@ -192,7 +192,7 @@ export async function executeAppKitSwap({
     step: "signing",
     message: isCrossChain
       ? `Initiating CCTP Crosschain Swap from ${fromChain} to ${toChain}...`
-      : `Submitting swap transaction on Arc Testnet (USDC sub-second finality)...`,
+      : `Submitting swap transaction on Celo Mainnet (USDC sub-second finality)...`,
   });
 
   const kit = await getSwapKit();
@@ -214,7 +214,7 @@ export async function executeAppKitSwap({
       };
 
       const result = await kit.swap(swapParams);
-      onStepUpdate({ step: "complete", message: "Swap confirmed on Arc Testnet!" });
+      onStepUpdate({ step: "complete", message: "Swap confirmed on Celo Mainnet!" });
       return {
         success: true,
         txHash: result.txHash || "0x" + Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join(""),
@@ -235,7 +235,7 @@ export async function executeAppKitSwap({
 
 /**
  * Unified Balance Kit Mock / State Aggregator
- * Combines Arc Testnet USDC + Base + Arbitrum into a single balance view
+ * Combines Celo Mainnet USDC + Base + Arbitrum into a single balance view
  */
 export function getUnifiedBalanceSummary(arcUsdcBalance = "0.00") {
   const arcBal = parseFloat(arcUsdcBalance) || 0;
@@ -246,10 +246,10 @@ export function getUnifiedBalanceSummary(arcUsdcBalance = "0.00") {
     totalUnifiedUsdc: (arcBal + baseBal + arbBal).toFixed(2),
     chains: [
       {
-        name: "Arc Testnet (Native Gas)",
+        name: "Celo Mainnet (Native Gas)",
         symbol: "USDC",
         amount: arcBal.toFixed(4),
-        domain: 5042002,
+        domain: 42220,
         active: true,
       },
       {
@@ -271,8 +271,8 @@ export function getUnifiedBalanceSummary(arcUsdcBalance = "0.00") {
 }
 
 /**
- * Borrow Kit Info for Arc
- * Collateralize cirBTC to borrow native USDC on Arc
+ * Borrow Kit Info for Celo
+ * Collateralize cirBTC to borrow native USDC on Celo
  */
 export function getBorrowKitDetails(cirBtcCollateral = "0.05") {
   const btcAmount = parseFloat(cirBtcCollateral) || 0;
@@ -296,14 +296,14 @@ export function getBorrowKitDetails(cirBtcCollateral = "0.05") {
 }
 
 /**
- * Earn Kit Info for Arc
+ * Earn Kit Info for Celo
  * Native USDC Liquidity & Yield options
  */
 export function getEarnKitPools() {
   return [
     {
       id: "arc-usdc-yield",
-      name: "Arc Native USDC Treasury Vault",
+      name: "Celo Native USDC Treasury Vault",
       asset: "USDC",
       apy: "5.12%",
       tvl: "4,250,800 USDC",
@@ -323,3 +323,7 @@ export function getEarnKitPools() {
     },
   ];
 }
+
+
+// Backward compatibility aliases
+export const ARC_SUPPORTED_SWAP_TOKENS = CELO_SUPPORTED_SWAP_TOKENS;

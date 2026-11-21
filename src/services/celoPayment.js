@@ -1,21 +1,9 @@
-export { activeArcChain };
-
-export async function estimateTransferFee() {
-  return "0.0001 CELO";
-}
-
-let activeWalletProvider = null;
-
-export function setActiveWalletProvider(provider) {
-  activeWalletProvider = provider || null;
-}
-
 /**
- * @file arcPayment.js
+ * @file celoPayment.js
  * @description Celo Mainnet Payment & Attribution Service using Viem.
  * Handles:
  * - Celo Mainnet (42220) network detection and auto-switching
- * - Native CELO and cNGN balance reading
+ * - Native CELO and cNGN / USD₮ balance reading
  * - Automatic ERC-8021 Transaction Attribution tagging (celo_9f7deabd99a6)
  * - 1-Click Tagged ERC-8004 Identity Registration
  */
@@ -34,15 +22,27 @@ import {
 } from 'viem';
 import {
   celoMainnet,
-  activeArcChain,
+  activeCeloChain,
   CELO_ATTRIBUTION_TAG,
   CELO_ATTRIBUTION_SUFFIX,
-  ARC_ERC8004_IDENTITY_REGISTRY,
+  CELO_ERC8004_IDENTITY_REGISTRY,
   ERC8004_IDENTITY_ABI,
   CELO_CNGN_ADDRESS,
   CELO_USDT_ADDRESS,
   ERC20_ABI,
-} from '../config/arc.js';
+} from '../config/celo.js';
+
+export { activeCeloChain, activeCeloChain as activeArcChain };
+
+export async function estimateTransferFee() {
+  return "0.0001 CELO";
+}
+
+let activeWalletProvider = null;
+
+export function setActiveWalletProvider(provider) {
+  activeWalletProvider = provider || null;
+}
 
 export const publicClient = createPublicClient({
   chain: celoMainnet,
@@ -86,11 +86,12 @@ export async function connectWallet(preferredType) {
   return {
     address,
     chainId: currentChainId,
+    isCelo: currentChainId === celoMainnet.id,
     isArc: currentChainId === celoMainnet.id,
   };
 }
 
-export async function switchOrAddArcNetwork() {
+export async function switchOrAddCeloNetwork() {
   const provider = getEthereumProvider();
   if (!provider) throw new Error('No EVM wallet found');
 
@@ -101,7 +102,6 @@ export async function switchOrAddArcNetwork() {
       method: 'wallet_switchEthereumChain',
       params: [{ chainId: chainIdHex }],
     });
-    return true;
   } catch (switchError) {
     if (switchError.code === 4902 || switchError?.data?.originalError?.code === 4902) {
       await provider.request({
@@ -109,44 +109,37 @@ export async function switchOrAddArcNetwork() {
         params: [
           {
             chainId: chainIdHex,
-            chainName: 'Celo Mainnet',
-            nativeCurrency: {
-              name: 'CELO',
-              symbol: 'CELO',
-              decimals: 18,
-            },
-            rpcUrls: ['https://forno.celo.org'],
-            blockExplorerUrls: ['https://celoscan.io'],
+            chainName: celoMainnet.name,
+            nativeCurrency: celoMainnet.nativeCurrency,
+            rpcUrls: celoMainnet.rpcUrls.default.http,
+            blockExplorerUrls: [celoMainnet.blockExplorers.default.url],
           },
         ],
       });
-      return true;
+    } else {
+      throw switchError;
     }
-    throw switchError;
   }
 }
+export const switchOrAddArcNetwork = switchOrAddCeloNetwork;
 
-/**
- * Reads real onchain CELO balance for a wallet address on Celo Mainnet.
- */
-export async function getUsdcBalance(walletAddress) {
+export async function getCeloBalance(walletAddress) {
   if (!walletAddress || !isAddress(walletAddress)) {
     return { formatted: '0.00', raw: 0n, symbol: 'CELO' };
   }
 
   try {
-    const rawBalance = await publicClient.getBalance({
+    const raw = await publicClient.getBalance({
       address: getAddress(walletAddress),
     });
 
-    const formatted = formatUnits(rawBalance, 18);
     return {
-      formatted: Number(formatted).toLocaleString('en-US', {
+      formatted: Number(formatUnits(raw, 18)).toLocaleString('en-US', {
         minimumFractionDigits: 2,
         maximumFractionDigits: 4,
       }),
-      rawString: formatted,
-      raw: rawBalance,
+      raw,
+      rawString: raw.toString(),
       symbol: 'CELO',
     };
   } catch (err) {
@@ -154,14 +147,16 @@ export async function getUsdcBalance(walletAddress) {
     return { formatted: '0.00', raw: 0n, symbol: 'CELO' };
   }
 }
+export const getUsdcBalance = getCeloBalance;
 
 /**
  * Executes a tagged on-chain payment on Celo Mainnet with ERC-8021 attribution (celo_9f7deabd99a6).
  */
-export async function sendUsdcOnArc({
+export async function sendPaymentOnCelo({
   fromAddress,
   toAddress,
   tagOrAddress,
+  amount,
   amountUsdc,
   memoText = '',
   memo,
@@ -190,7 +185,7 @@ export async function sendUsdcOnArc({
     throw new Error('Resolved recipient address is invalid.');
   }
 
-  const cleanAmount = String(amountUsdc).trim();
+  const cleanAmount = String(amount || amountUsdc).trim();
   if (!cleanAmount || isNaN(Number(cleanAmount)) || Number(cleanAmount) <= 0) {
     throw new Error('Please enter a valid amount greater than 0.');
   }
@@ -244,64 +239,58 @@ export async function sendUsdcOnArc({
     executionTimeMs: Date.now() - startTime,
   };
 }
+export const sendUsdcOnArc = sendPaymentOnCelo;
 
 /**
  * 1-Click Tagged ERC-8004 Identity Registration on Celo Mainnet.
- * Emits the attribution tag (celo_9f7deabd99a6) AND mints the ERC-8004 identity in a single transaction.
  */
-export async function registerTaggedErc8004Identity({ fromAddress, onStatusUpdate = () => {} }) {
+export async function registerCeloAgentIdentity({
+  fromAddress,
+  agentURI = 'https://celo.nairatag.ng/.well-known/agent-card.json',
+  onStatusUpdate = () => {},
+}) {
   if (!fromAddress || !isAddress(fromAddress)) {
-    throw new Error('Valid agent wallet must be connected.');
+    throw new Error('Valid wallet address is required.');
   }
 
   const provider = getEthereumProvider();
   if (!provider) throw new Error('EVM wallet provider unavailable.');
-
-  const currentChainId = parseInt(await provider.request({ method: 'eth_chainId' }), 16);
-  if (currentChainId !== celoMainnet.id) {
-    await switchOrAddArcNetwork();
-  }
 
   const walletClient = createWalletClient({
     chain: celoMainnet,
     transport: custom(provider),
   });
 
-  const agentURI = 'https://celo.nairatag.ng/.well-known/agent-card.json';
-  const baseCalldata = encodeFunctionData({
+  onStatusUpdate({ step: 'signing', message: 'Sign ERC-8004 registration on Celo Mainnet...' });
+
+  const registerData = encodeFunctionData({
     abi: ERC8004_IDENTITY_ABI,
     functionName: 'register',
     args: [agentURI],
   });
 
-  // Append attribution tag suffix (ERC-8021)
-  const taggedCalldata = concat([baseCalldata, CELO_ATTRIBUTION_SUFFIX]);
-
-  onStatusUpdate({ step: 'transacting', message: 'Sign ERC-8004 registration in your wallet...' });
+  const taggedRegisterData = concat([registerData, CELO_ATTRIBUTION_SUFFIX]);
 
   const hash = await walletClient.sendTransaction({
     account: getAddress(fromAddress),
-    to: ARC_ERC8004_IDENTITY_REGISTRY,
+    to: CELO_ERC8004_IDENTITY_REGISTRY,
+    data: taggedRegisterData,
     value: 0n,
-    data: taggedCalldata,
   });
 
-  onStatusUpdate({ step: 'confirming', message: 'Waiting for Celo block confirmation...' });
+  onStatusUpdate({ step: 'confirming', message: 'Confirming registration on Celo Mainnet...' });
   const receipt = await publicClient.waitForTransactionReceipt({
     hash,
     confirmations: 1,
-    timeout: 35000,
+    timeout: 30000,
   });
-
-  if (receipt.status !== 'success') {
-    throw new Error(`ERC-8004 Registration reverted. Hash: ${hash}`);
-  }
 
   return {
     txHash: hash,
     receipt,
     explorerUrl: `https://celoscan.io/tx/${hash}`,
-    agentURI,
-    tag: CELO_ATTRIBUTION_TAG,
+    blockNumber: Number(receipt.blockNumber),
+    attributionTag: CELO_ATTRIBUTION_TAG,
   };
 }
+export const registerArcAgentIdentity = registerCeloAgentIdentity;

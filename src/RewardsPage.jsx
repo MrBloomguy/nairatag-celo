@@ -31,8 +31,8 @@ import {
   REFERRAL_SIGNUP_POINTS,
 } from './services/referrals.js';
 import { consumeDailySpin, getDailySpinStats } from './services/wheelRewards.js';
-import { getArcRewardState, submitArcRewardAction } from './services/arcRewards.js';
-import { getTagShareUrl, getTelegramShareIntentUrl, getTwitterRewardShareUrl } from './services/arcSocialBroadcast.js';
+import { getArcRewardState, submitArcRewardAction } from './services/celoRewards.js';
+import { getTagShareUrl, getTelegramShareIntentUrl, getTwitterRewardShareUrl } from './services/celoSocialBroadcast.js';
 import './rewards.css';
 
 /**

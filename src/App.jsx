@@ -86,13 +86,17 @@ import {
 } from 'lucide-react';
 import {
   connectWallet,
-  switchOrAddArcNetwork,
-  getUsdcBalance,
-  sendUsdcOnArc,
+  switchOrAddCeloNetwork,
+  switchOrAddCeloNetwork as switchOrAddArcNetwork,
+  getCeloBalance,
+  getCeloBalance as getUsdcBalance,
+  sendPaymentOnCelo,
+  sendPaymentOnCelo as sendUsdcOnArc,
   estimateTransferFee,
-  activeArcChain,
+  activeCeloChain,
+  activeCeloChain as activeArcChain,
   getEthereumProvider,
-} from './services/arcPayment.js';
+} from './services/celoPayment.js';
 import {
   requestCircleEmailOtp,
   verifyCircleEmailOtp,
@@ -102,11 +106,11 @@ import {
   getStoredCircleSession,
   clearCircleSession,
 } from './services/circleWallet.js';
-import { clearArcSession, establishCircleArcSession, establishWalletArcSession } from './services/arcSession.js';
+import { clearArcSession, establishCircleArcSession, establishWalletArcSession } from './services/celoSession.js';
 import {
   resolveTag,
 } from './services/nairatagResolver.js';
-import { checkArcTagAvailability, claimArcNairaTag, getArcTagForWallet } from './services/arcNairaTag.js';
+import { checkArcTagAvailability, claimArcNairaTag, getArcTagForWallet } from './services/celoNairaTag.js';
 import {
   buildNairaTagAgentMetadataUri,
   findArcAgentForTag,
@@ -118,14 +122,20 @@ import {
   getValidationStatus,
 } from './services/erc8004Service.js';
 import {
-  ARC_ERC8004_REPUTATION_REGISTRY,
-  ARC_ERC8004_VALIDATION_REGISTRY,
-  ARC_MEMO_ADDRESS,
-  ARC_NAIRATAG_REGISTRY_ADDRESS,
-  ARC_NAIRATAG_RESOLVER_ADDRESS,
-  ARC_TESTNET_CONFIG,
-  ARC_USDC_ADDRESS,
-} from './config/arc.js';
+  CELO_ERC8004_REPUTATION_REGISTRY,
+  CELO_ERC8004_VALIDATION_REGISTRY,
+  CELO_NAIRATAG_REGISTRY_ADDRESS,
+  CELO_NAIRATAG_RESOLVER_ADDRESS,
+  CELO_MAINNET_CONFIG,
+  CELO_CNGN_ADDRESS,
+  CELO_ERC8004_REPUTATION_REGISTRY as ARC_ERC8004_REPUTATION_REGISTRY,
+  CELO_ERC8004_VALIDATION_REGISTRY as ARC_ERC8004_VALIDATION_REGISTRY,
+  CELO_NAIRATAG_REGISTRY_ADDRESS as ARC_MEMO_ADDRESS,
+  CELO_NAIRATAG_REGISTRY_ADDRESS as ARC_NAIRATAG_REGISTRY_ADDRESS,
+  CELO_NAIRATAG_RESOLVER_ADDRESS as ARC_NAIRATAG_RESOLVER_ADDRESS,
+  CELO_MAINNET_CONFIG as ARC_TESTNET_CONFIG,
+  CELO_CNGN_ADDRESS as ARC_USDC_ADDRESS,
+} from './config/celo.js';
 import {
   ARC_SUPPORTED_SWAP_TOKENS,
   APP_KIT_CROSSCHAINS,
@@ -134,11 +144,11 @@ import {
   getUnifiedBalanceSummary,
   getBorrowKitDetails,
   getEarnKitPools,
-} from './services/arcAppKit.js';
+} from './services/celoAppKit.js';
 import { resolveTagProfile } from './services/tagAvatar.js';
-import { getRecentArcTagActivity } from './services/arcRecentTagActivity.js';
-import { getArcAgentFollowState, setArcAgentFollow } from './services/arcAgentFollows.js';
-import { fetchArcAgentMetrics } from './services/arcAgentMetrics.js';
+import { getRecentArcTagActivity } from './services/celoRecentTagActivity.js';
+import { getArcAgentFollowState, setArcAgentFollow } from './services/celoAgentFollows.js';
+import { fetchArcAgentMetrics } from './services/celoAgentMetrics.js';
 import { discoverAgentsByCapability, isAgentDiscoveryRequest, resolveAgentMention } from './services/agentDiscovery.js';
 import {
   recordReferralSignup,
@@ -159,27 +169,27 @@ import {
   getWhatsAppShareUrl,
   TELEGRAM_CHANNEL_URL,
   TELEGRAM_CHANNEL_HANDLE,
-} from './services/arcSocialBroadcast.js';
+} from './services/celoSocialBroadcast.js';
 import {
   speakText,
   stopSpeaking,
-} from './services/arcGeminiChat.js';
+} from './services/celoGeminiChat.js';
 import {
   clearArcChatHistory,
   getArcChatHistory,
   getOrCreateArcChatConversationId,
   listArcChatConversations,
   sendArcChatMessage,
-} from './services/arcChat.js';
-import { createArcPlatformAgent, enableArcMcpTool, fetchArcAgentDirectory, getAdminArcAgentRegistry, transitionArcAgent } from './services/arcAgents.js';
+} from './services/celoChat.js';
+import { createArcPlatformAgent, enableArcMcpTool, fetchArcAgentDirectory, getAdminArcAgentRegistry, transitionArcAgent } from './services/celoAgents.js';
 import PlatformAgentAdminPage from './components/admin/PlatformAgentAdminPage.jsx';
 import PublicProfilePage from './components/PublicProfilePage.jsx';
 import confetti from 'canvas-confetti';
 import RewardsPage, { GoldenVoucherModal, LuckyWheelModal, ReferralModal } from './RewardsPage.jsx';
 import NotificationLayer from './components/NotificationLayer.jsx';
 import { recordConfirmedPaymentSpin } from './services/wheelRewards.js';
-import { getArcRewardState, markArcNotificationsRead, submitArcRewardAction } from './services/arcRewards.js';
-import { getArcAgentCompletedTaskCount, listArcTasks, startArcTask, submitArcTask } from './services/arcTasks.js';
+import { getArcRewardState, markArcNotificationsRead, submitArcRewardAction } from './services/celoRewards.js';
+import { getArcAgentCompletedTaskCount, listArcTasks, startArcTask, submitArcTask } from './services/celoTasks.js';
 import { IN_HOUSE_TASKS, claimInHouseVoucher, getInHouseVouchers, syncInHouseVouchers } from './services/inHouseTasks.js';
 import {
   getNotificationInbox,
@@ -587,16 +597,16 @@ function ArcAppShell() {
     return () => {
       if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
       if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-        try { mediaRecorderRef.current.stop(); } catch {}
+        try { mediaRecorderRef.current.stop(); } catch { }
       }
       if (speechRecognitionRef.current) {
-        try { speechRecognitionRef.current.stop(); } catch {}
+        try { speechRecognitionRef.current.stop(); } catch { }
       }
       if (voiceSpeechRecRef.current) {
-        try { voiceSpeechRecRef.current.stop(); } catch {}
+        try { voiceSpeechRecRef.current.stop(); } catch { }
       }
       if (activeAudioPlayerRef.current) {
-        try { activeAudioPlayerRef.current.pause(); } catch {}
+        try { activeAudioPlayerRef.current.pause(); } catch { }
       }
       stopSpeaking();
     };
@@ -643,7 +653,7 @@ function ArcAppShell() {
 
   const handleRemoveAttachedFile = () => {
     if (attachedFile?.previewUrl) {
-      try { URL.revokeObjectURL(attachedFile.previewUrl); } catch {}
+      try { URL.revokeObjectURL(attachedFile.previewUrl); } catch { }
     }
     setAttachedFile(null);
   };
@@ -659,7 +669,7 @@ function ArcAppShell() {
 
     if (isSpeechListening) {
       if (speechRecognitionRef.current) {
-        try { speechRecognitionRef.current.stop(); } catch {}
+        try { speechRecognitionRef.current.stop(); } catch { }
       }
       setIsSpeechListening(false);
       return;
@@ -788,10 +798,10 @@ function ArcAppShell() {
       try {
         mediaRecorderRef.current.stream?.getTracks().forEach((t) => t.stop());
         mediaRecorderRef.current.stop();
-      } catch {}
+      } catch { }
     }
     if (voiceSpeechRecRef.current) {
-      try { voiceSpeechRecRef.current.stop(); } catch {}
+      try { voiceSpeechRecRef.current.stop(); } catch { }
     }
     audioChunksRef.current = [];
     voiceTranscriptRef.current = '';
@@ -807,13 +817,13 @@ function ArcAppShell() {
     if (!recorder) return;
 
     if (voiceSpeechRecRef.current) {
-      try { voiceSpeechRecRef.current.stop(); } catch {}
+      try { voiceSpeechRecRef.current.stop(); } catch { }
     }
 
     recorder.onstop = () => {
       try {
         recorder.stream?.getTracks().forEach((t) => t.stop());
-      } catch {}
+      } catch { }
       const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
       const audioUrl = URL.createObjectURL(audioBlob);
       const userMsgId = 'usr-voice-' + Date.now();
@@ -1042,7 +1052,7 @@ function ArcAppShell() {
     setChatHistoryError('');
     setChatHistoryEntries([]);
     if (!walletAddress) {
-    setChatHistoryError('Sign in to view saved chats.');
+      setChatHistoryError('Sign in to view saved chats.');
       return;
     }
     setChatHistoryLoading(true);
@@ -2553,7 +2563,7 @@ function ArcAppShell() {
       setMyTag({ tag: res.cleanTag, owner: walletAddress });
       try {
 
-      } catch {}
+      } catch { }
 
       triggerCelebrationConfetti();
       setCelebrationDetails({
@@ -2805,7 +2815,7 @@ function ArcAppShell() {
                         className={`notification-item ${item.readAt ? '' : 'unread'}`}
                         onClick={() => {
                           setNotificationInbox(markInboxNotificationRead(item.id));
-                          markArcNotificationsRead(walletAddress, [item.id]).then(applyArcRewardState).catch(() => {});
+                          markArcNotificationsRead(walletAddress, [item.id]).then(applyArcRewardState).catch(() => { });
                           const destination = String(item.url || '').split('#')[1]?.split('?')[0];
                           setMainTab(['rewards', 'claim', 'pay', 'tasks', 'agents', 'chat', 'faq'].includes(destination) ? destination : 'rewards');
                           setIsNotificationOpen(false);
@@ -3499,7 +3509,7 @@ function ArcAppShell() {
                         title="Share on X"
                       >
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
-                          <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+                          <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
                         </svg>
                       </a>
                       <a
@@ -3889,321 +3899,321 @@ function ArcAppShell() {
                   </div>
                 ) : (
                   <div className="task-detail-grid">
-                  <div className="task-detail-main">
-                    <article className="task-detail-panel">
-                      <h2>Task details</h2>
-                      <p>{selectedTask.description}</p>
-                      <div className="task-detail-deliverable">
-                        <strong>What to submit</strong>
-                        <span>{selectedTask.deliverable}</span>
-                      </div>
-                      {selectedTask.requirements && (
+                    <div className="task-detail-main">
+                      <article className="task-detail-panel">
+                        <h2>Task details</h2>
+                        <p>{selectedTask.description}</p>
                         <div className="task-detail-deliverable">
-                          <strong>Requirements</strong>
-                          <span>{selectedTask.requirements}</span>
+                          <strong>What to submit</strong>
+                          <span>{selectedTask.deliverable}</span>
                         </div>
-                      )}
-                    </article>
+                        {selectedTask.requirements && (
+                          <div className="task-detail-deliverable">
+                            <strong>Requirements</strong>
+                            <span>{selectedTask.requirements}</span>
+                          </div>
+                        )}
+                      </article>
 
-                    <article className="task-detail-panel task-submit-panel">
-                      <div className="task-detail-panel-heading">
-                        <div>
-                          <h2>Work & submission</h2>
-                          <p>{taskProgress[selectedTask.id]?.status === 'submitted' ? 'Your work has been submitted for review.' : 'Start the task, then submit a link or describe your completed work.'}</p>
-                        </div>
-                        <span className={`task-progress-badge ${taskProgress[selectedTask.id]?.status || 'not-started'}`}>
-                          {taskProgress[selectedTask.id]?.status === 'paid' ? 'Reward paid' : taskProgress[selectedTask.id]?.status === 'submitted' ? 'In review' : taskProgress[selectedTask.id]?.status === 'in_progress' ? 'In progress' : 'Not started'}
-                        </span>
-                      </div>
-                      {taskProgress[selectedTask.id]?.status === 'paid' ? (
-                        <div className="task-submission-saved">
-                          <CheckCircle2 size={17} />
+                      <article className="task-detail-panel task-submit-panel">
+                        <div className="task-detail-panel-heading">
                           <div>
-                            <strong>Task reward paid</strong>
-                            <span>The Arc task service confirms this bounty as paid.</span>
-                            <span className="task-share-actions">
-                              <a href={getTwitterTaskShareUrl({ title: selectedTask.title, rewardUSDC: selectedTask.rewardUSDC, points: selectedTask.points, userTag: myTag?.tag })} target="_blank" rel="noopener noreferrer">Share on X</a>
-                              <a href={getTelegramShareIntentUrl({ text: `I completed "${selectedTask.title}" and received its task reward on NairaTag.`, url: myTag?.tag ? getTagShareUrl(myTag.tag) : 'https://arc.nairatag.ng/#tasks' })} target="_blank" rel="noopener noreferrer">Share on Telegram</a>
-                            </span>
+                            <h2>Work & submission</h2>
+                            <p>{taskProgress[selectedTask.id]?.status === 'submitted' ? 'Your work has been submitted for review.' : 'Start the task, then submit a link or describe your completed work.'}</p>
                           </div>
+                          <span className={`task-progress-badge ${taskProgress[selectedTask.id]?.status || 'not-started'}`}>
+                            {taskProgress[selectedTask.id]?.status === 'paid' ? 'Reward paid' : taskProgress[selectedTask.id]?.status === 'submitted' ? 'In review' : taskProgress[selectedTask.id]?.status === 'in_progress' ? 'In progress' : 'Not started'}
+                          </span>
                         </div>
-                      ) : taskProgress[selectedTask.id]?.status === 'submitted' ? (
-                        <div className="task-submission-saved">
-                          <CheckCircle2 size={17} />
-                          <div>
-                            <strong>Submission saved</strong>
-                            <span>Sent to the Arc task service for bounty owner review.</span>
-                            <span className="task-share-actions">
-                              <a href={getTwitterTaskShareUrl({ title: selectedTask.title, rewardUSDC: selectedTask.rewardUSDC, points: selectedTask.points, userTag: myTag?.tag })} target="_blank" rel="noopener noreferrer">Share on X</a>
-                              <a href={getTelegramShareIntentUrl({ text: `I submitted "${selectedTask.title}" on NairaTag. My bounty is pending task-owner review.`, url: myTag?.tag ? getTagShareUrl(myTag.tag) : 'https://arc.nairatag.ng/#tasks' })} target="_blank" rel="noopener noreferrer">Share on Telegram</a>
-                            </span>
+                        {taskProgress[selectedTask.id]?.status === 'paid' ? (
+                          <div className="task-submission-saved">
+                            <CheckCircle2 size={17} />
+                            <div>
+                              <strong>Task reward paid</strong>
+                              <span>The Arc task service confirms this bounty as paid.</span>
+                              <span className="task-share-actions">
+                                <a href={getTwitterTaskShareUrl({ title: selectedTask.title, rewardUSDC: selectedTask.rewardUSDC, points: selectedTask.points, userTag: myTag?.tag })} target="_blank" rel="noopener noreferrer">Share on X</a>
+                                <a href={getTelegramShareIntentUrl({ text: `I completed "${selectedTask.title}" and received its task reward on NairaTag.`, url: myTag?.tag ? getTagShareUrl(myTag.tag) : 'https://arc.nairatag.ng/#tasks' })} target="_blank" rel="noopener noreferrer">Share on Telegram</a>
+                              </span>
+                            </div>
                           </div>
-                        </div>
-                      ) : (
-                        <>
-                          {taskProgress[selectedTask.id]?.status !== 'in_progress' && (
-                            <button type="button" className="btn-agent-primary" onClick={() => handleStartTask(selectedTask)}>
-                              Start this task <ChevronRight size={15} />
+                        ) : taskProgress[selectedTask.id]?.status === 'submitted' ? (
+                          <div className="task-submission-saved">
+                            <CheckCircle2 size={17} />
+                            <div>
+                              <strong>Submission saved</strong>
+                              <span>Sent to the Arc task service for bounty owner review.</span>
+                              <span className="task-share-actions">
+                                <a href={getTwitterTaskShareUrl({ title: selectedTask.title, rewardUSDC: selectedTask.rewardUSDC, points: selectedTask.points, userTag: myTag?.tag })} target="_blank" rel="noopener noreferrer">Share on X</a>
+                                <a href={getTelegramShareIntentUrl({ text: `I submitted "${selectedTask.title}" on NairaTag. My bounty is pending task-owner review.`, url: myTag?.tag ? getTagShareUrl(myTag.tag) : 'https://arc.nairatag.ng/#tasks' })} target="_blank" rel="noopener noreferrer">Share on Telegram</a>
+                              </span>
+                            </div>
+                          </div>
+                        ) : (
+                          <>
+                            {taskProgress[selectedTask.id]?.status !== 'in_progress' && (
+                              <button type="button" className="btn-agent-primary" onClick={() => handleStartTask(selectedTask)}>
+                                Start this task <ChevronRight size={15} />
+                              </button>
+                            )}
+                            <textarea
+                              className="token-amount-field task-submission-input"
+                              rows={4}
+                              placeholder="Paste your deliverable link or describe the work you completed..."
+                              value={taskSubmissionDraft}
+                              onChange={(event) => setTaskSubmissionDraft(event.target.value)}
+                              disabled={taskProgress[selectedTask.id]?.status !== 'in_progress'}
+                            />
+                            <button
+                              type="button"
+                              className="btn-agent-primary"
+                              onClick={() => handleSubmitTask(selectedTask)}
+                              disabled={taskProgress[selectedTask.id]?.status !== 'in_progress'}
+                            >
+                              <Send size={14} /> Submit work for review
                             </button>
-                          )}
-                          <textarea
-                            className="token-amount-field task-submission-input"
-                            rows={4}
-                            placeholder="Paste your deliverable link or describe the work you completed..."
-                            value={taskSubmissionDraft}
-                            onChange={(event) => setTaskSubmissionDraft(event.target.value)}
-                            disabled={taskProgress[selectedTask.id]?.status !== 'in_progress'}
-                          />
-                          <button
-                            type="button"
-                            className="btn-agent-primary"
-                            onClick={() => handleSubmitTask(selectedTask)}
-                            disabled={taskProgress[selectedTask.id]?.status !== 'in_progress'}
-                          >
-                            <Send size={14} /> Submit work for review
-                          </button>
-                        </>
-                      )}
-                      <div className="task-detail-local-note">Task progress and submissions are stored in the shared Arc task service. Escrow payouts remain unavailable until an Arc escrow contract is deployed and connected.</div>
-                    </article>
-                  </div>
+                          </>
+                        )}
+                        <div className="task-detail-local-note">Task progress and submissions are stored in the shared Arc task service. Escrow payouts remain unavailable until an Arc escrow contract is deployed and connected.</div>
+                      </article>
+                    </div>
 
-                  <aside className="task-detail-sidebar">
-                    <article className="task-detail-panel task-reward-panel">
-                      <span className="task-detail-eyebrow">BOUNTY REWARD</span>
-                      <strong>${selectedTask.rewardUSDC} <small>USDC</small></strong>
-                      <span>+{selectedTask.points} Protocol Points after approval</span>
-                      <button type="button" className="btn-agent-secondary" disabled title="The bounty escrow contract is not connected yet.">
-                        <Coins size={14} /> Claim reward
+                    <aside className="task-detail-sidebar">
+                      <article className="task-detail-panel task-reward-panel">
+                        <span className="task-detail-eyebrow">BOUNTY REWARD</span>
+                        <strong>${selectedTask.rewardUSDC} <small>USDC</small></strong>
+                        <span>+{selectedTask.points} Protocol Points after approval</span>
+                        <button type="button" className="btn-agent-secondary" disabled title="The bounty escrow contract is not connected yet.">
+                          <Coins size={14} /> Claim reward
+                        </button>
+                        <small className="task-detail-local-note">Reward claims activate after escrow contract and owner approval integration.</small>
+                      </article>
+
+                      <article className="task-detail-panel">
+                        <h2><ShieldCheck size={16} /> Escrow status</h2>
+                        <div className="task-escrow-status">{selectedTask.escrowStatus}</div>
+                        <p>Arc task progress is stored remotely. This bounty is not yet backed by an Arc escrow contract.</p>
+                      </article>
+
+                      <button type="button" className="btn-agent-secondary task-chat-button" onClick={() => handleTaskChat(selectedTask)}>
+                        <MessageSquare size={15} /> Chat with task owner
                       </button>
-                      <small className="task-detail-local-note">Reward claims activate after escrow contract and owner approval integration.</small>
-                    </article>
-
-                    <article className="task-detail-panel">
-                      <h2><ShieldCheck size={16} /> Escrow status</h2>
-                      <div className="task-escrow-status">{selectedTask.escrowStatus}</div>
-                      <p>Arc task progress is stored remotely. This bounty is not yet backed by an Arc escrow contract.</p>
-                    </article>
-
-                    <button type="button" className="btn-agent-secondary task-chat-button" onClick={() => handleTaskChat(selectedTask)}>
-                      <MessageSquare size={15} /> Chat with task owner
-                    </button>
-                  </aside>
+                    </aside>
                   </div>
                 )}
               </section>
             ) : (
               <>
-            {/* Top Bar: Search and Grid/List View Toggle */}
-            <div className="agents-top-bar">
-              <div className="agents-top-controls task-top-controls" style={{ width: '100%', justifyContent: 'space-between', gap: '8px' }}>
-                {/* Search Bar (reduced compact length to leave maximum room for Create Task) */}
-                <div className="agents-search-input-wrap task-search-wrap" style={{ flex: '0 1 110px', maxWidth: '120px', minWidth: '70px' }}>
-                  <Search size={13} color="var(--privy-color-foreground-3)" style={{ flexShrink: 0 }} />
-                  <input
-                    type="text"
-                    className="agents-search-input task-search-input"
-                    placeholder="Search..."
-                    value={tasksSearch}
-                    onChange={(e) => setTasksSearch(e.target.value)}
-                    style={{ minWidth: 0, width: '100%' }}
-                  />
-                  {tasksSearch && (
+                {/* Top Bar: Search and Grid/List View Toggle */}
+                <div className="agents-top-bar">
+                  <div className="agents-top-controls task-top-controls" style={{ width: '100%', justifyContent: 'space-between', gap: '8px' }}>
+                    {/* Search Bar (reduced compact length to leave maximum room for Create Task) */}
+                    <div className="agents-search-input-wrap task-search-wrap" style={{ flex: '0 1 110px', maxWidth: '120px', minWidth: '70px' }}>
+                      <Search size={13} color="var(--privy-color-foreground-3)" style={{ flexShrink: 0 }} />
+                      <input
+                        type="text"
+                        className="agents-search-input task-search-input"
+                        placeholder="Search..."
+                        value={tasksSearch}
+                        onChange={(e) => setTasksSearch(e.target.value)}
+                        style={{ minWidth: 0, width: '100%' }}
+                      />
+                      {tasksSearch && (
+                        <button
+                          type="button"
+                          style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: 'var(--privy-color-foreground-3)', flexShrink: 0 }}
+                          onClick={() => setTasksSearch('')}
+                        >
+                          <X size={12} />
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Create Task Button */}
+                    <div className="task-header-actions" style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0, marginLeft: 'auto' }}>
+                      <button
+                        type="button"
+                        className="btn-agent-primary create-task-header-btn"
+                        style={{ padding: '6px 11px', fontSize: '11.5px', display: 'flex', alignItems: 'center', gap: '5px', whiteSpace: 'nowrap', flexShrink: 0 }}
+                        onClick={() => setIsPostTaskOpen(true)}
+                      >
+                        <Plus size={13} />
+                        <span>Create Task</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Metrics Overview Row (Compact 4-in-a-row matching Agents stats grid) */}
+                <div className="agents-stats-grid">
+                  <div className="agents-stat-card">
+                    <span className="agents-stat-card-label">Active Tasks</span>
+                    <span className="agents-stat-card-value">{allTasks.length + IN_HOUSE_TASKS.length}</span>
+                  </div>
+                  <div className="agents-stat-card">
+                    <span className="agents-stat-card-label">Total Agents</span>
+                    <span className="agents-stat-card-value">{chatAgents.length}</span>
+                  </div>
+                  <div className="agents-stat-card">
+                    <span className="agents-stat-card-label">Total Earned</span>
+                    <span className="agents-stat-card-value" style={{ color: '#059669' }}>{userPoints.toLocaleString()} Pts</span>
+                  </div>
+                  <div className="agents-stat-card">
+                    <span className="agents-stat-card-label">Your Points</span>
+                    <span className="agents-stat-card-value" style={{ color: '#059669' }}>{userPoints} Pts</span>
+                  </div>
+                </div>
+
+                {/* Category Filter Pills Row */}
+                <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '4px', scrollbarWidth: 'none' }}>
+                  {[
+                    { id: 'all', label: 'All Tasks' },
+                    { id: 'dev', label: '⚡ Engineering' },
+                    { id: 'design', label: '🎨 Design' },
+                    { id: 'data', label: '📊 Data & AI' },
+                    { id: 'content', label: '✍️ Content' },
+                    { id: 'test', label: '🧪 Testing' },
+                    { id: 'community', label: '📱 Community' },
+                  ].map((cat) => (
                     <button
+                      key={cat.id}
                       type="button"
-                      style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: 'var(--privy-color-foreground-3)', flexShrink: 0 }}
-                      onClick={() => setTasksSearch('')}
+                      className={`task-cat-pill ${tasksFilter === cat.id ? 'active' : ''}`}
+                      onClick={() => setTasksFilter(cat.id)}
                     >
-                      <X size={12} />
+                      {cat.label}
                     </button>
-                  )}
+                  ))}
                 </div>
 
-                {/* Create Task Button */}
-                <div className="task-header-actions" style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0, marginLeft: 'auto' }}>
-                  <button
-                    type="button"
-                    className="btn-agent-primary create-task-header-btn"
-                    style={{ padding: '6px 11px', fontSize: '11.5px', display: 'flex', alignItems: 'center', gap: '5px', whiteSpace: 'nowrap', flexShrink: 0 }}
-                    onClick={() => setIsPostTaskOpen(true)}
-                  >
-                    <Plus size={13} />
-                    <span>Create Task</span>
-                  </button>
-                </div>
-              </div>
-            </div>
+                <div className="agents-milestones-grid">
+                  {filteredTasks.length === 0 ? (
+                    <div className="tasks-empty-state-card" style={{ gridColumn: '1 / -1' }}>
+                      <div className="tasks-empty-badge-glow">
+                        <div className="tasks-empty-icon-wrap">
+                          {tasksLoading ? (
+                            <RefreshCw size={26} color="#5B4FFF" className="spin-anim" />
+                          ) : (tasksSearch || tasksFilter !== 'all') ? (
+                            <Search size={24} color="#5B4FFF" />
+                          ) : (
+                            <Sparkles size={26} color="#5B4FFF" />
+                          )}
+                        </div>
+                      </div>
 
-            {/* Metrics Overview Row (Compact 4-in-a-row matching Agents stats grid) */}
-            <div className="agents-stats-grid">
-              <div className="agents-stat-card">
-                <span className="agents-stat-card-label">Active Tasks</span>
-                <span className="agents-stat-card-value">{allTasks.length + IN_HOUSE_TASKS.length}</span>
-              </div>
-              <div className="agents-stat-card">
-                <span className="agents-stat-card-label">Total Agents</span>
-                <span className="agents-stat-card-value">{chatAgents.length}</span>
-              </div>
-              <div className="agents-stat-card">
-                <span className="agents-stat-card-label">Total Earned</span>
-                <span className="agents-stat-card-value" style={{ color: '#059669' }}>{userPoints.toLocaleString()} Pts</span>
-              </div>
-              <div className="agents-stat-card">
-                <span className="agents-stat-card-label">Your Points</span>
-                <span className="agents-stat-card-value" style={{ color: '#059669' }}>{userPoints} Pts</span>
-              </div>
-            </div>
+                      <h3 className="tasks-empty-title">
+                        {tasksLoading
+                          ? 'Syncing Arc Escrow Bounties…'
+                          : (tasksSearch || tasksFilter !== 'all')
+                            ? 'No Matching Tasks Found'
+                            : 'No tasks available'}
+                      </h3>
 
-            {/* Category Filter Pills Row */}
-            <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '4px', scrollbarWidth: 'none' }}>
-              {[
-                { id: 'all', label: 'All Tasks' },
-                { id: 'dev', label: '⚡ Engineering' },
-                { id: 'design', label: '🎨 Design' },
-                { id: 'data', label: '📊 Data & AI' },
-                { id: 'content', label: '✍️ Content' },
-                { id: 'test', label: '🧪 Testing' },
-                { id: 'community', label: '📱 Community' },
-              ].map((cat) => (
-                <button
-                  key={cat.id}
-                  type="button"
-                  className={`task-cat-pill ${tasksFilter === cat.id ? 'active' : ''}`}
-                  onClick={() => setTasksFilter(cat.id)}
-                >
-                  {cat.label}
-                </button>
-              ))}
-            </div>
+                      {(tasksLoading || tasksSearch || tasksFilter !== 'all') && (
+                        <p className="tasks-empty-subtitle">
+                          {tasksLoading
+                            ? 'Connecting to Arc Osaka smart contracts and querying verified community milestones…'
+                            : tasksSearch
+                              ? `No bounties match "${tasksSearch}". Try clearing your search or switching categories.`
+                              : 'There are no open bounties in this category yet. Explore other categories or post one yourself.'}
+                        </p>
+                      )}
 
-            <div className="agents-milestones-grid">
-                {filteredTasks.length === 0 ? (
-                  <div className="tasks-empty-state-card" style={{ gridColumn: '1 / -1' }}>
-                    <div className="tasks-empty-badge-glow">
-                      <div className="tasks-empty-icon-wrap">
-                        {tasksLoading ? (
-                          <RefreshCw size={26} color="#5B4FFF" className="spin-anim" />
-                        ) : (tasksSearch || tasksFilter !== 'all') ? (
-                          <Search size={24} color="#5B4FFF" />
-                        ) : (
-                          <Sparkles size={26} color="#5B4FFF" />
+                      <div className="tasks-empty-actions">
+                        {(tasksSearch || tasksFilter !== 'all') && (
+                          <button
+                            type="button"
+                            className="btn-agent-secondary"
+                            onClick={() => { setTasksSearch(''); setTasksFilter('all'); }}
+                          >
+                            Clear Filters
+                          </button>
+                        )}
+                        {!tasksLoading && (
+                          <button
+                            type="button"
+                            className="btn-agent-primary"
+                            onClick={() => setIsPostTaskOpen(true)}
+                          >
+                            <Plus size={14} />
+                            <span>Create Task</span>
+                          </button>
+                        )}
+                        {!tasksLoading && (
+                          <button
+                            type="button"
+                            className="btn-agent-secondary"
+                            onClick={() => setTasksRefreshKey((key) => key + 1)}
+                            title="Refresh tasks list"
+                          >
+                            <RefreshCw size={13} />
+                            <span>Refresh</span>
+                          </button>
                         )}
                       </div>
                     </div>
-
-                    <h3 className="tasks-empty-title">
-                      {tasksLoading
-                        ? 'Syncing Arc Escrow Bounties…'
-                        : (tasksSearch || tasksFilter !== 'all')
-                          ? 'No Matching Tasks Found'
-                          : 'No tasks available'}
-                    </h3>
-
-                    {(tasksLoading || tasksSearch || tasksFilter !== 'all') && (
-                      <p className="tasks-empty-subtitle">
-                        {tasksLoading
-                          ? 'Connecting to Arc Osaka smart contracts and querying verified community milestones…'
-                          : tasksSearch
-                            ? `No bounties match "${tasksSearch}". Try clearing your search or switching categories.`
-                            : 'There are no open bounties in this category yet. Explore other categories or post one yourself.'}
-                      </p>
-                    )}
-
-                    <div className="tasks-empty-actions">
-                      {(tasksSearch || tasksFilter !== 'all') && (
-                        <button
-                          type="button"
-                          className="btn-agent-secondary"
-                          onClick={() => { setTasksSearch(''); setTasksFilter('all'); }}
+                  ) : (
+                    filteredTasks.map((task, idx) => {
+                      const voucherClaim = task.isVoucherTask
+                        ? inHouseVouchers.find((voucher) => voucher.taskId === task.voucherTask.id)
+                        : null;
+                      const isDone = task.isVoucherTask
+                        ? voucherClaim?.status === 'approved'
+                        : taskProgress[task.id]?.status === 'paid';
+                      const rankLabel = task.rank || `#${idx + 1}`;
+                      return (
+                        <div
+                          key={task.id}
+                          className="agent-milestone-card"
+                          onClick={() => setSelectedTaskId(task.id)}
+                          role="button"
+                          tabIndex={0}
+                          onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') setSelectedTaskId(task.id); }}
+                          style={{ cursor: 'pointer' }}
                         >
-                          Clear Filters
-                        </button>
-                      )}
-                      {!tasksLoading && (
-                        <button
-                          type="button"
-                          className="btn-agent-primary"
-                          onClick={() => setIsPostTaskOpen(true)}
-                        >
-                          <Plus size={14} />
-                          <span>Create Task</span>
-                        </button>
-                      )}
-                      {!tasksLoading && (
-                        <button
-                          type="button"
-                          className="btn-agent-secondary"
-                          onClick={() => setTasksRefreshKey((key) => key + 1)}
-                          title="Refresh tasks list"
-                        >
-                          <RefreshCw size={13} />
-                          <span>Refresh</span>
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                ) : (
-                  filteredTasks.map((task, idx) => {
-                    const voucherClaim = task.isVoucherTask
-                      ? inHouseVouchers.find((voucher) => voucher.taskId === task.voucherTask.id)
-                      : null;
-                    const isDone = task.isVoucherTask
-                      ? voucherClaim?.status === 'approved'
-                      : taskProgress[task.id]?.status === 'paid';
-                    const rankLabel = task.rank || `#${idx + 1}`;
-                    return (
-                      <div
-                        key={task.id}
-                        className="agent-milestone-card"
-                        onClick={() => setSelectedTaskId(task.id)}
-                        role="button"
-                        tabIndex={0}
-                        onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') setSelectedTaskId(task.id); }}
-                        style={{ cursor: 'pointer' }}
-                      >
-                        <span className="card-rank-tag">{rankLabel}</span>
+                          <span className="card-rank-tag">{rankLabel}</span>
 
-                        <div className="milestone-badge-stage">
-                          <AgentMedallion type={task.badgeType || (idx % 2 === 0 ? 'emerald' : 'cyan')} size={46} />
-                        </div>
+                          <div className="milestone-badge-stage">
+                            <AgentMedallion type={task.badgeType || (idx % 2 === 0 ? 'emerald' : 'cyan')} size={46} />
+                          </div>
 
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
-                          <h3 className="milestone-card-title" style={{ margin: 0 }}>₦{task.creatorTag.replace(/^₦/, '').toUpperCase()}</h3>
-                          <img
-                            src="/verified-badge.png"
-                            alt=""
-                            aria-hidden="true"
-                            style={{ width: '16px', height: '16px', objectFit: 'contain', flexShrink: 0 }}
-                            title="Arc Escrow Verified"
-                          />
-                        </div>
-                        <div className="milestone-card-role" title={task.title}>{task.title}</div>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+                            <h3 className="milestone-card-title" style={{ margin: 0 }}>₦{task.creatorTag.replace(/^₦/, '').toUpperCase()}</h3>
+                            <img
+                              src="/verified-badge.png"
+                              alt=""
+                              aria-hidden="true"
+                              style={{ width: '16px', height: '16px', objectFit: 'contain', flexShrink: 0 }}
+                              title="Arc Escrow Verified"
+                            />
+                          </div>
+                          <div className="milestone-card-role" title={task.title}>{task.title}</div>
 
-                        <div className="milestone-task-status">
-                          <span>{task.categoryLabel} • {task.deadline}</span>
-                        </div>
+                          <div className="milestone-task-status">
+                            <span>{task.categoryLabel} • {task.deadline}</span>
+                          </div>
 
-                        <div className="milestone-progress-bar-wrap">
-                          <div
-                            className="milestone-progress-bar-fill"
-                            style={{
-                              width: isDone ? '100%' : '75%',
-                              background: isDone ? '#10B981' : 'var(--primary, #0052FF)'
-                            }}
-                          />
-                        </div>
+                          <div className="milestone-progress-bar-wrap">
+                            <div
+                              className="milestone-progress-bar-fill"
+                              style={{
+                                width: isDone ? '100%' : '75%',
+                                background: isDone ? '#10B981' : 'var(--primary, #0052FF)'
+                              }}
+                            />
+                          </div>
 
-                        <div className="milestone-earnings-row">
-                          <span className="milestone-earnings-label">Reward</span>
-                          <span className="milestone-earnings-value" style={{ color: isDone ? '#10B981' : 'var(--primary, #0052FF)' }}>
-                            {isDone ? 'Paid' : `$${task.rewardUSDC} USDC`}
-                          </span>
+                          <div className="milestone-earnings-row">
+                            <span className="milestone-earnings-label">Reward</span>
+                            <span className="milestone-earnings-value" style={{ color: isDone ? '#10B981' : 'var(--primary, #0052FF)' }}>
+                              {isDone ? 'Paid' : `$${task.rewardUSDC} USDC`}
+                            </span>
+                          </div>
                         </div>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
+                      );
+                    })
+                  )}
+                </div>
 
               </>
             )}
@@ -4233,20 +4243,20 @@ function ArcAppShell() {
                 <ArrowLeft size={18} />
               </button>}
               <div className="chat-top-nav-actions">
-              <button
-                type="button"
-                className="chat-history-btn"
-                onClick={handleOpenChatHistory}
-                aria-label="Open saved chat history"
-                title="Saved chats"
-              ><History size={16} /></button>
-              {walletAddress && myTag?.tag && <button
-                type="button"
-                className="chat-history-btn personal-agent-open"
-                onClick={() => setIsPersonalAgentOpen(true)}
-                aria-label="Manage your personal agent"
-                title="Manage your personal agent"
-              ><Brain size={16} /><span>My agent</span></button>}
+                <button
+                  type="button"
+                  className="chat-history-btn"
+                  onClick={handleOpenChatHistory}
+                  aria-label="Open saved chat history"
+                  title="Saved chats"
+                ><History size={16} /></button>
+                {walletAddress && myTag?.tag && <button
+                  type="button"
+                  className="chat-history-btn personal-agent-open"
+                  onClick={() => setIsPersonalAgentOpen(true)}
+                  aria-label="Manage your personal agent"
+                  title="Manage your personal agent"
+                ><Brain size={16} /><span>My agent</span></button>}
               </div>
             </div>
 
@@ -5085,9 +5095,9 @@ function ArcAppShell() {
               {celebrationDetails.type === 'payment' && `USDC Payment Sent to ${celebrationDetails.recipient}`}
               {celebrationDetails.type === 'swap' && `Swapped: ${celebrationDetails.amount}`}
               {celebrationDetails.type === 'agent' && `Agent Minted: ${celebrationDetails.amount}`}
-          {celebrationDetails.type === 'claim' && (celebrationDetails.erc8004LinkError
-            ? `Tag claimed. ERC-8004 link needs approval: ${celebrationDetails.amount}`
-            : `Tag claimed${celebrationDetails.erc8004Id ? ` and linked as ERC-8004 #${celebrationDetails.erc8004Id}` : ''}: ${celebrationDetails.amount}`)}
+              {celebrationDetails.type === 'claim' && (celebrationDetails.erc8004LinkError
+                ? `Tag claimed. ERC-8004 link needs approval: ${celebrationDetails.amount}`
+                : `Tag claimed${celebrationDetails.erc8004Id ? ` and linked as ERC-8004 #${celebrationDetails.erc8004Id}` : ''}: ${celebrationDetails.amount}`)}
             </div>
 
             {/* Ticket receipt */}
@@ -5166,7 +5176,7 @@ function ArcAppShell() {
                     title="Share to X"
                   >
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+                      <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
                     </svg>
                     <span>Post to X</span>
                   </a>

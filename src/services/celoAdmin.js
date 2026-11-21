@@ -1,7 +1,7 @@
 import { keccak256, stringToHex } from 'viem';
-import { getEthereumProvider } from './arcPayment.js';
+import { getEthereumProvider } from './celoPayment.js';
 
-const API = import.meta.env.VITE_ARC_ADMIN_API || 'https://nairatag.ng/api/arc-admin';
+const API = import.meta.env.VITE_CELO_ADMIN_API || 'https://nairatag.ng/api/arc-admin';
 
 async function sign(walletAddress, action, payload) {
   const provider = getEthereumProvider();
@@ -21,14 +21,14 @@ async function read(response) {
   return data;
 }
 
-export async function getArcAdminDashboard(walletAddress) {
+export async function getCeloAdminDashboard(walletAddress) {
   const auth = await sign(walletAddress, 'dashboard', { action: 'dashboard' });
   const url = new URL(API);
   Object.entries(auth).forEach(([key, value]) => url.searchParams.set(key, String(value)));
   return (await read(await fetch(url, { headers: { Accept: 'application/json' }, cache: 'no-store' }))).dashboard;
 }
 
-export async function submitArcAdminAction(walletAddress, action, fields = {}) {
+export async function submitCeloAdminAction(walletAddress, action, fields = {}) {
   const payload = { action, ...fields };
   const auth = await sign(walletAddress, action, payload);
   return (await read(await fetch(API, {
@@ -36,3 +36,8 @@ export async function submitArcAdminAction(walletAddress, action, fields = {}) {
     body: JSON.stringify({ ...payload, ...auth }),
   }))).result;
 }
+
+// Backward compatibility aliases
+export const getArcAdminDashboard = getCeloAdminDashboard;
+export const submitArcAdminAction = submitCeloAdminAction;
+

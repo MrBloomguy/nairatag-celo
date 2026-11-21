@@ -1,5 +1,5 @@
 import { keccak256, stringToHex } from 'viem';
-import { getArcSessionToken } from './arcSession.js';
+import { getArcSessionToken } from './celoSession.js';
 
 const CHAIN_ID = 5042002;
 const API = import.meta.env.VITE_ARC_PERSONAL_AGENT_API || 'https://nairatag.ng/api/arc-personal-agent';

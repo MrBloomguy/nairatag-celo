@@ -1,6 +1,6 @@
 /**
- * Browser text-to-speech helpers for saved Arc chat responses.
- * AI requests and chat persistence run through the server-side Arc chat API.
+ * Browser text-to-speech helpers for saved Celo chat responses.
+ * AI requests and chat persistence run through the server-side Celo chat API.
  */
 export function speakText(text) {
   if (typeof window === 'undefined' || !window.speechSynthesis) return;

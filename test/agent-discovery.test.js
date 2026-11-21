@@ -5,7 +5,7 @@ import {
   isAgentDiscoveryRequest,
   resolveAgentMention,
 } from '../src/services/agentDiscovery.js';
-import { mapArcAgentRecord } from '../src/services/arcAgents.js';
+import { mapCeloAgentRecord as mapArcAgentRecord } from '../src/services/celoAgents.js';
 
 const agents = [
   {

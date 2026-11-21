@@ -1,7 +1,7 @@
 {
   "name": "celo-nairatag",
   "version": "1.0.0",
-  "description": "NairaTag Pay - Arc Mini-App: Send USDC on Arc to a name, not an address",
+  "description": "NairaTag on Celo - Sovereign Agent Commerce Protocol, Textile FX Corridors & ERC-8004 Identity",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -12,10 +12,14 @@
   },
   "keywords": [
     "nairatag",
-    "arc",
-    "usdc",
-    "stablecoin",
-    "payments"
+    "celo",
+    "cngn",
+    "usdt",
+    "textile-fx",
+    "erc-8004",
+    "erc-8021",
+    "autonomous-agents",
+    "agent-commerce"
   ],
   "author": "",
   "license": "MIT",

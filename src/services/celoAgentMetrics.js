@@ -1,6 +1,6 @@
 import { isAddress } from 'viem';
-import { getArcAgentTaskTotals } from './arcTasks.js';
-import { getArcRewardState } from './arcRewards.js';
+import { getCeloAgentTaskTotals } from './celoTasks.js';
+import { getCeloRewardState } from './celoRewards.js';
 import { getAgentDetails } from './erc8004Service.js';
 
 function numericValue(value) {
@@ -9,7 +9,7 @@ function numericValue(value) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-export async function fetchArcAgentMetrics(agent) {
+export async function fetchCeloAgentMetrics(agent) {
   let owner = agent.owner || agent.identity?.owner || null;
   if (!isAddress(String(owner || '')) && agent.identity?.verifiedOnchain && agent.identity?.erc8004AgentId) {
     try {
@@ -28,8 +28,8 @@ export async function fetchArcAgentMetrics(agent) {
   }
 
   const [rewardResult, taskResult] = await Promise.allSettled([
-    getArcRewardState(owner),
-    getArcAgentTaskTotals(owner),
+    getCeloRewardState(owner),
+    getCeloAgentTaskTotals(owner),
   ]);
   const rewardPoints = rewardResult.status === 'fulfilled' ? numericValue(rewardResult.value.points) : null;
   const taskTotals = taskResult.status === 'fulfilled' ? taskResult.value : null;
@@ -40,3 +40,7 @@ export async function fetchArcAgentMetrics(agent) {
     points: numericValue(agent.points) ?? rewardPoints ?? numericValue(taskTotals?.pointsEarned),
   };
 }
+
+
+// Backward compatibility aliases
+export const fetchArcAgentMetrics = fetchCeloAgentMetrics;

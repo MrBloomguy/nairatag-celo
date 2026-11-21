@@ -1,11 +1,11 @@
-import { broadcastArcPaidTaskToTelegram, broadcastArcTaskToTelegram } from './arcSocialBroadcast.js';
-const ARC_TASKS_API = import.meta.env.VITE_ARC_TASKS_API || (import.meta.env.DEV ? '/api/arc-tasks' : 'https://nairatag.ng/api/arc-tasks');
-const ARC_CHAIN_ID = 5042002;
+import { broadcastCeloPaidTaskToTelegram, broadcastCeloTaskToTelegram } from './celoSocialBroadcast.js';
+const CELO_TASKS_API = import.meta.env.VITE_CELO_TASKS_API || (import.meta.env.DEV ? '/api/arc-tasks' : 'https://nairatag.ng/api/arc-tasks');
+const CELO_CHAIN_ID = 42220;
 const alertedPaidTasks = new Set();
 
 function arcTasksUrl() {
   const base = typeof window !== 'undefined' ? window.location.origin : 'https://nairatag.ng';
-  return new URL(ARC_TASKS_API, base);
+  return new URL(CELO_TASKS_API, base);
 }
 
 function mapTask(row) {
@@ -22,7 +22,7 @@ function mapTask(row) {
     points: Number(row.points),
     deadline: row.deadline_label,
     status: row.status,
-    escrowStatus: row.escrow_status === 'not_integrated' ? 'Arc escrow contract not connected' : row.escrow_status,
+    escrowStatus: row.escrow_status === 'not_integrated' ? 'Celo escrow contract not connected' : row.escrow_status,
     escrowContract: row.escrow_contract || null,
     createdAt: row.created_at,
   };
@@ -40,12 +40,12 @@ function mapProgress(progress) {
 async function readResponse(response) {
   const payload = await response.json().catch(() => ({}));
   if (!response.ok || !payload.ok) {
-    throw new Error(payload.error || `Arc task service returned ${response.status}.`);
+    throw new Error(payload.error || `Celo task service returned ${response.status}.`);
   }
   return payload;
 }
 
-export async function listArcTasks(walletAddress = '') {
+export async function listCeloTasks(walletAddress = '') {
   const url = arcTasksUrl();
   if (walletAddress) url.searchParams.set('wallet', walletAddress);
   const payload = await readResponse(await fetch(url, { headers: { Accept: 'application/json' } }));
@@ -55,7 +55,7 @@ export async function listArcTasks(walletAddress = '') {
     Object.entries(progress).filter(([taskId, row]) => row.status === 'paid' && !alertedPaidTasks.has(`${walletAddress.toLowerCase()}:${taskId}`)).forEach(([taskId]) => {
       const key = `${walletAddress.toLowerCase()}:${taskId}`;
       alertedPaidTasks.add(key);
-      broadcastArcPaidTaskToTelegram({ taskId, walletAddress }).catch((error) => {
+      broadcastCeloPaidTaskToTelegram({ taskId, walletAddress }).catch((error) => {
         alertedPaidTasks.delete(key);
         console.warn('[Telegram task reward alert]', error.message);
       });
@@ -64,7 +64,7 @@ export async function listArcTasks(walletAddress = '') {
   return { tasks, progress };
 }
 
-export async function getArcAgentCompletedTaskCount(agentWallet) {
+export async function getCeloAgentCompletedTaskCount(agentWallet) {
   const url = arcTasksUrl();
   url.searchParams.set('agentWallet', agentWallet);
   const payload = await readResponse(await fetch(url, { headers: { Accept: 'application/json' } }));
@@ -72,7 +72,7 @@ export async function getArcAgentCompletedTaskCount(agentWallet) {
 }
 
 /** Read task rewards for an agent wallet without triggering user notification broadcasts. */
-export async function getArcAgentTaskTotals(agentWallet) {
+export async function getCeloAgentTaskTotals(agentWallet) {
   if (!agentWallet) return { earnings: 0, pointsEarned: 0 };
   const url = arcTasksUrl();
   url.searchParams.set('wallet', agentWallet);
@@ -98,30 +98,38 @@ async function submitSignedAction({ action, taskId, walletAddress, deliverable, 
   if (!provider?.request) throw new Error('A compatible wallet is required to sign this task action.');
   const timestamp = Date.now();
   const message = [
-    'NairaTag Arc Tasks',
+    'NairaTag Celo Tasks',
     `Action: ${action}`,
     `Task: ${taskId}`,
     `Wallet: ${walletAddress.toLowerCase()}`,
-    `Chain: ${ARC_CHAIN_ID}`,
+    `Chain: ${CELO_CHAIN_ID}`,
     `Timestamp: ${timestamp}`,
   ].join('\n');
   const signature = await provider.request({ method: 'personal_sign', params: [message, walletAddress] });
-  const payload = await readResponse(await fetch(ARC_TASKS_API, {
+  const payload = await readResponse(await fetch(CELO_TASKS_API, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
     body: JSON.stringify({ action, taskId, walletAddress, timestamp, signature, deliverable }),
   }));
   if (action === 'start' || action === 'submit') {
-    broadcastArcTaskToTelegram({ action, taskId, taskTitle, rewardUSDC, points, walletAddress, timestamp, signature })
+    broadcastCeloTaskToTelegram({ action, taskId, taskTitle, rewardUSDC, points, walletAddress, timestamp, signature })
       .catch((error) => console.warn('[Telegram task alert]', error.message));
   }
   return mapProgress({ [taskId]: payload.progress })[taskId];
 }
 
-export function startArcTask({ taskId, walletAddress, taskTitle, rewardUSDC, points }) {
+export function startCeloTask({ taskId, walletAddress, taskTitle, rewardUSDC, points }) {
   return submitSignedAction({ action: 'start', taskId, walletAddress, taskTitle, rewardUSDC, points });
 }
 
-export function submitArcTask({ taskId, walletAddress, deliverable, taskTitle, rewardUSDC, points }) {
+export function submitCeloTask({ taskId, walletAddress, deliverable, taskTitle, rewardUSDC, points }) {
   return submitSignedAction({ action: 'submit', taskId, walletAddress, deliverable, taskTitle, rewardUSDC, points });
 }
+
+
+// Backward compatibility aliases
+export const listArcTasks = listCeloTasks;
+export const getArcAgentCompletedTaskCount = getCeloAgentCompletedTaskCount;
+export const getArcAgentTaskTotals = getCeloAgentTaskTotals;
+export const startArcTask = startCeloTask;
+export const submitArcTask = submitCeloTask;

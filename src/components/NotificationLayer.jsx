@@ -19,7 +19,7 @@ import {
   playMicroSound,
   triggerHaptic,
 } from '../services/pushNotification.js';
-import { getArcRewardState } from '../services/arcRewards.js';
+import { getArcRewardState } from '../services/celoRewards.js';
 import '../notifications.css';
 
 function localDayKey(date = new Date()) {

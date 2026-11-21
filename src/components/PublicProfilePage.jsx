@@ -19,7 +19,7 @@ import {
 } from 'lucide-react';
 import { resolveTagProfile, generateAvatarSvg } from '../services/tagAvatar.js';
 import { resolveTag } from '../services/nairatagResolver.js';
-import { ARC_NAIRATAG_RESOLVER_ADDRESS, ARC_TESTNET_CONFIG } from '../config/arc.js';
+import { CELO_NAIRATAG_RESOLVER_ADDRESS as ARC_NAIRATAG_RESOLVER_ADDRESS, CELO_MAINNET_CONFIG as ARC_TESTNET_CONFIG } from '../config/celo.js';
 import confetti from 'canvas-confetti';
 
 export default function PublicProfilePage({ rawHandle, type = 'agent' }) {

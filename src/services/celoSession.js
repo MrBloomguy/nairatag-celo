@@ -1,4 +1,4 @@
-const AUTH_API = import.meta.env.VITE_ARC_AUTH_API || 'https://nairatag.ng/api/arc-auth';
+const AUTH_API = import.meta.env.VITE_CELO_AUTH_API || 'https://nairatag.ng/api/arc-auth';
 let activeSession = null;
 
 async function postAuth(body) {
@@ -24,14 +24,14 @@ function saveSession(result, walletAddress) {
   return session;
 }
 
-export async function establishCircleArcSession({ userToken, walletAddress }) {
+export async function establishCircleCeloSession({ userToken, walletAddress }) {
   if (!userToken || !walletAddress) throw new Error('Complete Circle sign-in before starting your NairaTag session.');
   const result = await postAuth({ action: 'circle', userToken, walletAddress });
   if (!result.token) throw new Error('The account session service returned no session token.');
   return saveSession(result, walletAddress);
 }
 
-export async function establishWalletArcSession(walletAddress) {
+export async function establishWalletCeloSession(walletAddress) {
   if (!walletAddress) throw new Error('Connect a wallet before signing in.');
   const provider = typeof window !== 'undefined' ? window.ethereum : null;
   if (!provider?.request) throw new Error('Your wallet provider is unavailable.');
@@ -47,10 +47,17 @@ export async function establishWalletArcSession(walletAddress) {
   return saveSession(result, walletAddress);
 }
 
-export function getArcSessionToken(walletAddress) {
+export function getCeloSessionToken(walletAddress) {
   if (!activeSession?.token || activeSession.expiresAt <= Date.now()
     || String(activeSession.walletAddress).toLowerCase() !== String(walletAddress || '').toLowerCase()) return null;
   return activeSession.token;
 }
 
-export function clearArcSession() { activeSession = null; }
+export function clearCeloSession() { activeSession = null; }
+
+// Backward compatibility aliases
+export const clearArcSession = clearCeloSession;
+export const establishCircleArcSession = establishCircleCeloSession;
+export const establishWalletArcSession = establishWalletCeloSession;
+export const getArcSessionToken = getCeloSessionToken;
+

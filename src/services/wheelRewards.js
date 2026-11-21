@@ -1,4 +1,4 @@
-import { getArcRewardState, submitArcRewardAction } from './arcRewards.js';
+import { getArcRewardState, submitArcRewardAction } from './celoRewards.js';
 
 export async function getDailySpinStats(accountKey) {
   const state = await getArcRewardState(accountKey);

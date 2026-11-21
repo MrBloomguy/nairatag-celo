@@ -1,10 +1,10 @@
 import { encodePacked, keccak256, parseAbiItem } from 'viem';
-import { publicClient } from './arcPayment.js';
+import { publicClient } from './celoPayment.js';
 import {
-  ARC_NAIRATAG_REGISTRY_ADDRESS,
-  ARC_NAIRATAG_RESOLVER_ADDRESS,
-  ARC_USDC_ADDRESS,
-} from '../config/arc.js';
+  CELO_NAIRATAG_REGISTRY_ADDRESS,
+  CELO_NAIRATAG_RESOLVER_ADDRESS,
+  CELO_USDC_ADDRESS,
+} from '../config/celo.js';
 
 const CLAIMED_EVENT = parseAbiItem(
   'event TagClaimed(bytes32 indexed node, string canonical, string rawTag, address indexed owner, address resolver)',
@@ -16,24 +16,24 @@ const REVERSE_RESOLVER_ABI = [
 ];
 
 /**
- * Reads the latest Arc registry claims and confirmed USDC transfers directly
- * from Arc. Usage is attached only to a wallet that owns a tag in the scanned
+ * Reads the latest Celo registry claims and confirmed USDC transfers directly
+ * from Celo. Usage is attached only to a wallet that owns a tag in the scanned
  * registry history; no sample names or inferred profiles are returned.
  */
-export async function getRecentArcTagActivity(limit = 12) {
+export async function getRecentCeloTagActivity(limit = 12) {
   const latestBlock = await publicClient.getBlockNumber();
   const [claimLogs, transferResponse] = await Promise.all([
     publicClient.getLogs({
-      address: ARC_NAIRATAG_REGISTRY_ADDRESS,
+      address: CELO_NAIRATAG_REGISTRY_ADDRESS,
       event: CLAIMED_EVENT,
       fromBlock: latestBlock > 2500n ? latestBlock - 2500n : 0n,
       toBlock: latestBlock,
     }),
-    fetch(`https://explorer.testnet.arc.io/api/v2/tokens/${ARC_USDC_ADDRESS}/transfers`, {
+    fetch(`https://explorer.testnet.arc.io/api/v2/tokens/${CELO_USDC_ADDRESS}/transfers`, {
       headers: { Accept: 'application/json' },
     }),
   ]);
-  if (!transferResponse.ok) throw new Error(`Arc explorer activity returned ${transferResponse.status}.`);
+  if (!transferResponse.ok) throw new Error(`Celo explorer activity returned ${transferResponse.status}.`);
   const transferPayload = await transferResponse.json();
   const transferLogs = (transferPayload.items || []).map((item) => ({
     args: { from: item.from?.hash, to: item.to?.hash, value: BigInt(item.total?.value || item.total?.decimal || 0) },
@@ -71,7 +71,7 @@ export async function getRecentArcTagActivity(limit = 12) {
       const names = await Promise.all(transferWallets.map(async (address) => {
         const node = keccak256(encodePacked(['bytes32', 'address'], [REVERSE_NAMESPACE, address]));
         const name = await publicClient.readContract({
-          address: ARC_NAIRATAG_RESOLVER_ADDRESS,
+          address: CELO_NAIRATAG_RESOLVER_ADDRESS,
           abi: REVERSE_RESOLVER_ABI,
           functionName: 'name',
           args: [node],
@@ -83,7 +83,7 @@ export async function getRecentArcTagActivity(limit = 12) {
         if (/^[a-z0-9_]{2,32}$/.test(tag)) reverseNames.set(address, tag);
       });
     } catch (error) {
-      console.warn('[Recent Arc reverse tag lookup]', error.message);
+      console.warn('[Recent Celo reverse tag lookup]', error.message);
     }
   }
 
@@ -116,3 +116,7 @@ export async function getRecentArcTagActivity(limit = 12) {
     .sort((a, b) => b.blockNumber - a.blockNumber)
     .slice(0, Math.max(0, limit));
 }
+
+
+// Backward compatibility aliases
+export const getRecentArcTagActivity = getRecentCeloTagActivity;

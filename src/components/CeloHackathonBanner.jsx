@@ -14,16 +14,16 @@ import {
   Send,
   Terminal,
 } from 'lucide-react';
-import { publicClient, registerTaggedErc8004Identity } from '../services/arcPayment.js';
+import { publicClient, registerCeloAgentIdentity as registerTaggedErc8004Identity } from '../services/celoPayment.js';
 import {
   celoMainnet,
   CELO_ATTRIBUTION_TAG,
   CELO_ATTRIBUTION_SUFFIX,
   OFFICIAL_AGENT_WALLET,
-  ARC_ERC8004_IDENTITY_REGISTRY,
+  CELO_ERC8004_IDENTITY_REGISTRY as ARC_ERC8004_IDENTITY_REGISTRY,
   ERC8004_IDENTITY_ABI,
   TEXTILE_FX_ROUTER,
-} from '../config/arc.js';
+} from '../config/celo.js';
 
 export default function CeloHackathonBanner({ userAddress, onConnectWallet }) {
   const [isRegistered, setIsRegistered] = useState(false);

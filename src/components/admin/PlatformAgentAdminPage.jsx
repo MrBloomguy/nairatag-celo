@@ -40,9 +40,9 @@ import {
   createArcPlatformAgent,
   transitionArcAgent,
   enableArcMcpTool,
-} from '../../services/arcAgents.js';
-import { connectWallet } from '../../services/arcPayment.js';
-import { getArcAdminDashboard, submitArcAdminAction } from '../../services/arcAdmin.js';
+} from '../../services/celoAgents.js';
+import { connectWallet } from '../../services/celoPayment.js';
+import { getArcAdminDashboard, submitArcAdminAction } from '../../services/celoAdmin.js';
 import './PlatformAgentAdminPage.css';
 
 export default function PlatformAgentAdminPage() {

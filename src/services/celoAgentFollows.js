@@ -1,6 +1,6 @@
-const ARC_AGENT_FOLLOWS_API = import.meta.env.VITE_ARC_AGENT_FOLLOWS_API
+const CELO_AGENT_FOLLOWS_API = import.meta.env.VITE_CELO_AGENT_FOLLOWS_API
   || 'https://nairatag.ng/api/arc-follows';
-const ARC_CHAIN_ID = 5042002;
+const CELO_CHAIN_ID = 42220;
 
 function normalizeTag(tag) {
   return String(tag || '').trim().replace(/^[₦$@#]/, '').toLowerCase();
@@ -14,8 +14,8 @@ async function readResponse(response) {
   return payload;
 }
 
-export async function getArcAgentFollowState(agentId, walletAddress = '') {
-  const url = new URL(ARC_AGENT_FOLLOWS_API);
+export async function getCeloAgentFollowState(agentId, walletAddress = '') {
+  const url = new URL(CELO_AGENT_FOLLOWS_API);
   url.searchParams.set('agentId', String(agentId));
   if (walletAddress) url.searchParams.set('wallet', walletAddress);
   const payload = await readResponse(await fetch(url, { headers: { Accept: 'application/json' } }));
@@ -25,8 +25,8 @@ export async function getArcAgentFollowState(agentId, walletAddress = '') {
   };
 }
 
-export async function setArcAgentFollow({ action, agentId, tag, walletAddress }) {
-  if (!walletAddress) throw new Error('Connect your Arc wallet to follow an agent.');
+export async function setCeloAgentFollow({ action, agentId, tag, walletAddress }) {
+  if (!walletAddress) throw new Error('Connect your Celo wallet to follow an agent.');
   if (!['follow', 'unfollow'].includes(action)) throw new Error('Choose follow or unfollow.');
   const provider = typeof window !== 'undefined' ? window.ethereum : null;
   if (!provider?.request) throw new Error('A compatible wallet is required to sign this follow action.');
@@ -35,17 +35,17 @@ export async function setArcAgentFollow({ action, agentId, tag, walletAddress })
   const cleanTag = normalizeTag(tag);
   const id = String(agentId);
   const message = [
-    'NairaTag Arc Agent Follows',
+    'NairaTag Celo Agent Follows',
     `Action: ${action}`,
     `Agent: ${id}`,
     `Tag: ${cleanTag}`,
     `Wallet: ${walletAddress.toLowerCase()}`,
-    `Chain: ${ARC_CHAIN_ID}`,
+    `Chain: ${CELO_CHAIN_ID}`,
     `Timestamp: ${timestamp}`,
   ].join('\n');
   const signature = await provider.request({ method: 'personal_sign', params: [message, walletAddress] });
 
-  const payload = await readResponse(await fetch(ARC_AGENT_FOLLOWS_API, {
+  const payload = await readResponse(await fetch(CELO_AGENT_FOLLOWS_API, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
     body: JSON.stringify({ action, agentId: id, tag: cleanTag, walletAddress, timestamp, signature }),
@@ -55,3 +55,8 @@ export async function setArcAgentFollow({ action, agentId, tag, walletAddress })
     following: Boolean(payload.following),
   };
 }
+
+
+// Backward compatibility aliases
+export const getArcAgentFollowState = getCeloAgentFollowState;
+export const setArcAgentFollow = setCeloAgentFollow;

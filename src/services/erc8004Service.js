@@ -19,18 +19,18 @@ import {
   getAddress,
 } from 'viem';
 import {
-  arcTestnet,
-  ARC_ERC8004_IDENTITY_REGISTRY,
-  ARC_ERC8004_REPUTATION_REGISTRY,
-  ARC_ERC8004_VALIDATION_REGISTRY,
+  celoMainnet,
+  CELO_ERC8004_IDENTITY_REGISTRY as ARC_ERC8004_IDENTITY_REGISTRY,
+  CELO_ERC8004_REPUTATION_REGISTRY as ARC_ERC8004_REPUTATION_REGISTRY,
+  CELO_ERC8004_VALIDATION_REGISTRY as ARC_ERC8004_VALIDATION_REGISTRY,
   ERC8004_IDENTITY_ABI,
   ERC8004_REPUTATION_ABI,
   ERC8004_VALIDATION_ABI,
-} from '../config/arc.js';
-import { getEthereumProvider, switchOrAddArcNetwork } from './arcPayment.js';
+} from '../config/celo.js';
+import { getEthereumProvider, switchOrAddCeloNetwork as switchOrAddArcNetwork } from './celoPayment.js';
 
 export const publicClient = createPublicClient({
-  chain: arcTestnet,
+  chain: celoMainnet,
   transport: http(),
 });
 

@@ -1,9 +1,9 @@
 import { keccak256, stringToHex } from 'viem';
-import { getEthereumProvider } from './arcPayment.js';
+import { getEthereumProvider } from './celoPayment.js';
 
-const ARC_AGENTS_API = import.meta.env?.VITE_ARC_AGENTS_API || (import.meta.env?.DEV ? '/api/arc-agents' : 'https://nairatag.ng/api/arc-agents');
+const CELO_AGENTS_API = import.meta.env?.VITE_CELO_AGENTS_API || (import.meta.env?.DEV ? '/api/arc-agents' : 'https://nairatag.ng/api/arc-agents');
 
-export function mapArcAgentRecord(agent = {}) {
+export function mapCeloAgentRecord(agent = {}) {
   const tag = String(agent.tag || '').trim().replace(/^[₦$@#]/, '').toLowerCase();
   if (!/^[a-z0-9_-]{2,32}$/.test(tag)) return null;
   const stats = agent.stats && typeof agent.stats === 'object' ? agent.stats : {};
@@ -41,8 +41,8 @@ export function mapArcAgentRecord(agent = {}) {
   };
 }
 
-export async function fetchArcAgentDirectory({ signal } = {}) {
-  const response = await fetch(ARC_AGENTS_API, {
+export async function fetchCeloAgentDirectory({ signal } = {}) {
+  const response = await fetch(CELO_AGENTS_API, {
     method: 'GET',
     headers: { Accept: 'application/json' },
     cache: 'no-store',
@@ -50,9 +50,9 @@ export async function fetchArcAgentDirectory({ signal } = {}) {
   });
   const payload = await response.json().catch(() => ({}));
   if (!response.ok || !payload.ok || !Array.isArray(payload.agents)) {
-    throw new Error(payload.error || `Arc agent registry returned ${response.status}.`);
+    throw new Error(payload.error || `Celo agent registry returned ${response.status}.`);
   }
-  return payload.agents.map(mapArcAgentRecord).filter(Boolean);
+  return payload.agents.map(mapCeloAgentRecord).filter(Boolean);
 }
 
 async function signAdminPayload({ walletAddress, action, payload }) {
@@ -78,7 +78,7 @@ async function signAdminPayload({ walletAddress, action, payload }) {
 
 async function sendAdminPayload({ walletAddress, action, payload }) {
   const auth = await signAdminPayload({ walletAddress, action, payload });
-  const response = await fetch(ARC_AGENTS_API, {
+  const response = await fetch(CELO_AGENTS_API, {
     method: 'POST', headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
     body: JSON.stringify({ ...payload, ...auth }),
   });
@@ -87,21 +87,21 @@ async function sendAdminPayload({ walletAddress, action, payload }) {
   return result;
 }
 
-export async function getAdminArcAgentRegistry({ walletAddress }) {
+export async function getAdminCeloAgentRegistry({ walletAddress }) {
   const result = await sendAdminPayload({ walletAddress, action: 'list', payload: { action: 'list' } });
-  return (result.agents || []).map(mapArcAgentRecord).filter(Boolean);
+  return (result.agents || []).map(mapCeloAgentRecord).filter(Boolean);
 }
 
-export async function transitionArcAgent({ walletAddress, tag, action }) {
+export async function transitionCeloAgent({ walletAddress, tag, action }) {
   return sendAdminPayload({ walletAddress, action, payload: { action, tag: String(tag || '').trim().replace(/^[₦$@#]/, '').toLowerCase() } });
 }
 
-export async function enableArcMcpTool({ walletAddress, tag, toolKey }) {
+export async function enableCeloMcpTool({ walletAddress, tag, toolKey }) {
   const action = 'enable_mcp_tool';
   return sendAdminPayload({ walletAddress, action, payload: { action, tag: String(tag || '').trim().replace(/^[₦$@#]/, '').toLowerCase(), toolKey } });
 }
 
-export async function createArcPlatformAgent({ walletAddress, agent }) {
+export async function createCeloPlatformAgent({ walletAddress, agent }) {
   const payload = {
     tag: String(agent.tag || '').trim().replace(/^[₦$@#]/, '').toLowerCase(),
     displayName: String(agent.displayName || '').trim(),
@@ -121,7 +121,7 @@ export async function createArcPlatformAgent({ walletAddress, agent }) {
     } } : {}),
   };
   const auth = await signAdminPayload({ walletAddress, action: 'create', payload });
-  const response = await fetch(ARC_AGENTS_API, {
+  const response = await fetch(CELO_AGENTS_API, {
     method: 'POST',
     headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
     body: JSON.stringify({ ...payload, ...auth }),
@@ -131,3 +131,12 @@ export async function createArcPlatformAgent({ walletAddress, agent }) {
   return result.agent;
 }
 
+
+
+// Backward compatibility aliases
+export const mapArcAgentRecord = mapCeloAgentRecord;
+export const fetchArcAgentDirectory = fetchCeloAgentDirectory;
+export const getAdminArcAgentRegistry = getAdminCeloAgentRegistry;
+export const transitionArcAgent = transitionCeloAgent;
+export const enableArcMcpTool = enableCeloMcpTool;
+export const createArcPlatformAgent = createCeloPlatformAgent;

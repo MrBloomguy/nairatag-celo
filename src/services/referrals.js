@@ -1,5 +1,5 @@
 import { normalizeTag } from './nairatagResolver.js';
-import { submitArcRewardAction } from './arcRewards.js';
+import { submitArcRewardAction } from './celoRewards.js';
 
 let pendingReferral = null;
 export const REFERRAL_SIGNUP_POINTS = 100;

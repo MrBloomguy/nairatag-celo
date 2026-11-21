@@ -1,10 +1,10 @@
-import { broadcastArcRewardToTelegram } from './arcSocialBroadcast.js';
-const ARC_REWARDS_API = import.meta.env.VITE_ARC_REWARDS_API || (import.meta.env.DEV ? '/api/arc-rewards' : 'https://nairatag.ng/api/arc-rewards');
-const ARC_CHAIN_ID = 5042002;
+import { broadcastCeloRewardToTelegram } from './celoSocialBroadcast.js';
+const CELO_REWARDS_API = import.meta.env.VITE_CELO_REWARDS_API || (import.meta.env.DEV ? '/api/arc-rewards' : 'https://nairatag.ng/api/arc-rewards');
+const CELO_CHAIN_ID = 42220;
 
 function arcRewardsUrl() {
   const base = typeof window !== 'undefined' ? window.location.origin : 'https://nairatag.ng';
-  return new URL(ARC_REWARDS_API, base);
+  return new URL(CELO_REWARDS_API, base);
 }
 
 function mapState(value = {}) {
@@ -38,11 +38,11 @@ function mapState(value = {}) {
 
 async function parseResponse(response) {
   const payload = await response.json().catch(() => ({}));
-  if (!response.ok || !payload.ok) throw new Error(payload.error || `Arc rewards service returned ${response.status}.`);
+  if (!response.ok || !payload.ok) throw new Error(payload.error || `Celo rewards service returned ${response.status}.`);
   return payload;
 }
 
-export async function getArcRewardState(walletAddress) {
+export async function getCeloRewardState(walletAddress) {
   if (!walletAddress) return mapState();
   const url = arcRewardsUrl();
   url.searchParams.set('wallet', walletAddress);
@@ -50,8 +50,8 @@ export async function getArcRewardState(walletAddress) {
   return mapState(payload.state);
 }
 
-export async function submitArcRewardAction({ action, walletAddress, tag, referrerTag, txHash, requestId, ids }) {
-  if (!walletAddress) throw new Error('Connect your Arc wallet to continue.');
+export async function submitCeloRewardAction({ action, walletAddress, tag, referrerTag, txHash, requestId, ids }) {
+  if (!walletAddress) throw new Error('Connect your Celo wallet to continue.');
   const provider = typeof window !== 'undefined' ? window.ethereum : null;
   if (!provider?.request) throw new Error('A compatible wallet is required to sign this reward action.');
   const timestamp = Date.now();
@@ -69,28 +69,34 @@ export async function submitArcRewardAction({ action, walletAddress, tag, referr
     ...(payload.ids ? { ids: payload.ids.join(',') } : {}),
   };
   const message = [
-    'NairaTag Arc Rewards', `Action: ${action}`, `Wallet: ${walletAddress.toLowerCase()}`,
-    `Chain: ${ARC_CHAIN_ID}`, `Timestamp: ${timestamp}`,
+    'NairaTag Celo Rewards', `Action: ${action}`, `Wallet: ${walletAddress.toLowerCase()}`,
+    `Chain: ${CELO_CHAIN_ID}`, `Timestamp: ${timestamp}`,
     ...Object.entries(signedFields).sort(([a], [b]) => a.localeCompare(b)).map(([key, value]) => `${key}: ${value}`),
   ].join('\n');
   payload.signature = await provider.request({ method: 'personal_sign', params: [message, walletAddress] });
-  const response = await parseResponse(await fetch(ARC_REWARDS_API, {
+  const response = await parseResponse(await fetch(CELO_REWARDS_API, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
     body: JSON.stringify(payload),
   }));
   if (['daily_claim', 'spin', 'payment_confirmed', 'referral_signup'].includes(action)) {
-    broadcastArcRewardToTelegram(payload).catch((error) => console.warn('[Telegram reward alert]', error.message));
+    broadcastCeloRewardToTelegram(payload).catch((error) => console.warn('[Telegram reward alert]', error.message));
   }
   return { result: response.result, state: mapState(response.state) };
 }
 
-export async function markArcNotificationsRead(walletAddress, ids = []) {
+export async function markCeloNotificationsRead(walletAddress, ids = []) {
   if (!walletAddress) return null;
-  const response = await parseResponse(await fetch(ARC_REWARDS_API, {
+  const response = await parseResponse(await fetch(CELO_REWARDS_API, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
     body: JSON.stringify({ action: 'notifications_read', walletAddress, ids }),
   }));
   return mapState(response.state);
 }
+
+
+// Backward compatibility aliases
+export const getArcRewardState = getCeloRewardState;
+export const submitArcRewardAction = submitCeloRewardAction;
+export const markArcNotificationsRead = markCeloNotificationsRead;

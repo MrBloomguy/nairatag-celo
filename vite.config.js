@@ -41,18 +41,8 @@ export default defineConfig(({ mode }) => {
       include: ['react', 'react-dom/client', 'lucide-react', 'canvas-confetti', 'viem'],
     },
     build: {
-      minify: process.env.VERCEL ? 'oxc' : false,
-      chunkSizeWarningLimit: 800,
-      rollupOptions: {
-        output: {
-          manualChunks(id) {
-            if (id.includes('node_modules/viem')) return 'viem';
-            if (id.includes('node_modules/@circle-fin')) return 'circle-sdk';
-            if (id.includes('node_modules/motion') || id.includes('node_modules/framer-motion')) return 'motion';
-            if (id.includes('node_modules/react') || id.includes('node_modules/react-dom')) return 'react-vendor';
-          },
-        },
-      },
+      minify: false,
+      chunkSizeWarningLimit: 2000,
     },
     server: {
       port: 5173,

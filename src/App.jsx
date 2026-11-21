@@ -3494,45 +3494,6 @@ function ArcAppShell() {
                   )}
                 </div>
 
-                {/* Smart Cross-Currency FX Corridor Callout */}
-                <div
-                  style={{
-                    padding: '9px 12px',
-                    borderRadius: '8px',
-                    background: 'rgba(5, 150, 105, 0.05)',
-                    border: '1px solid rgba(5, 150, 105, 0.16)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    fontSize: '11.5px',
-                    color: 'var(--text-secondary, #4b5563)',
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <ArrowDownUp size={13} color="#059669" />
-                    <span>Need USD₮ ⇄ cNGN conversion?</span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setPaySubMode('corridor')}
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      color: '#059669',
-                      fontWeight: 700,
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '3px',
-                      padding: 0,
-                      fontSize: '11.5px',
-                    }}
-                  >
-                    <span>FX Corridor</span>
-                    <ArrowRight size={11} />
-                  </button>
-                </div>
-
                 {/* Action Button */}
                 <button
                   type="button"

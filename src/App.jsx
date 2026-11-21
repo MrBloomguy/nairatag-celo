@@ -3452,8 +3452,7 @@ function ArcAppShell() {
                       <span>CELO</span>
                     </div>
                   </div>
-                  <div className="token-input-footer">
-                    <span>Celo Mainnet (ERC-8021)</span>
+                  <div className="token-input-footer" style={{ justifyContent: 'flex-end' }}>
                     <div className="balance-quick-chips">
                       <button type="button" className="quick-chip-btn" onClick={() => setAmountInput('0.1')}>0.1</button>
                       <button type="button" className="quick-chip-btn" onClick={() => setAmountInput('0.5')}>0.5</button>

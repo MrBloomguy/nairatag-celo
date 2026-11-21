@@ -715,12 +715,13 @@ export default function BookingMarketplace({
       )}
 
       {/* ─────────────────────────────────────────────────────────────
-          BOOKING FLOW MODAL DIALOG (OVERLAY OVER DISCOVER SERVICES)
+          BOOKING FLOW MODAL DIALOG (COMPACT, TITLE-FREE, ZERO SCROLLBAR)
           ───────────────────────────────────────────────────────────── */}
       {activeSubTab === 'discover' && selectedService && currentStep !== 'discover' && (
         <div
           role="dialog"
           aria-modal="true"
+          className="compact-booking-dialog"
           style={{
             position: 'fixed',
             inset: 0,
@@ -733,6 +734,8 @@ export default function BookingMarketplace({
             justifyContent: 'center',
             padding: '16px',
             overflowY: 'auto',
+            scrollbarWidth: 'none',
+            msOverflowStyle: 'none',
           }}
           onClick={(e) => {
             if (e.target === e.currentTarget) {
@@ -742,969 +745,950 @@ export default function BookingMarketplace({
           }}
         >
           <div
+            className="compact-booking-dialog"
             style={{
               width: '100%',
-              maxWidth: currentStep === 'review' || currentStep === 'confirmed_details' ? '540px' : '480px',
-              maxHeight: '90vh',
+              maxWidth: '430px',
+              maxHeight: '94vh',
               overflowY: 'auto',
-              borderRadius: '24px',
+              scrollbarWidth: 'none',
+              msOverflowStyle: 'none',
+              borderRadius: '20px',
+              background: '#fff',
+              border: '1px solid #e2e8f0',
+              padding: '16px 18px',
               boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+              boxSizing: 'border-box',
             }}
             onClick={(e) => e.stopPropagation()}
           >
             {/* ── FLOW VIEW 2: SERVICE DETAILS ── */}
             {currentStep === 'details' && selectedService && (
-        <div style={{ maxWidth: '480px', margin: '0 auto' }}>
-          <div style={{ background: '#fff', borderRadius: '20px', border: '1px solid #e2e8f0', padding: '20px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.03)' }}>
-            {/* Header */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-              <h2 style={{ fontSize: '18px', fontWeight: 800, margin: 0, color: '#0f172a' }}>Service Details</h2>
-              <button
-                type="button"
-                onClick={() => {
-                  setCurrentStep('discover');
-                  setSelectedService(null);
-                }}
-                style={{
-                  background: '#f1f5f9',
-                  border: 'none',
-                  borderRadius: '50%',
-                  width: '32px',
-                  height: '32px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer',
-                  color: '#64748b',
-                }}
-                title="Close modal"
-              >
-                <X size={16} />
-              </button>
-            </div>
+              <div>
+                {/* Header (No Title - Compact Close Button Only) */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', marginBottom: '8px' }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCurrentStep('discover');
+                      setSelectedService(null);
+                    }}
+                    style={{
+                      background: '#f1f5f9',
+                      border: 'none',
+                      borderRadius: '50%',
+                      width: '28px',
+                      height: '28px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                      color: '#64748b',
+                    }}
+                    title="Close modal"
+                  >
+                    <X size={15} />
+                  </button>
+                </div>
 
-            {/* Studio Hero Image */}
-            <div style={{ borderRadius: '14px', overflow: 'hidden', height: '180px', marginBottom: '16px', background: '#000' }}>
-              <img
-                src={selectedService.image || 'https://images.unsplash.com/photo-1598488035139-bdbb2231ce04?auto=format&fit=crop&w=800&q=80'}
-                alt={selectedService.title}
-                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-              />
-            </div>
+                {/* Studio Hero Image */}
+                <div style={{ borderRadius: '12px', overflow: 'hidden', height: '110px', marginBottom: '10px', background: '#000' }}>
+                  <img
+                    src={selectedService.image || 'https://images.unsplash.com/photo-1598488035139-bdbb2231ce04?auto=format&fit=crop&w=800&q=80'}
+                    alt={selectedService.title}
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                  />
+                </div>
 
-            {/* Title & Badge */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
-              <span style={{ fontWeight: 800, fontSize: '15px', color: '#0f172a' }}>
-                ₦{selectedService.agentTag.toUpperCase()}
-              </span>
-              
-            </div>
-            <h3 style={{ fontSize: '18px', fontWeight: 800, margin: '0 0 6px 0', color: '#0f172a' }}>
-              {selectedService.title}
-            </h3>
-            <p style={{ fontSize: '13px', color: '#64748b', margin: '0 0 16px 0', lineHeight: 1.4 }}>
-              {selectedService.description}
-            </p>
+                {/* Title & Tag */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
+                  <span style={{ fontWeight: 800, fontSize: '13px', color: '#059669' }}>
+                    ₦{selectedService.agentTag.toUpperCase()}
+                  </span>
+                </div>
+                <h3 style={{ fontSize: '16px', fontWeight: 800, margin: '0 0 4px 0', color: '#0f172a', lineHeight: 1.3 }}>
+                  {selectedService.title}
+                </h3>
+                <p style={{ fontSize: '12px', color: '#64748b', margin: '0 0 10px 0', lineHeight: 1.35 }}>
+                  {selectedService.description}
+                </p>
 
-            {/* Specs List */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '18px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#334155' }}>
-                <Clock size={15} color="#64748b" />
-                <span>{Math.round(selectedService.durationMinutes / 60)} hours</span>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#334155' }}>
-                <Tag size={15} color="#64748b" />
-                <span style={{ fontWeight: 700 }}>{formatPriceWithUsdt(selectedService.price)}</span>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#334155' }}>
-                <Calendar size={15} color="#64748b" />
-                <span>Scheduled session</span>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#334155' }}>
-                <Wallet size={15} color="#64748b" />
-                <span>{selectedService.currency}</span>
-              </div>
-            </div>
-
-            {/* Info Callout */}
-            <div
-              style={{
-                background: '#eff6ff',
-                borderRadius: '12px',
-                padding: '12px 14px',
-                display: 'flex',
-                gap: '10px',
-                alignItems: 'flex-start',
-                marginBottom: '20px',
-                border: '1px solid #dbeafe',
-              }}
-            >
-              <ShieldCheck size={18} color="#2563eb" style={{ flexShrink: 0, marginTop: '2px' }} />
-              <p style={{ margin: 0, fontSize: '12px', color: '#1e40af', lineHeight: 1.4 }}>
-                This service is offered by an independent NairaTag agent. Availability will be checked before confirmation.
-              </p>
-            </div>
-
-            {/* CTA Button */}
-            <button
-              type="button"
-              onClick={() => setCurrentStep('schedule')}
-              style={{
-                width: '100%',
-                background: '#059669',
-                color: '#fff',
-                border: 'none',
-                borderRadius: '12px',
-                padding: '12px',
-                fontSize: '14px',
-                fontWeight: 700,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '6px',
-              }}
-            >
-              <span>Choose date & time</span>
-              <ArrowRight size={15} />
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* ─────────────────────────────────────────────────────────────
-          FLOW VIEW 3: CHOOSE A TIME
-          ───────────────────────────────────────────────────────────── */}
-      {currentStep === 'schedule' && selectedService && (
-        <div style={{ maxWidth: '480px', margin: '0 auto' }}>
-          <div style={{ background: '#fff', borderRadius: '20px', border: '1px solid #e2e8f0', padding: '20px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.03)' }}>
-            {/* Header */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <button
-                  type="button"
-                  onClick={() => setCurrentStep('details')}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#0f172a', padding: 0 }}
-                  title="Back to Service Details"
+                {/* Specs 2x2 Compact Grid */}
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(2, 1fr)',
+                    gap: '6px 10px',
+                    background: '#f8fafc',
+                    border: '1px solid #f1f5f9',
+                    borderRadius: '10px',
+                    padding: '8px 12px',
+                    marginBottom: '10px',
+                    fontSize: '12px',
+                  }}
                 >
-                  <ArrowLeft size={18} />
-                </button>
-                <h2 style={{ fontSize: '18px', fontWeight: 800, margin: 0, color: '#0f172a' }}>Choose a Time</h2>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setCurrentStep('discover');
-                  setSelectedService(null);
-                }}
-                style={{
-                  background: '#f1f5f9',
-                  border: 'none',
-                  borderRadius: '50%',
-                  width: '32px',
-                  height: '32px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer',
-                  color: '#64748b',
-                }}
-                title="Close modal"
-              >
-                <X size={16} />
-              </button>
-            </div>
-
-            {/* Select a date */}
-            <div style={{ marginBottom: '20px' }}>
-              <label style={{ fontSize: '13px', fontWeight: 700, color: '#0f172a', display: 'block', marginBottom: '10px' }}>
-                Select a date
-              </label>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
-                {datePills.map((d) => {
-                  const isSelected = selectedDate === d.dateStr;
-                  return (
-                    <button
-                      key={d.dateStr}
-                      type="button"
-                      onClick={() => setSelectedDate(d.dateStr)}
-                      style={{
-                        padding: '10px 8px',
-                        borderRadius: '12px',
-                        border: isSelected ? '2px solid #059669' : '1px solid #e2e8f0',
-                        background: '#fff',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        gap: '2px',
-                        position: 'relative',
-                      }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <span style={{ fontSize: '12px', fontWeight: 700, color: '#0f172a' }}>{d.label}</span>
-                        {isSelected && (
-                          <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#059669' }} />
-                        )}
-                      </div>
-                      <span style={{ fontSize: '11px', color: '#64748b' }}>{d.sub}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Available times */}
-            <div style={{ marginBottom: '24px' }}>
-              <label style={{ fontSize: '13px', fontWeight: 700, color: '#0f172a', display: 'block', marginBottom: '10px' }}>
-                Available times
-              </label>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
-                {timeSlotButtons.map((timeStr) => {
-                  const isSelected = selectedSlotTime === timeStr;
-                  return (
-                    <button
-                      key={timeStr}
-                      type="button"
-                      onClick={() => setSelectedSlotTime(timeStr)}
-                      style={{
-                        padding: '10px 8px',
-                        borderRadius: '10px',
-                        border: isSelected ? 'none' : '1px solid #e2e8f0',
-                        background: isSelected ? '#059669' : '#fff',
-                        color: isSelected ? '#fff' : '#0f172a',
-                        fontWeight: 700,
-                        fontSize: '12.5px',
-                        cursor: 'pointer',
-                      }}
-                    >
-                      {timeStr}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Selected Summary Cards */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '20px' }}>
-              <div
-                style={{
-                  border: '1px solid #e2e8f0',
-                  borderRadius: '12px',
-                  padding: '10px 14px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '10px',
-                  background: '#f8fafc',
-                }}
-              >
-                <Calendar size={16} color="#059669" />
-                <div>
-                  <div style={{ fontSize: '10px', color: '#64748b', textTransform: 'uppercase' }}>Selected date</div>
-                  <div style={{ fontSize: '13px', fontWeight: 700, color: '#0f172a' }}>{getSelectedDateDisplay(selectedDate)}</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#334155' }}>
+                    <Clock size={13} color="#059669" />
+                    <span>{Math.round(selectedService.durationMinutes / 60)} hours</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#334155' }}>
+                    <Tag size={13} color="#059669" />
+                    <span style={{ fontWeight: 700, color: '#0f172a' }}>{formatPriceWithUsdt(selectedService.price)}</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#334155' }}>
+                    <Calendar size={13} color="#059669" />
+                    <span>Scheduled session</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#334155' }}>
+                    <Wallet size={13} color="#059669" />
+                    <span>{selectedService.currency}</span>
+                  </div>
                 </div>
-              </div>
 
-              <div
-                style={{
-                  border: '1px solid #e2e8f0',
-                  borderRadius: '12px',
-                  padding: '10px 14px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '10px',
-                  background: '#f8fafc',
-                }}
-              >
-                <Clock size={16} color="#059669" />
-                <div>
-                  <div style={{ fontSize: '10px', color: '#64748b', textTransform: 'uppercase' }}>Selected time</div>
-                  <div style={{ fontSize: '13px', fontWeight: 700, color: '#0f172a' }}>{selectedSlotTime}</div>
+                {/* Info Callout */}
+                <div
+                  style={{
+                    background: '#eff6ff',
+                    borderRadius: '10px',
+                    padding: '8px 10px',
+                    display: 'flex',
+                    gap: '8px',
+                    alignItems: 'center',
+                    marginBottom: '12px',
+                    border: '1px solid #dbeafe',
+                  }}
+                >
+                  <ShieldCheck size={16} color="#2563eb" style={{ flexShrink: 0 }} />
+                  <p style={{ margin: 0, fontSize: '11px', color: '#1e40af', lineHeight: 1.35 }}>
+                    Offered by independent sovereign NairaTag agent. Verified on Celo Mainnet.
+                  </p>
                 </div>
-              </div>
-            </div>
 
-            {/* CTA Continue */}
-            <button
-              type="button"
-              onClick={() => setCurrentStep('review')}
-              style={{
-                width: '100%',
-                background: '#059669',
-                color: '#fff',
-                border: 'none',
-                borderRadius: '12px',
-                padding: '12px',
-                fontSize: '14px',
-                fontWeight: 700,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '6px',
-              }}
-            >
-              <span>Continue</span>
-              <ArrowRight size={15} />
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* ─────────────────────────────────────────────────────────────
-          FLOW VIEW 4: REVIEW BOOKING
-          ───────────────────────────────────────────────────────────── */}
-      {currentStep === 'review' && selectedService && (
-        <div style={{ maxWidth: '480px', margin: '0 auto' }}>
-          <div style={{ background: '#fff', borderRadius: '20px', border: '1px solid #e2e8f0', padding: '20px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.03)' }}>
-            {/* Header */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                {/* CTA Button */}
                 <button
                   type="button"
                   onClick={() => setCurrentStep('schedule')}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#0f172a', padding: 0 }}
-                  title="Back to Schedule"
+                  style={{
+                    width: '100%',
+                    background: '#059669',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: '10px',
+                    padding: '10px',
+                    fontSize: '13.5px',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                  }}
                 >
-                  <ArrowLeft size={18} />
+                  <span>Choose date & time</span>
+                  <ArrowRight size={14} />
                 </button>
-                <h2 style={{ fontSize: '18px', fontWeight: 800, margin: 0, color: '#0f172a' }}>Review Booking</h2>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setCurrentStep('discover');
-                  setSelectedService(null);
-                }}
-                style={{
-                  background: '#f1f5f9',
-                  border: 'none',
-                  borderRadius: '50%',
-                  width: '32px',
-                  height: '32px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer',
-                  color: '#64748b',
-                }}
-                title="Close modal"
-              >
-                <X size={16} />
-              </button>
-            </div>
-
-            {/* Provider Card */}
-            <div
-              style={{
-                border: '1px solid #e2e8f0',
-                borderRadius: '14px',
-                padding: '12px 14px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '12px',
-                marginBottom: '16px',
-              }}
-            >
-              <div
-                style={{
-                  width: '38px',
-                  height: '38px',
-                  borderRadius: '10px',
-                  background: '#dcfce7',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: '#15803d',
-                  flexShrink: 0,
-                }}
-              >
-                <Headphones size={20} />
-              </div>
-              <div style={{ flex: 1 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <span style={{ fontWeight: 800, fontSize: '14px', color: '#0f172a' }}>
-                    ₦{selectedService.agentTag.toUpperCase()}
-                  </span>
-                  <span style={{ fontSize: '10px', background: '#dcfce7', color: '#15803d', padding: '1px 6px', borderRadius: '9999px', fontWeight: 600 }}>
-                    Selected
-                  </span>
-                </div>
-                <div style={{ fontSize: '12px', color: '#64748b' }}>
-                  {selectedService.title}
-                </div>
-              </div>
-            </div>
-
-            {/* Summary Key-Values */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '14px', fontSize: '13px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748b' }}>
-                <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><Calendar size={14} /> Date</span>
-                <span style={{ fontWeight: 700, color: '#0f172a' }}>{getSelectedDateDisplay(selectedDate)}</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748b' }}>
-                <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><Clock size={14} /> Time</span>
-                <span style={{ fontWeight: 700, color: '#0f172a' }}>{selectedSlotTime}</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748b' }}>
-                <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><Clock size={14} /> Duration</span>
-                <span style={{ fontWeight: 700, color: '#0f172a' }}>{Math.round((selectedService?.durationMinutes || 120) / 60)} hours</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748b' }}>
-                <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><Tag size={14} /> Service price</span>
-                <span style={{ fontWeight: 700, color: '#0f172a' }}>{formatPriceWithUsdt(selectedService?.price || 50000)}</span>
-              </div>
-            </div>
-
-            <div style={{ height: '1px', background: '#e2e8f0', margin: '14px 0' }} />
-
-            {/* Total Row */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px' }}>
-              <span style={{ fontSize: '15px', fontWeight: 800, color: '#0f172a' }}>Total</span>
-              <span style={{ fontSize: '16px', fontWeight: 800, color: '#0f172a' }}>{formatPriceWithUsdt(selectedService?.price || 50000)}</span>
-            </div>
-
-            {/* Notes for the provider */}
-            <div style={{ marginBottom: '18px' }}>
-              <label style={{ fontSize: '12.5px', fontWeight: 700, color: '#0f172a', display: 'block', marginBottom: '6px' }}>
-                Notes for the provider
-              </label>
-              <textarea
-                value={customerNotes}
-                onChange={(e) => setCustomerNotes(e.target.value)}
-                rows={2}
-                style={{
-                  width: '100%',
-                  borderRadius: '10px',
-                  border: '1px solid #cbd5e1',
-                  padding: '9px 12px',
-                  fontSize: '12.5px',
-                  outline: 'none',
-                  boxSizing: 'border-box',
-                  color: '#0f172a',
-                  fontFamily: 'inherit',
-                }}
-              />
-            </div>
-
-            {/* Payment Method Selector */}
-            <div style={{ marginBottom: '20px' }}>
-              <label style={{ fontSize: '12.5px', fontWeight: 700, color: '#0f172a', display: 'block', marginBottom: '8px' }}>
-                Payment method
-              </label>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {/* Option 1: Agent Vault */}
-                <div
-                  onClick={() => setSelectedPaymentMethod('vault')}
-                  style={{
-                    border: selectedPaymentMethod === 'vault' ? '2px solid #059669' : '1px solid #e2e8f0',
-                    borderRadius: '12px',
-                    padding: '10px 14px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    cursor: 'pointer',
-                    background: selectedPaymentMethod === 'vault' ? 'rgba(5, 150, 105, 0.03)' : '#fff',
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <div style={{ width: '16px', height: '16px', borderRadius: '50%', border: '2px solid #059669', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      {selectedPaymentMethod === 'vault' && (
-                        <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#059669' }} />
-                      )}
-                    </div>
-                    <div>
-                      <div style={{ fontWeight: 700, fontSize: '13px', color: '#0f172a' }}>Agent Vault</div>
-                      <div style={{ fontSize: '11px', color: '#64748b' }}>Allow an authorized agent to pay.</div>
-                    </div>
-                  </div>
-                  <ArrowRight size={14} color="#94a3b8" />
-                </div>
-
-                {/* Option 2: Pay directly */}
-                <div
-                  onClick={() => setSelectedPaymentMethod('direct')}
-                  style={{
-                    border: selectedPaymentMethod === 'direct' ? '2px solid #059669' : '1px solid #e2e8f0',
-                    borderRadius: '12px',
-                    padding: '10px 14px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    cursor: 'pointer',
-                    background: selectedPaymentMethod === 'direct' ? 'rgba(5, 150, 105, 0.03)' : '#fff',
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <div style={{ width: '16px', height: '16px', borderRadius: '50%', border: '2px solid #cbd5e1', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      {selectedPaymentMethod === 'direct' && (
-                        <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#059669' }} />
-                      )}
-                    </div>
-                    <div>
-                      <div style={{ fontWeight: 700, fontSize: '13px', color: '#0f172a' }}>Pay directly</div>
-                      <div style={{ fontSize: '11px', color: '#64748b' }}>Authorize payment yourself.</div>
-                    </div>
-                  </div>
-                  <ArrowRight size={14} color="#94a3b8" />
-                </div>
-              </div>
-            </div>
-
-            {/* Payment Method Authorization Summary */}
-            {selectedPaymentMethod === 'vault' ? (
-              <div
-                style={{
-                  marginTop: '12px',
-                  marginBottom: '16px',
-                  background: '#f0fdf4',
-                  border: '1px solid #bbf7d0',
-                  borderRadius: '12px',
-                  padding: '12px 14px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '10px',
-                }}
-              >
-                <ShieldCheck size={20} color="#059669" style={{ flexShrink: 0 }} />
-                <div style={{ fontSize: '12px', color: '#166534', lineHeight: 1.4 }}>
-                  <strong>Agent Vault Authorized:</strong> Payment will be settled automatically via your scoped Altana smart wallet session (<code style={{ fontFamily: 'monospace', fontWeight: 700 }}>0x71C2...b1D</code>) on Celo Mainnet.
-                </div>
-              </div>
-            ) : (
-              <div
-                style={{
-                  marginTop: '12px',
-                  marginBottom: '16px',
-                  background: '#f8fafc',
-                  border: '1px solid #e2e8f0',
-                  borderRadius: '12px',
-                  padding: '12px 14px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '10px',
-                }}
-              >
-                <Wallet size={20} color="#0284c7" style={{ flexShrink: 0 }} />
-                <div style={{ fontSize: '12px', color: '#0369a1', lineHeight: 1.4 }}>
-                  <strong>Direct Payment:</strong> You will authorize the transaction directly from your connected Celo wallet ({walletAddress ? `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}` : 'Connected'}).
-                </div>
               </div>
             )}
 
-            {bookingError && (
-              <div style={{ padding: '8px 12px', borderRadius: '8px', background: '#fee2e2', color: '#b91c1c', fontSize: '12px', marginBottom: '12px' }}>
-                {bookingError}
-              </div>
-            )}
+            {/* ── FLOW VIEW 3: CHOOSE A TIME ── */}
+            {currentStep === 'schedule' && selectedService && (
+              <div>
+                {/* Header (No Title - Back & Close Buttons Only) */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+                  <button
+                    type="button"
+                    onClick={() => setCurrentStep('details')}
+                    style={{
+                      background: '#f1f5f9',
+                      border: 'none',
+                      borderRadius: '50%',
+                      width: '28px',
+                      height: '28px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                      color: '#0f172a',
+                    }}
+                    title="Back to Details"
+                  >
+                    <ArrowLeft size={15} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCurrentStep('discover');
+                      setSelectedService(null);
+                    }}
+                    style={{
+                      background: '#f1f5f9',
+                      border: 'none',
+                      borderRadius: '50%',
+                      width: '28px',
+                      height: '28px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                      color: '#64748b',
+                    }}
+                    title="Close modal"
+                  >
+                    <X size={15} />
+                  </button>
+                </div>
 
-            {/* CTA Request & Confirm Booking */}
-            <button
-              type="button"
-              disabled={isSubmitting}
-              onClick={handleRequestBooking}
-              style={{
-                width: '100%',
-                background: '#059669',
-                color: '#fff',
-                border: 'none',
-                borderRadius: '12px',
-                padding: '12px',
-                fontSize: '14px',
-                fontWeight: 700,
-                cursor: isSubmitting ? 'not-allowed' : 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '6px',
-                opacity: isSubmitting ? 0.7 : 1,
-                boxShadow: '0 4px 6px -1px rgba(5, 150, 105, 0.25)',
-              }}
-            >
-              <span>{isSubmitting ? 'Confirming Booking...' : (selectedPaymentMethod === 'vault' ? 'Authorize & Book' : 'Confirm & Book')}</span>
-              <ArrowRight size={15} />
-            </button>
-          </div>
-        </div>
-      )}
+                {/* Select a date */}
+                <div style={{ marginBottom: '10px' }}>
+                  <label style={{ fontSize: '12px', fontWeight: 700, color: '#0f172a', display: 'block', marginBottom: '5px' }}>
+                    Select date
+                  </label>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px' }}>
+                    {datePills.map((d) => {
+                      const isSelected = selectedDate === d.dateStr;
+                      return (
+                        <button
+                          key={d.dateStr}
+                          type="button"
+                          onClick={() => setSelectedDate(d.dateStr)}
+                          style={{
+                            padding: '6px 4px',
+                            borderRadius: '10px',
+                            border: isSelected ? '2px solid #059669' : '1px solid #e2e8f0',
+                            background: isSelected ? '#ecfdf5' : '#fff',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            gap: '1px',
+                          }}
+                        >
+                          <span style={{ fontSize: '11.5px', fontWeight: 700, color: isSelected ? '#059669' : '#0f172a' }}>{d.label}</span>
+                          <span style={{ fontSize: '10px', color: '#64748b' }}>{d.sub}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
 
-      {/* ─────────────────────────────────────────────────────────────
-          FLOW VIEW 5: BOOKING REQUEST CREATED
-          ───────────────────────────────────────────────────────────── */}
-      {currentStep === 'created' && (
-        <div style={{ maxWidth: '440px', margin: '0 auto' }}>
-          <div style={{ background: '#fff', borderRadius: '24px', border: '1px solid #e2e8f0', padding: '32px 24px', textAlign: 'center', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.05)' }}>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '4px' }}>
-              <button
-                type="button"
-                onClick={() => {
-                  setCurrentStep('discover');
-                  setSelectedService(null);
-                }}
-                style={{
-                  background: '#f1f5f9',
-                  border: 'none',
-                  borderRadius: '50%',
-                  width: '32px',
-                  height: '32px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer',
-                  color: '#64748b',
-                }}
-                title="Close modal"
-              >
-                <X size={16} />
-              </button>
-            </div>
+                {/* Available times */}
+                <div style={{ marginBottom: '10px' }}>
+                  <label style={{ fontSize: '12px', fontWeight: 700, color: '#0f172a', display: 'block', marginBottom: '5px' }}>
+                    Available times
+                  </label>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px' }}>
+                    {timeSlotButtons.map((timeStr) => {
+                      const isSelected = selectedSlotTime === timeStr;
+                      return (
+                        <button
+                          key={timeStr}
+                          type="button"
+                          onClick={() => setSelectedSlotTime(timeStr)}
+                          style={{
+                            padding: '6px 4px',
+                            borderRadius: '8px',
+                            border: isSelected ? 'none' : '1px solid #e2e8f0',
+                            background: isSelected ? '#059669' : '#fff',
+                            color: isSelected ? '#fff' : '#0f172a',
+                            fontWeight: 700,
+                            fontSize: '11.5px',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          {timeStr}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
 
-            {/* Green Radiating Checkmark Icon */}
-            <div
-              style={{
-                width: '64px',
-                height: '64px',
-                borderRadius: '50%',
-                background: '#059669',
-                color: '#fff',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                margin: '0 auto 16px',
-                boxShadow: '0 0 0 8px rgba(5, 150, 105, 0.15)',
-              }}
-            >
-              <Check size={32} strokeWidth={3} />
-            </div>
+                {/* Selected Summary Cards: 2-column compact row */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '12px' }}>
+                  <div
+                    style={{
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '8px',
+                      padding: '6px 8px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      background: '#f8fafc',
+                    }}
+                  >
+                    <Calendar size={13} color="#059669" />
+                    <div>
+                      <div style={{ fontSize: '8.5px', color: '#64748b', textTransform: 'uppercase' }}>Selected date</div>
+                      <div style={{ fontSize: '11.5px', fontWeight: 700, color: '#0f172a' }}>{getSelectedDateDisplay(selectedDate)}</div>
+                    </div>
+                  </div>
 
-            <h3 style={{ fontSize: '18px', fontWeight: 800, margin: '0 0 6px 0', color: '#0f172a' }}>
-              Booking Request Created
-            </h3>
-            <p style={{ fontSize: '13px', color: '#64748b', margin: '0 0 20px 0' }}>
-              Your request is ready for provider and payment checks.
-            </p>
+                  <div
+                    style={{
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '8px',
+                      padding: '6px 8px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      background: '#f8fafc',
+                    }}
+                  >
+                    <Clock size={13} color="#059669" />
+                    <div>
+                      <div style={{ fontSize: '8.5px', color: '#64748b', textTransform: 'uppercase' }}>Selected time</div>
+                      <div style={{ fontSize: '11.5px', fontWeight: 700, color: '#0f172a' }}>{selectedSlotTime}</div>
+                    </div>
+                  </div>
+                </div>
 
-            {/* Details Table */}
-            <div style={{ background: '#f8fafc', borderRadius: '14px', padding: '14px 16px', marginBottom: '16px', fontSize: '12.5px', textAlign: 'left' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', color: '#64748b' }}>
-                <span>Reference</span>
-                <span style={{ fontWeight: 700, color: '#0f172a' }}>
-                  {activeBookingRecord?.id ? activeBookingRecord.id.replace('book_', 'NT-BOOK-').slice(0, 12).toUpperCase() : 'NT-BOOK-4829'}
-                </span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', color: '#64748b' }}>
-                <span>Service</span>
-                <span style={{ fontWeight: 700, color: '#0f172a' }}>₦{selectedService?.agentTag?.toUpperCase() || 'MUSIC'}</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', color: '#64748b' }}>
-                <span>Date</span>
-                <span style={{ fontWeight: 700, color: '#0f172a' }}>{getSelectedDateDisplay(selectedDate)}</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', color: '#64748b' }}>
-                <span>Time</span>
-                <span style={{ fontWeight: 700, color: '#0f172a' }}>{selectedSlotTime}</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', color: '#64748b' }}>
-                <span>Payment Route</span>
-                <span style={{ fontWeight: 700, color: '#0f172a' }}>
-                  {selectedPaymentMethod === 'vault' ? 'Agent Vault' : 'Direct'}
-                </span>
-              </div>
-            </div>
-
-            {/* Status Pill */}
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: '#fef3c7', color: '#b45309', padding: '6px 14px', borderRadius: '9999px', fontSize: '11.5px', fontWeight: 600, marginBottom: '20px' }}>
-              <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#b45309' }} />
-              <span>Pending provider / authorization checks</span>
-            </div>
-
-            {/* Actions */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <button
-                type="button"
-                onClick={() => setCurrentStep('confirmed_details')}
-                style={{
-                  width: '100%',
-                  background: '#059669',
-                  color: '#fff',
-                  border: 'none',
-                  borderRadius: '12px',
-                  padding: '12px',
-                  fontSize: '13.5px',
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                }}
-              >
-                View Confirmed Details
-              </button>
-              <button
-                type="button"
-                onClick={() => setCurrentStep('discover')}
-                style={{
-                  width: '100%',
-                  background: 'none',
-                  color: '#475569',
-                  border: '1px solid #e2e8f0',
-                  borderRadius: '12px',
-                  padding: '10px',
-                  fontSize: '13px',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                }}
-              >
-                Explore More Services
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ─────────────────────────────────────────────────────────────
-          FLOW VIEW 6: BOOKING DETAILS (CONFIRMED)
-          ───────────────────────────────────────────────────────────── */}
-      {currentStep === 'confirmed_details' && (
-        <div style={{ maxWidth: '540px', margin: '0 auto' }}>
-          <div style={{ background: '#fff', borderRadius: '20px', border: '1px solid #e2e8f0', padding: '24px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.03)' }}>
-            {/* Header */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <h2 style={{ fontSize: '18px', fontWeight: 800, margin: 0, color: '#0f172a' }}>Booking Details</h2>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                {/* CTA Continue */}
                 <button
                   type="button"
-                  onClick={() => alert('Booking link copied to clipboard!')}
+                  onClick={() => setCurrentStep('review')}
+                  style={{
+                    width: '100%',
+                    background: '#059669',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: '10px',
+                    padding: '10px',
+                    fontSize: '13.5px',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                  }}
+                >
+                  <span>Continue</span>
+                  <ArrowRight size={14} />
+                </button>
+              </div>
+            )}
+
+            {/* ── FLOW VIEW 4: REVIEW BOOKING ── */}
+            {currentStep === 'review' && selectedService && (
+              <div>
+                {/* Header (No Title - Back & Close Buttons Only) */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                  <button
+                    type="button"
+                    onClick={() => setCurrentStep('schedule')}
+                    style={{
+                      background: '#f1f5f9',
+                      border: 'none',
+                      borderRadius: '50%',
+                      width: '28px',
+                      height: '28px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                      color: '#0f172a',
+                    }}
+                    title="Back to Schedule"
+                  >
+                    <ArrowLeft size={15} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCurrentStep('discover');
+                      setSelectedService(null);
+                    }}
+                    style={{
+                      background: '#f1f5f9',
+                      border: 'none',
+                      borderRadius: '50%',
+                      width: '28px',
+                      height: '28px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                      color: '#64748b',
+                    }}
+                    title="Close modal"
+                  >
+                    <X size={15} />
+                  </button>
+                </div>
+
+                {/* Provider Card */}
+                <div
+                  style={{
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '10px',
+                    padding: '8px 10px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                    marginBottom: '10px',
+                  }}
+                >
+                  <div
+                    style={{
+                      width: '32px',
+                      height: '32px',
+                      borderRadius: '8px',
+                      background: '#dcfce7',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: '#15803d',
+                      flexShrink: 0,
+                    }}
+                  >
+                    <Headphones size={17} />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span style={{ fontWeight: 800, fontSize: '13px', color: '#0f172a' }}>
+                        ₦{selectedService.agentTag.toUpperCase()}
+                      </span>
+                      <span style={{ fontSize: '9.5px', background: '#dcfce7', color: '#15803d', padding: '1px 5px', borderRadius: '9999px', fontWeight: 600 }}>
+                        Selected
+                      </span>
+                    </div>
+                    <div style={{ fontSize: '11px', color: '#64748b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {selectedService.title}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Summary Key-Values */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '8px', fontSize: '12px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748b' }}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}><Calendar size={13} /> Date</span>
+                    <span style={{ fontWeight: 700, color: '#0f172a' }}>{getSelectedDateDisplay(selectedDate)}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748b' }}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}><Clock size={13} /> Time</span>
+                    <span style={{ fontWeight: 700, color: '#0f172a' }}>{selectedSlotTime}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748b' }}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}><Clock size={13} /> Duration</span>
+                    <span style={{ fontWeight: 700, color: '#0f172a' }}>{Math.round((selectedService?.durationMinutes || 120) / 60)} hours</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748b' }}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}><Tag size={13} /> Service price</span>
+                    <span style={{ fontWeight: 700, color: '#0f172a' }}>{formatPriceWithUsdt(selectedService?.price || 50000)}</span>
+                  </div>
+                </div>
+
+                <div style={{ height: '1px', background: '#f1f5f9', margin: '6px 0' }} />
+
+                {/* Total Row */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                  <span style={{ fontSize: '13.5px', fontWeight: 800, color: '#0f172a' }}>Total</span>
+                  <span style={{ fontSize: '15px', fontWeight: 800, color: '#0f172a' }}>{formatPriceWithUsdt(selectedService?.price || 50000)}</span>
+                </div>
+
+                {/* Notes for the provider (Compact) */}
+                <div style={{ marginBottom: '8px' }}>
+                  <label style={{ fontSize: '11px', fontWeight: 700, color: '#0f172a', display: 'block', marginBottom: '3px' }}>
+                    Notes for provider
+                  </label>
+                  <input
+                    type="text"
+                    value={customerNotes}
+                    onChange={(e) => setCustomerNotes(e.target.value)}
+                    placeholder="Add special notes..."
+                    style={{
+                      width: '100%',
+                      borderRadius: '8px',
+                      border: '1px solid #cbd5e1',
+                      padding: '6px 10px',
+                      fontSize: '11.5px',
+                      outline: 'none',
+                      boxSizing: 'border-box',
+                      color: '#0f172a',
+                      fontFamily: 'inherit',
+                    }}
+                  />
+                </div>
+
+                {/* Payment Method Selector */}
+                <div style={{ marginBottom: '8px' }}>
+                  <label style={{ fontSize: '11px', fontWeight: 700, color: '#0f172a', display: 'block', marginBottom: '4px' }}>
+                    Payment route
+                  </label>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
+                    {/* Option 1: Agent Vault */}
+                    <div
+                      onClick={() => setSelectedPaymentMethod('vault')}
+                      style={{
+                        border: selectedPaymentMethod === 'vault' ? '2px solid #059669' : '1px solid #e2e8f0',
+                        borderRadius: '10px',
+                        padding: '6px 8px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        cursor: 'pointer',
+                        background: selectedPaymentMethod === 'vault' ? '#ecfdf5' : '#fff',
+                      }}
+                    >
+                      <div style={{ width: '12px', height: '12px', borderRadius: '50%', border: '2px solid #059669', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        {selectedPaymentMethod === 'vault' && (
+                          <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#059669' }} />
+                        )}
+                      </div>
+                      <div style={{ fontSize: '11.5px', fontWeight: 700, color: '#0f172a' }}>Agent Vault</div>
+                    </div>
+
+                    {/* Option 2: Pay directly */}
+                    <div
+                      onClick={() => setSelectedPaymentMethod('direct')}
+                      style={{
+                        border: selectedPaymentMethod === 'direct' ? '2px solid #059669' : '1px solid #e2e8f0',
+                        borderRadius: '10px',
+                        padding: '6px 8px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        cursor: 'pointer',
+                        background: selectedPaymentMethod === 'direct' ? '#ecfdf5' : '#fff',
+                      }}
+                    >
+                      <div style={{ width: '12px', height: '12px', borderRadius: '50%', border: '2px solid #cbd5e1', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        {selectedPaymentMethod === 'direct' && (
+                          <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#059669' }} />
+                        )}
+                      </div>
+                      <div style={{ fontSize: '11.5px', fontWeight: 700, color: '#0f172a' }}>Pay directly</div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Payment Method Authorization Summary (Compact) */}
+                {selectedPaymentMethod === 'vault' ? (
+                  <div
+                    style={{
+                      marginBottom: '10px',
+                      background: '#f0fdf4',
+                      border: '1px solid #bbf7d0',
+                      borderRadius: '8px',
+                      padding: '8px 10px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                    }}
+                  >
+                    <ShieldCheck size={16} color="#059669" style={{ flexShrink: 0 }} />
+                    <div style={{ fontSize: '11px', color: '#166534', lineHeight: 1.35 }}>
+                      <strong>Agent Vault:</strong> Settled autonomously via Altana smart session (<code style={{ fontFamily: 'monospace', fontWeight: 700 }}>0x71C2...b1D</code>) on Celo Mainnet.
+                    </div>
+                  </div>
+                ) : (
+                  <div
+                    style={{
+                      marginBottom: '10px',
+                      background: '#f8fafc',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '8px',
+                      padding: '8px 10px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                    }}
+                  >
+                    <Wallet size={16} color="#0284c7" style={{ flexShrink: 0 }} />
+                    <div style={{ fontSize: '11px', color: '#0369a1', lineHeight: 1.35 }}>
+                      <strong>Direct:</strong> Payment authorized from connected Celo wallet ({walletAddress ? `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}` : 'Connected'}).
+                    </div>
+                  </div>
+                )}
+
+                {bookingError && (
+                  <div style={{ padding: '6px 10px', borderRadius: '8px', background: '#fee2e2', color: '#b91c1c', fontSize: '11px', marginBottom: '8px' }}>
+                    {bookingError}
+                  </div>
+                )}
+
+                {/* CTA Request & Confirm Booking */}
+                <button
+                  type="button"
+                  disabled={isSubmitting}
+                  onClick={handleRequestBooking}
+                  style={{
+                    width: '100%',
+                    background: '#059669',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: '10px',
+                    padding: '10px',
+                    fontSize: '13.5px',
+                    fontWeight: 700,
+                    cursor: isSubmitting ? 'not-allowed' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                    opacity: isSubmitting ? 0.7 : 1,
+                    boxShadow: '0 4px 6px -1px rgba(5, 150, 105, 0.25)',
+                  }}
+                >
+                  <span>{isSubmitting ? 'Confirming Booking...' : (selectedPaymentMethod === 'vault' ? 'Authorize & Book' : 'Confirm & Book')}</span>
+                  <ArrowRight size={14} />
+                </button>
+              </div>
+            )}
+
+            {/* ── FLOW VIEW 5: BOOKING REQUEST CREATED ── */}
+            {currentStep === 'created' && (
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '4px' }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCurrentStep('discover');
+                      setSelectedService(null);
+                    }}
+                    style={{
+                      background: '#f1f5f9',
+                      border: 'none',
+                      borderRadius: '50%',
+                      width: '28px',
+                      height: '28px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                      color: '#64748b',
+                    }}
+                    title="Close modal"
+                  >
+                    <X size={15} />
+                  </button>
+                </div>
+
+                {/* Green Checkmark Icon */}
+                <div
+                  style={{
+                    width: '44px',
+                    height: '44px',
+                    borderRadius: '50%',
+                    background: '#059669',
+                    color: '#fff',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    margin: '0 auto 8px',
+                    boxShadow: '0 0 0 6px rgba(5, 150, 105, 0.12)',
+                  }}
+                >
+                  <Check size={22} strokeWidth={3} />
+                </div>
+
+                <h3 style={{ fontSize: '15px', fontWeight: 800, margin: '0 0 3px 0', color: '#0f172a' }}>
+                  Booking Confirmed & Settled
+                </h3>
+                <p style={{ fontSize: '11.5px', color: '#64748b', margin: '0 0 10px 0' }}>
+                  Your session has been reserved and settled on Celo Mainnet.
+                </p>
+
+                {/* Details Table */}
+                <div style={{ background: '#f8fafc', borderRadius: '10px', padding: '8px 12px', marginBottom: '10px', fontSize: '11.5px', textAlign: 'left' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', color: '#64748b' }}>
+                    <span>Reference</span>
+                    <span style={{ fontWeight: 700, color: '#0f172a' }}>
+                      {activeBookingRecord?.id ? activeBookingRecord.id.replace('book_', 'NT-BOOK-').slice(0, 12).toUpperCase() : 'NT-BOOK-4829'}
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', color: '#64748b' }}>
+                    <span>Service</span>
+                    <span style={{ fontWeight: 700, color: '#0f172a' }}>₦{selectedService?.agentTag?.toUpperCase() || 'MUSIC'}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', color: '#64748b' }}>
+                    <span>Date</span>
+                    <span style={{ fontWeight: 700, color: '#0f172a' }}>{getSelectedDateDisplay(selectedDate)}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', color: '#64748b' }}>
+                    <span>Time</span>
+                    <span style={{ fontWeight: 700, color: '#0f172a' }}>{selectedSlotTime}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', color: '#64748b' }}>
+                    <span>Payment Route</span>
+                    <span style={{ fontWeight: 700, color: '#0f172a' }}>
+                      {selectedPaymentMethod === 'vault' ? 'Agent Vault' : 'Direct'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Status Pill */}
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', background: '#ecfdf5', color: '#059669', padding: '4px 10px', borderRadius: '9999px', fontSize: '10.5px', fontWeight: 700, marginBottom: '12px' }}>
+                  <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#059669' }} />
+                  <span>Settled & Confirmed on Celo</span>
+                </div>
+
+                {/* Actions */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <button
+                    type="button"
+                    onClick={() => setCurrentStep('confirmed_details')}
+                    style={{
+                      width: '100%',
+                      background: '#059669',
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: '10px',
+                      padding: '9px',
+                      fontSize: '12.5px',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    View Confirmed Receipt →
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCurrentStep('discover');
+                      setSelectedService(null);
+                    }}
+                    style={{
+                      width: '100%',
+                      background: 'none',
+                      color: '#475569',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '10px',
+                      padding: '8px',
+                      fontSize: '12px',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Explore More Services
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* ── FLOW VIEW 6: BOOKING DETAILS (CONFIRMED) ── */}
+            {currentStep === 'confirmed_details' && (
+              <div>
+                {/* Header (No Title - Share & Close Buttons Only) */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '6px', marginBottom: '10px' }}>
+                  <button
+                    type="button"
+                    onClick={() => alert('Booking link copied to clipboard!')}
+                    style={{
+                      background: '#f8fafc',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '8px',
+                      padding: '4px 8px',
+                      fontSize: '11px',
+                      fontWeight: 600,
+                      color: '#0f172a',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <Share2 size={12} />
+                    <span>Share</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCurrentStep('discover');
+                      setSelectedService(null);
+                    }}
+                    style={{
+                      background: '#f1f5f9',
+                      border: 'none',
+                      borderRadius: '50%',
+                      width: '28px',
+                      height: '28px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                      color: '#64748b',
+                    }}
+                    title="Close modal"
+                  >
+                    <X size={15} />
+                  </button>
+                </div>
+
+                {/* Provider Card */}
+                <div
+                  style={{
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '10px',
+                    padding: '8px 10px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    marginBottom: '10px',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div
+                      style={{
+                        width: '32px',
+                        height: '32px',
+                        borderRadius: '8px',
+                        background: '#dcfce7',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: '#15803d',
+                      }}
+                    >
+                      <Headphones size={18} />
+                    </div>
+                    <div>
+                      <div style={{ fontWeight: 800, fontSize: '13.5px', color: '#0f172a' }}>
+                        ₦{selectedService?.agentTag?.toUpperCase() || 'MUSIC'}
+                      </div>
+                      <div style={{ fontSize: '11px', color: '#64748b' }}>
+                        {selectedService?.title || 'Music production session'}
+                      </div>
+                    </div>
+                  </div>
+                  <span style={{ fontSize: '10px', background: '#dcfce7', color: '#15803d', padding: '2px 8px', borderRadius: '9999px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '3px' }}>
+                    <Check size={11} strokeWidth={3} />
+                    <span>Confirmed</span>
+                  </span>
+                </div>
+
+                {/* 5-Stage Stepper (Compact) */}
+                <div style={{ marginBottom: '12px', padding: '0 4px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'relative' }}>
+                    <div style={{ position: 'absolute', top: '8px', left: '10px', right: '10px', height: '2px', background: '#e2e8f0', zIndex: 1 }} />
+                    <div style={{ position: 'absolute', top: '8px', left: '10px', width: '75%', height: '2px', background: '#059669', zIndex: 1 }} />
+
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', zIndex: 2 }}>
+                      <div style={{ width: '16px', height: '16px', borderRadius: '50%', background: '#059669', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '3px' }}>
+                        <Check size={9} strokeWidth={3} />
+                      </div>
+                      <span style={{ fontSize: '8.5px', color: '#475569', fontWeight: 600 }}>Requested</span>
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', zIndex: 2 }}>
+                      <div style={{ width: '16px', height: '16px', borderRadius: '50%', background: '#059669', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '3px' }}>
+                        <Check size={9} strokeWidth={3} />
+                      </div>
+                      <span style={{ fontSize: '8.5px', color: '#475569', fontWeight: 600 }}>Accepted</span>
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', zIndex: 2 }}>
+                      <div style={{ width: '16px', height: '16px', borderRadius: '50%', background: '#059669', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '3px' }}>
+                        <Check size={9} strokeWidth={3} />
+                      </div>
+                      <span style={{ fontSize: '8.5px', color: '#475569', fontWeight: 600 }}>Awaiting pay</span>
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', zIndex: 2 }}>
+                      <div style={{ width: '16px', height: '16px', borderRadius: '50%', background: '#059669', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '3px' }}>
+                        <Check size={9} strokeWidth={3} />
+                      </div>
+                      <span style={{ fontSize: '8.5px', color: '#059669', fontWeight: 700 }}>Confirmed</span>
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', zIndex: 2 }}>
+                      <div style={{ width: '16px', height: '16px', borderRadius: '50%', background: '#fff', border: '1.5px solid #cbd5e1', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '3px' }}>
+                        <div style={{ width: '4px', height: '4px', borderRadius: '50%', background: '#cbd5e1' }} />
+                      </div>
+                      <span style={{ fontSize: '8.5px', color: '#94a3b8' }}>In progress</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Date & Meta Info */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '12px', fontWeight: 700, color: '#0f172a', marginBottom: '2px' }}>
+                      <Calendar size={13} color="#64748b" />
+                      <span>{getSelectedDateDisplay(selectedDate)}, 2026 · {selectedSlotTime}</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '11px', color: '#64748b' }}>
+                      <Clock size={12} color="#64748b" />
+                      <span>{Math.round((selectedService?.durationMinutes || 120) / 60)} hours</span>
+                    </div>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontSize: '9.5px', color: '#64748b', textTransform: 'uppercase' }}>Total</div>
+                    <div style={{ fontSize: '14.5px', fontWeight: 800, color: '#0f172a' }}>{formatPriceWithUsdt(selectedService?.price || 50000)}</div>
+                  </div>
+                </div>
+
+                {/* Paid via Agent Vault / Direct Banner */}
+                <div
+                  style={{
+                    background: '#ecfdf5',
+                    border: '1px solid #a7f3d0',
+                    borderRadius: '10px',
+                    padding: '8px 12px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                    marginBottom: '10px',
+                  }}
+                >
+                  <ShieldCheck size={20} color="#059669" style={{ flexShrink: 0 }} />
+                  <div>
+                    <div style={{ fontWeight: 800, fontSize: '12.5px', color: '#065f46' }}>
+                      {selectedPaymentMethod === 'vault' ? 'Paid via Agent Vault' : 'Paid Directly'}
+                    </div>
+                    <div style={{ fontSize: '11px', color: '#047857' }}>
+                      {selectedPaymentMethod === 'vault' ? 'Authorization complete. Settled autonomously on Celo Mainnet.' : 'Payment confirmed on Celo Mainnet.'}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Settlement Receipt Table */}
+                <div
                   style={{
                     background: '#f8fafc',
-                    border: '1px solid #e2e8f0',
-                    borderRadius: '8px',
-                    padding: '6px 12px',
-                    fontSize: '12px',
-                    fontWeight: 600,
-                    color: '#0f172a',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '5px',
-                    cursor: 'pointer',
-                  }}
-                >
-                  <Share2 size={13} />
-                  <span>Share</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setCurrentStep('discover');
-                    setSelectedService(null);
-                  }}
-                  style={{
-                    background: '#f1f5f9',
-                    border: 'none',
-                    borderRadius: '50%',
-                    width: '32px',
-                    height: '32px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    cursor: 'pointer',
-                    color: '#64748b',
-                  }}
-                  title="Close modal"
-                >
-                  <X size={16} />
-                </button>
-              </div>
-            </div>
-
-            {/* Provider Card */}
-            <div
-              style={{
-                border: '1px solid #e2e8f0',
-                borderRadius: '14px',
-                padding: '14px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                marginBottom: '24px',
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div
-                  style={{
-                    width: '40px',
-                    height: '40px',
+                    border: '1px solid #cbd5e1',
                     borderRadius: '10px',
-                    background: '#dcfce7',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: '#15803d',
+                    padding: '10px 12px',
                   }}
                 >
-                  <Headphones size={22} />
-                </div>
-                <div>
-                  <div style={{ fontWeight: 800, fontSize: '15px', color: '#0f172a' }}>
-                    ₦{selectedService?.agentTag?.toUpperCase() || 'MUSIC'}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <FileText size={14} color="#059669" />
+                      <span style={{ fontSize: '12px', fontWeight: 800, color: '#0f172a' }}>Settlement Receipt</span>
+                    </div>
+                    <span style={{ fontSize: '9px', background: '#dcfce7', color: '#15803d', padding: '1px 6px', borderRadius: '9999px', fontWeight: 700 }}>
+                      BOUND_AND_VERIFIED
+                    </span>
                   </div>
-                  <div style={{ fontSize: '12.5px', color: '#64748b' }}>
-                    {selectedService?.title || 'Music production session'}
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', fontSize: '11px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748b' }}>
+                      <span>Session Wallet</span>
+                      <span style={{ fontFamily: 'monospace', fontWeight: 600, color: '#0f172a' }}>0x71C22998...b1D</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748b' }}>
+                      <span>Transaction Hash</span>
+                      <a
+                        href="https://celoscan.io/tx/0x250e11feca536de2e68722f82643be4dad3568bccc358d356dbf4b843c820436"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{ color: '#059669', fontWeight: 600, textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '3px' }}
+                      >
+                        <span>0x250e11fe...0436</span>
+                        <ExternalLink size={10} />
+                      </a>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748b' }}>
+                      <span>Settled Amount</span>
+                      <span style={{ fontWeight: 700, color: '#0f172a' }}>₦{Number(selectedService?.price || 50000).toLocaleString()} cNGN (~${((Number(selectedService?.price || 50000)) / 1445).toFixed(2)} USD₮)</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748b' }}>
+                      <span>Protocol Attribution</span>
+                      <span style={{ fontWeight: 600, color: '#475569' }}>celo_9f7deabd99a6 (ERC-8021)</span>
+                    </div>
                   </div>
                 </div>
               </div>
-              <span style={{ fontSize: '11px', background: '#dcfce7', color: '#15803d', padding: '3px 10px', borderRadius: '9999px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '4px' }}>
-                <Check size={12} strokeWidth={3} />
-                <span>Confirmed</span>
-              </span>
-            </div>
-
-            {/* 5-Stage Stepper */}
-            <div style={{ marginBottom: '24px', padding: '0 8px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'relative' }}>
-                <div style={{ position: 'absolute', top: '10px', left: '10px', right: '10px', height: '2px', background: '#e2e8f0', zIndex: 1 }} />
-                <div style={{ position: 'absolute', top: '10px', left: '10px', width: '75%', height: '2px', background: '#059669', zIndex: 1 }} />
-
-                {/* Stage 1 */}
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', zIndex: 2 }}>
-                  <div style={{ width: '20px', height: '20px', borderRadius: '50%', background: '#059669', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '6px' }}>
-                    <Check size={11} strokeWidth={3} />
-                  </div>
-                  <span style={{ fontSize: '10px', color: '#475569', fontWeight: 600 }}>Requested</span>
-                </div>
-
-                {/* Stage 2 */}
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', zIndex: 2 }}>
-                  <div style={{ width: '20px', height: '20px', borderRadius: '50%', background: '#059669', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '6px' }}>
-                    <Check size={11} strokeWidth={3} />
-                  </div>
-                  <span style={{ fontSize: '10px', color: '#475569', fontWeight: 600 }}>Provider accepted</span>
-                </div>
-
-                {/* Stage 3 */}
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', zIndex: 2 }}>
-                  <div style={{ width: '20px', height: '20px', borderRadius: '50%', background: '#059669', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '6px' }}>
-                    <Check size={11} strokeWidth={3} />
-                  </div>
-                  <span style={{ fontSize: '10px', color: '#475569', fontWeight: 600 }}>Awaiting payment</span>
-                </div>
-
-                {/* Stage 4 */}
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', zIndex: 2 }}>
-                  <div style={{ width: '20px', height: '20px', borderRadius: '50%', background: '#059669', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '6px' }}>
-                    <Check size={11} strokeWidth={3} />
-                  </div>
-                  <span style={{ fontSize: '10px', color: '#059669', fontWeight: 700 }}>Confirmed</span>
-                </div>
-
-                {/* Stage 5 */}
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', zIndex: 2 }}>
-                  <div style={{ width: '20px', height: '20px', borderRadius: '50%', background: '#fff', border: '2px solid #cbd5e1', color: '#94a3b8', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '6px' }}>
-                    <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#cbd5e1' }} />
-                  </div>
-                  <span style={{ fontSize: '10px', color: '#94a3b8' }}>In progress</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Date & Meta Info */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px' }}>
-              <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', fontWeight: 700, color: '#0f172a', marginBottom: '4px' }}>
-                  <Calendar size={14} color="#64748b" />
-                  <span>{getSelectedDateDisplay(selectedDate)}, 2026 · {selectedSlotTime}</span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12.5px', color: '#64748b' }}>
-                  <Clock size={13} color="#64748b" />
-                  <span>2 hours</span>
-                </div>
-              </div>
-              <div style={{ textAlign: 'right' }}>
-                <div style={{ fontSize: '11px', color: '#64748b', textTransform: 'uppercase' }}>Total</div>
-                <div style={{ fontSize: '18px', fontWeight: 800, color: '#0f172a' }}>{formatPriceWithUsdt(selectedService?.price || 50000)}</div>
-              </div>
-            </div>
-
-            {/* Paid via Agent Vault Banner */}
-            <div
-              style={{
-                background: '#ecfdf5',
-                border: '1px solid #a7f3d0',
-                borderRadius: '12px',
-                padding: '14px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '12px',
-              }}
-            >
-              <ShieldCheck size={24} color="#059669" style={{ flexShrink: 0 }} />
-              <div>
-                <div style={{ fontWeight: 800, fontSize: '13.5px', color: '#065f46' }}>
-                  Paid via Agent Vault
-                </div>
-                <div style={{ fontSize: '12px', color: '#047857' }}>
-                  Authorization complete. Your booking is confirmed.
-                </div>
-              </div>
-            </div>
-
-            {/* Agent Vault Settlement Receipt */}
-            <div
-              style={{
-                marginTop: '16px',
-                background: '#f8fafc',
-                border: '1px solid #cbd5e1',
-                borderRadius: '14px',
-                padding: '16px',
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <FileText size={16} color="#059669" />
-                  <span style={{ fontSize: '13px', fontWeight: 800, color: '#0f172a' }}>Payment Settlement Receipt</span>
-                </div>
-                <span style={{ fontSize: '10px', background: '#dcfce7', color: '#15803d', padding: '2px 8px', borderRadius: '9999px', fontWeight: 700 }}>
-                  BOUND_AND_VERIFIED
-                </span>
-              </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '12px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748b' }}>
-                  <span>Altana Session Wallet</span>
-                  <span style={{ fontFamily: 'monospace', fontWeight: 600, color: '#0f172a' }}>0x71C22998...b1D (EIP-7702)</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748b' }}>
-                  <span>Transaction Hash</span>
-                  <a
-                    href="https://celoscan.io/tx/0x250e11feca536de2e68722f82643be4dad3568bccc358d356dbf4b843c820436"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    style={{ color: '#059669', fontWeight: 600, textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '3px' }}
-                  >
-                    <span>0x250e11fe...0436</span>
-                    <ExternalLink size={11} />
-                  </a>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748b' }}>
-                  <span>Settled Amount</span>
-                  <span style={{ fontWeight: 700, color: '#0f172a' }}>₦{Number(selectedService?.price || 50000).toLocaleString()} cNGN (~${((Number(selectedService?.price || 50000)) / 1445).toFixed(2)} USD₮)</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748b' }}>
-                  <span>Recipient Gateway</span>
-                  <span style={{ fontFamily: 'monospace', fontWeight: 600, color: '#0f172a' }}>0x653f773C...1693</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748b' }}>
-                  <span>Protocol Attribution</span>
-                  <span style={{ fontWeight: 600, color: '#475569' }}>celo_9f7deabd99a6 (ERC-8021)</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748b' }}>
-                  <span>Remaining Session Budget</span>
-                  <span style={{ fontWeight: 700, color: '#059669' }}>₦10,000 cNGN</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+            )}
           </div>
         </div>
       )}

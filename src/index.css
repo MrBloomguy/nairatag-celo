@@ -8871,6 +8871,19 @@ body:has(.main-content-wrapper.chat-mode) #root {
 
 
 .agent-directory-earnings { color: var(--privy-color-foreground); font-size: 11px; font-weight: 700; white-space: nowrap; }
+
+/* Compact Booking Dialog Scrollbar Removal */
+.compact-booking-dialog,
+.compact-booking-dialog * {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+.compact-booking-dialog::-webkit-scrollbar,
+.compact-booking-dialog *::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
 .agent-directory-points { color: var(--privy-color-foreground-3); font-size: 10px; font-weight: 650; white-space: nowrap; }
 .agent-directory-list-row .agent-circle-right { gap: 10px; }
 .agent-directory-card .agent-directory-points { margin-top: 1px; }
@@ -8933,3 +8946,16 @@ body:has(.main-content-wrapper.chat-mode) #root {
 .agent-directory-card-earnings { display: flex; align-items: baseline; justify-content: center; gap: 5px; color: var(--privy-color-foreground-2); font-size: 11px; }
 .agent-directory-card-earnings strong { color: var(--privy-color-foreground); font-size: 12px; }
 .agent-directory-earnings { color: var(--privy-color-foreground); font-size: 11px; font-weight: 700; white-space: nowrap; }
+
+/* Compact Booking Dialog Scrollbar Removal */
+.compact-booking-dialog,
+.compact-booking-dialog * {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+.compact-booking-dialog::-webkit-scrollbar,
+.compact-booking-dialog *::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}

@@ -10,6 +10,7 @@ import AltanaSessionCard from './components/AltanaSessionCard';
 import SelfAgentVerificationCard from './components/SelfAgentVerificationCard';
 import AgentVaultCard from './components/AgentVaultCard';
 import BookingMarketplace from './components/bookings/BookingMarketplace.jsx';
+import CeloHackathonDemoHub from './components/CeloHackathonDemoHub.jsx';
 import { ClipboardCheck as ClipboardCheckIcon } from 'lucide-react';
 import { ChevronsLeftRight as ChevronsLeftRightIcon } from 'lucide-react';
 import { Car as CarIcon } from 'lucide-react';
@@ -456,11 +457,14 @@ function ArcAppShell() {
     setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
   };
 
-  // Navigation: 'chat' (Home) | 'claim' | 'tasks' | 'agents' | 'pay' | 'chat' | 'faq' | 'rewards'
-  const VALID_TABS = ['claim', 'tasks', 'agents', 'pay', 'chat', 'faq', 'rewards', 'profile'];
+  // Navigation: 'chat' (Home) | 'claim' | 'tasks' | 'agents' | 'pay' | 'chat' | 'faq' | 'rewards' | 'hub'
+  const VALID_TABS = ['claim', 'tasks', 'agents', 'pay', 'chat', 'faq', 'rewards', 'profile', 'hub'];
   const [mainTab, setMainTabState] = useState(() => {
     try {
       const hash = window.location.hash.replace('#', '').toLowerCase();
+      if (hash === 'hub' || hash === 'demo' || hash === 'hackathon') {
+        return 'hub';
+      }
       if (hash === 'bookings' || hash === 'services') {
         return 'tasks';
       }
@@ -482,7 +486,9 @@ function ArcAppShell() {
     const handleHash = () => {
       try {
         const hash = window.location.hash.replace('#', '').toLowerCase();
-        if (hash === 'bookings' || hash === 'services') {
+        if (hash === 'hub' || hash === 'demo' || hash === 'hackathon') {
+          setMainTabState('hub');
+        } else if (hash === 'bookings' || hash === 'services') {
           setMainTabState('tasks');
           setTasksTabSection('bookings');
         } else if (VALID_TABS.includes(hash)) {
@@ -2716,6 +2722,20 @@ function ArcAppShell() {
             <Gift size={14} />
             <span>Rewards</span>
           </button>
+          <button
+            type="button"
+            className={`nav-tab-btn ${mainTab === 'hub' ? 'active' : ''}`}
+            onClick={() => setMainTab('hub')}
+            style={{
+              background: mainTab === 'hub' ? '#059669' : 'rgba(5, 150, 105, 0.08)',
+              color: mainTab === 'hub' ? '#fff' : '#059669',
+              border: '1px solid rgba(5, 150, 105, 0.3)',
+              fontWeight: 700,
+            }}
+          >
+            <Sparkles size={14} color={mainTab === 'hub' ? '#fef08a' : '#059669'} />
+            <span>Demo Hub</span>
+          </button>
         </nav>
 
         {/* Right Side: Search Icon + More (···) + Connect Pill */}
@@ -3235,6 +3255,21 @@ function ArcAppShell() {
 
       {/* ─── Main Application Body ─── */}
       <main className={`main-content-wrapper ${mainTab === 'claim' ? 'claim-active' : ''} ${mainTab === 'chat' ? 'chat-mode' : ''}`}>
+        {mainTab === 'hub' && (
+          <CeloHackathonDemoHub
+            walletAddress={walletAddress}
+            onConnectWallet={() => setIsConnectModalOpen(true)}
+            onNavigateTo={(target) => {
+              if (target === 'bookings') {
+                setMainTab('tasks');
+                setTasksTabSection('services');
+              } else {
+                setMainTab(target);
+              }
+            }}
+          />
+        )}
+
         {mainTab === 'profile' && (
           <section className="account-dashboard">
             <div className="account-dashboard-heading">

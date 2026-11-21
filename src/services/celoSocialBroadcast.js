@@ -50,15 +50,15 @@ export async function broadcastCeloVoucherClaimToTelegram({ taskId, walletAddres
 
 export function getTagShareUrl(tag) {
   const clean = String(tag || '').replace(/^[$₦@#]/, '').trim().toUpperCase();
-  if (!/^[A-Z0-9_-]{1,32}$/.test(clean)) return 'https://arc.nairatag.ng/';
+  if (!/^[A-Z0-9_-]{1,32}$/.test(clean)) return 'https://celo.nairatag.ng/';
   const encodedRef = encodeURIComponent(`₦${clean}`);
-  return `https://arc.nairatag.ng/tag/${encodeURIComponent(clean)}?ref=${encodedRef}#claim`;
+  return `https://celo.nairatag.ng/tag/${encodeURIComponent(clean)}?ref=${encodedRef}#claim`;
 }
 
 export function getAgentShareUrl(tag) {
   const clean = String(tag || '').replace(/^[$₦@#]/, '').trim().toUpperCase();
-  if (!/^[A-Z0-9_-]{1,32}$/.test(clean)) return 'https://arc.nairatag.ng/#agents';
-  return `https://arc.nairatag.ng/agent/${encodeURIComponent(clean)}#agents`;
+  if (!/^[A-Z0-9_-]{1,32}$/.test(clean)) return 'https://celo.nairatag.ng/#agents';
+  return `https://celo.nairatag.ng/agent/${encodeURIComponent(clean)}#agents`;
 }
 
 export function getAgentWhatsAppShareUrl({ tag }) {
@@ -101,7 +101,7 @@ export function getWhatsAppShareUrl({ tag }) {
   return `https://wa.me/?text=${encodeURIComponent(text)}`;
 }
 
-export function getTelegramShareIntentUrl({ text, url = 'https://arc.nairatag.ng' }) {
+export function getTelegramShareIntentUrl({ text, url = 'https://celo.nairatag.ng' }) {
   return `https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`;
 }
 
@@ -111,7 +111,7 @@ export function getTwitterTaskShareUrl({ title, rewardUSDC, points, userTag }) {
   const pointText = points ? `${points} Protocol Points` : '';
   const potential = [reward, pointText].filter(Boolean).join(' and ');
   const text = `I submitted "${taskTitle}" for review on @NairaTaghq.${potential ? ` Potential reward: ${potential}; pending owner review.` : ''} Explore Celo tasks. #Celo #NairaTag`;
-  const url = userTag ? getTagShareUrl(userTag) : 'https://arc.nairatag.ng/#tasks';
+  const url = userTag ? getTagShareUrl(userTag) : 'https://celo.nairatag.ng/#tasks';
   return `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`;
 }
 
@@ -120,7 +120,7 @@ export function getTwitterRewardShareUrl({ points, userTag }) {
   const label = identity ? ` as ₦${identity}` : '';
   const amount = Number(points) > 0 ? ` I now have ${Number(points).toLocaleString()} Protocol Points` : ' I just earned an Celo reward';
   const text = `${amount}${label} on @NairaTaghq. Explore Celo tasks and rewards. #Celo #NairaTag`;
-  const url = identity ? getTagShareUrl(identity) : 'https://arc.nairatag.ng/#rewards';
+  const url = identity ? getTagShareUrl(identity) : 'https://celo.nairatag.ng/#rewards';
   return `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`;
 }
 

@@ -55,7 +55,7 @@ const INTENTS = [
 const STATUS_COPY = {
   waiting: 'Waiting for your wallet approval',
   transacting: 'Sending your transaction',
-  confirming: 'Confirming it on Arc',
+  confirming: 'Confirming it on Celo',
 };
 
 const GENERAL_INTENT = {

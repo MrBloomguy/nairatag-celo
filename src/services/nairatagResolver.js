@@ -1,7 +1,7 @@
 /**
  * @file nairatagResolver.js
  * @description Canonical NairaTag Identity and Address-Resolution Adapter.
- * Bridges Arc payment workflows to the canonical NairaTag registry & Supabase identity layer.
+ * Bridges Celo payment workflows to the canonical NairaTag registry & Supabase identity layer.
  * 
  * Rules:
  * - Never returns simulated/mock identities.
@@ -84,7 +84,7 @@ export function classifyInput(input) {
  * Resolves a canonical NairaTag to its verified recipient wallet address.
  * 
  * @param {string} rawTag - e.g. "₦michael" or "michael"
- * @param {string} [network='arc'] - Target payment network
+ * @param {string} [network='celo'] - Target payment network
  * @returns {Promise<{
  *   success: boolean,
  *   canonicalTag?: string,
@@ -96,7 +96,7 @@ export function classifyInput(input) {
  *   error?: string
  * }>}
  */
-export async function resolveTag(rawTag, network = 'arc') {
+export async function resolveTag(rawTag, network = 'celo') {
   const norm = normalizeTag(rawTag);
   if (!norm.valid) {
     return {
@@ -142,7 +142,7 @@ export async function resolveTag(rawTag, network = 'arc') {
       canonicalTag: data.tag || norm.canonicalTag,
       cleanTag: norm.cleanTag,
       resolvedAddress: checksummedAddress,
-      network: data.network || 'Arc Compatible',
+      network: data.network || 'Celo Compatible',
       isVerified: true,
       source: 'canonical-nairatag-registry',
       reputation: data.reputation || 100
@@ -327,7 +327,7 @@ export async function claimTag({
       handle: norm.cleanTag,
       walletAddress: targetWallet.toLowerCase(),
       account: targetWallet.toLowerCase(),
-      network: 'Arc Osaka EVM',
+      network: 'Celo Mainnet',
       signature: finalSignature,
       message,
       nonce: finalNonce,

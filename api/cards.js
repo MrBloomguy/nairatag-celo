@@ -18,7 +18,7 @@ export default function handler(req, res) {
     const ext = String(req.query?.ext || requestedExt || (pathname.endsWith('.png') ? 'png' : 'svg')).toLowerCase();
     const mode = String(req.query?.mode || requestUrl.searchParams.get('mode') || 'card').toLowerCase();
     const amount = req.query?.amount || requestUrl.searchParams.get('amount');
-    const network = req.query?.network || requestUrl.searchParams.get('network') || 'arc';
+    const network = req.query?.network || requestUrl.searchParams.get('network') || 'celo';
     const action = req.query?.action || requestUrl.searchParams.get('action');
     const options = { amount, network, action };
     const svg = mode === 'story'

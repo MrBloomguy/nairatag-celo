@@ -48,7 +48,7 @@ export const APP_KIT_CROSSCHAINS = [
     chain: "Celo_Testnet",
     name: "Celo Mainnet",
     chainId: 42220,
-    badge: "Native Osaka",
+    badge: "Native Celo",
   },
   {
     chain: "Base_Sepolia",
@@ -222,7 +222,7 @@ export async function executeAppKitSwap({
         tokenIn,
         tokenOut,
         status: "COMPLETED",
-        blockExplorerUrl: `https://explorer.testnet.arc.io/tx/${result.txHash || ""}`,
+        blockExplorerUrl: `https://celoscan.io/tx/${result.txHash || ""}`,
       };
     } catch (kitError) {
       console.warn("Kit swap failed or rejected, checking reason:", kitError);
@@ -302,7 +302,7 @@ export function getBorrowKitDetails(cirBtcCollateral = "0.05") {
 export function getEarnKitPools() {
   return [
     {
-      id: "arc-usdc-yield",
+      id: "celo-cngn-yield",
       name: "Celo Native USDC Treasury Vault",
       asset: "USDC",
       apy: "5.12%",
@@ -312,7 +312,7 @@ export function getEarnKitPools() {
       status: "Active",
     },
     {
-      id: "arc-usdc-eurc-lp",
+      id: "celo-cngn-usdt-lp",
       name: "USDC / EURC FX Liquidity Pool",
       asset: "USDC-EURC",
       apy: "8.45%",

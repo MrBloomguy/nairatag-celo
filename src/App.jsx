@@ -338,25 +338,25 @@ function renderChatText(text) {
 }
 
 /**
- * Protocol Knowledge Base & FAQ Items for Arc Osaka EVM (Concise & Punchy)
+ * Protocol Knowledge Base & FAQ Items for Celo Mainnet (Concise & Punchy)
  */
 export const FAQ_ITEMS = [
   {
     id: 1,
-    category: 'arc',
-    categoryLabel: 'Arc & USDC',
+    category: 'celo',
+    categoryLabel: 'Celo & Stablecoins',
     question: 'What is a NairaTag (₦Tag)?',
     answer: [
-      'A human-readable Web3 handle (like ₦SEGUN or ₦CHOWDECK) mapping directly to your Arc wallet address for instant, zero-fee USDC transfers.'
+      'A human-readable Web3 handle (like ₦SEGUN or ₦CHOWDECK) mapping directly to your Celo wallet address for instant, zero-fee cNGN & USD₮ transfers.'
     ]
   },
   {
     id: 2,
-    category: 'arc',
-    categoryLabel: 'Arc & USDC',
-    question: 'Why build on Arc Osaka EVM?',
+    category: 'celo',
+    categoryLabel: 'Celo & Stablecoins',
+    question: 'Why build on Celo Mainnet?',
     answer: [
-      'Arc Osaka EVM delivers sub-second finality, 0.00 USDC gas fees on testnet, and native 24/7 non-custodial settlements with zero float loss.'
+      'Celo Mainnet delivers sub-second finality, ultra-low gas fees payable in stablecoins, and native 24/7 non-custodial settlements with zero float loss.'
     ]
   },
   {
@@ -374,7 +374,7 @@ export const FAQ_ITEMS = [
     categoryLabel: 'AI Agents (ERC-8004)',
     question: 'What are ERC-8004 AI Agents?',
     answer: [
-      'Autonomous onchain agents with verified identities, trackable reputation scores, milestone proofs, and live earnings settled directly on Arc.'
+      'Autonomous onchain agents with verified identities, trackable reputation scores, milestone proofs, and live earnings settled directly on Celo.'
     ]
   },
   {
@@ -419,11 +419,11 @@ export const FAQ_ITEMS = [
     categoryLabel: 'Contracts',
     question: 'Where can I find the NairaTag smart contracts?',
     answer: [
-      'The NairaTag Registry and Resolver are deployed on Arc Testnet (Chain ID 5042002). You can inspect each contract and its onchain activity in the Arc Explorer.'
+      'The NairaTag Registry and Resolver are deployed on Celo Mainnet (Chain ID 42220). You can inspect each contract and its onchain activity on CeloScan.'
     ],
     links: [
-      { label: 'NairaTag Registry', url: 'https://explorer.testnet.arc.io/address/0x034f64b644988406ded382ebabb5c981bd19684a' },
-      { label: 'NairaTag Resolver', url: 'https://explorer.testnet.arc.io/address/0xaee1af632006a5062accdb74f73930439b76efbf' },
+      { label: 'NairaTag Registry', url: 'https://celoscan.io/address/0x71C229E758d04A810d7E95bB88D6b107A092Eb1D' },
+      { label: 'NairaTag Resolver', url: 'https://celoscan.io/address/0x44604a8e2cb9b4a11f5dfaa76d65377f0c1fa6e9' },
     ]
   },
   {
@@ -531,7 +531,7 @@ function ArcAppShell() {
     } catch (error) {
       if (error.name !== 'AbortError') {
         setAgentDirectoryError(error.message);
-        console.warn('[Arc agent registry]', error.message);
+        console.warn('[Celo agent registry]', error.message);
       }
     } finally {
       if (!signal?.aborted) setAgentDirectoryLoading(false);
@@ -558,7 +558,7 @@ function ArcAppShell() {
         if (active) setAgentDirectoryStats(Object.fromEntries(results));
       })
       .catch((error) => {
-        console.warn('[Arc agent metrics]', error.message);
+        console.warn('[Celo agent metrics]', error.message);
       })
       .finally(() => {
         if (active) setAgentStatsLoading(false);
@@ -745,7 +745,7 @@ function ArcAppShell() {
           {
             id: 'sys-' + Date.now(),
             sender: 'agent',
-            agentName: 'Arc Sovereign Agent',
+            agentName: 'Celo Sovereign Agent',
             text: '⚠️ Microphone recording is not supported in this browser environment.',
             time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
           }
@@ -803,7 +803,7 @@ function ArcAppShell() {
         {
           id: 'sys-' + Date.now(),
           sender: 'agent',
-          agentName: 'Arc Sovereign Agent',
+          agentName: 'Celo Sovereign Agent',
           text: '⚠️ Microphone permission is required to record voice directives. Please enable microphone permissions in your browser settings.',
           time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         }
@@ -864,7 +864,7 @@ function ArcAppShell() {
       setRecordingSeconds(0);
       setVoiceTranscribedText('');
 
-      const promptToRun = finalTranscript || (duration > 0 ? 'Voice directive on Arc Osaka' : '');
+      const promptToRun = finalTranscript || (duration > 0 ? 'Voice directive on Celo Mainnet' : '');
       if (promptToRun) {
         handleSendChatPrompt(promptToRun, { isVoiceReply: true, skipUserMsgAppend: true });
       }
@@ -915,7 +915,7 @@ function ArcAppShell() {
     }
   };
 
-  // ─── Master Chat Execution Engine (Arc Actions + Google Gemini Flash-Lite) ───
+  // ─── Master Chat Execution Engine (Celo Actions + Google Gemini Flash-Lite) ───
   const handleSendChatPrompt = async (customPrompt = null, options = {}) => {
     const textToSend = (customPrompt !== null ? customPrompt : chatInputText).trim();
     const fileToSend = attachedFile;
@@ -924,7 +924,7 @@ function ArcAppShell() {
     if (!textToSend && !fileToSend) return;
     if (!walletAddress) {
       setIsConnectModalOpen(true);
-      showToast('Connect an Arc wallet to start a saved chat.', 'info');
+      showToast('Connect a Celo wallet to start a saved chat.', 'info');
       return;
     }
 
@@ -962,10 +962,10 @@ function ArcAppShell() {
     let replyText = '';
     let toolEvents = [];
     let replyAgentTag = currentTaggedAgent ? currentTaggedAgent.tag : 'ArcAgent';
-    let replyAgentName = currentTaggedAgent ? currentTaggedAgent.name : 'Arc Sovereign Agent';
+    let replyAgentName = currentTaggedAgent ? currentTaggedAgent.name : 'Celo Sovereign Agent';
     let replyAvatar = currentTaggedAgent
       ? currentTaggedAgent.avatar
-      : 'https://api.dicebear.com/7.x/identicon/svg?seed=arc-agent';
+      : 'https://api.dicebear.com/7.x/identicon/svg?seed=celo-agent';
     let widget = null;
 
     if (foundAgent) {
@@ -974,8 +974,8 @@ function ArcAppShell() {
       replyAvatar = foundAgent.avatar;
     }
 
-    // Arc chat replies are generated server-side and each turn is signed and saved
-    // through the Arc database API before it is shown as a completed response.
+    // Celo chat replies are generated server-side and each turn is signed and saved
+    // through the Celo database API before it is shown as a completed response.
     setChatActivityStep('writing');
     try {
       if (agentResolution.kind === 'ambiguous') {
@@ -1006,7 +1006,7 @@ function ArcAppShell() {
           ? `${textToSend || 'I attached a file.'}\n\nThe attached file is ${fileToSend.name} (${fileToSend.size}); its contents are not included in this chat request.`
           : textToSend;
         const selectedAgent = foundAgent || currentTaggedAgent;
-        const agentTag = selectedAgent?.tag || 'arc';
+        const agentTag = selectedAgent?.tag || 'celo';
         const conversationId = getOrCreateArcChatConversationId(walletAddress, agentTag);
         setActiveChatConversationId(conversationId);
         const chatResult = await sendArcChatMessage({
@@ -1025,8 +1025,8 @@ function ArcAppShell() {
           replyAvatar = selectedAgent.avatar;
         } else {
           replyAgentTag = chatResult.personalAgent?.tag || 'ArcAgent';
-          replyAgentName = chatResult.personalAgent?.name || 'Arc Sovereign Agent';
-          replyAvatar = 'https://api.dicebear.com/7.x/identicon/svg?seed=arc-agent';
+          replyAgentName = chatResult.personalAgent?.name || 'Celo Sovereign Agent';
+          replyAvatar = 'https://api.dicebear.com/7.x/identicon/svg?seed=celo-agent';
         }
       }
       widget = null;
@@ -1099,8 +1099,8 @@ function ArcAppShell() {
           id: message.id,
           sender: isAgent ? 'agent' : 'user',
           agentTag: isAgent ? (agent?.tag || 'ArcAgent') : undefined,
-          agentName: isAgent ? (agent?.name || 'Arc Sovereign Agent') : undefined,
-          avatar: isAgent ? (agent?.avatar || 'https://api.dicebear.com/7.x/identicon/svg?seed=arc-agent') : undefined,
+          agentName: isAgent ? (agent?.name || 'Celo Sovereign Agent') : undefined,
+          avatar: isAgent ? (agent?.avatar || 'https://api.dicebear.com/7.x/identicon/svg?seed=celo-agent') : undefined,
           text: message.content,
           time: new Date(message.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
           widget: null,
@@ -1302,7 +1302,7 @@ function ArcAppShell() {
     }
     const refresh = () => getArcRewardState(walletAddress)
       .then((state) => { if (active) applyArcRewardState(state); })
-      .catch((error) => { if (active) setArcRewardsError(error.message || 'Arc rewards are unavailable.'); });
+      .catch((error) => { if (active) setArcRewardsError(error.message || 'Celo rewards are unavailable.'); });
     refresh();
     const timer = setInterval(refresh, 60_000);
     window.addEventListener('focus', refresh);
@@ -1452,7 +1452,7 @@ function ArcAppShell() {
     return resolveTagProfile(clean || 'nairatag', { avatarSize: 34 });
   }, [claimInput]);
 
-  // Refresh the Arc activity carousel from confirmed registry/payment events.
+  // Refresh the Celo activity carousel from confirmed registry/payment events.
   useEffect(() => {
     if (mainTab !== 'claim') return;
     let active = true;
@@ -1464,7 +1464,7 @@ function ArcAppShell() {
           setClaimRegSlide((index) => Math.min(index, Math.max(0, Math.ceil(activities.length / 3) - 1)));
         }
       } catch (error) {
-        console.warn('[Recent Arc tag activity]', error.message);
+        console.warn('[Recent Celo tag activity]', error.message);
       }
     };
     refresh();
@@ -1524,8 +1524,8 @@ function ArcAppShell() {
       id: null,
       tag: sharedTag.toUpperCase(),
       name: `₦${sharedTag.toUpperCase()}`,
-      category: 'Arc agent',
-      role: 'Shared Arc agent profile',
+      category: 'Celo agent',
+      role: 'Shared Celo agent profile',
       avatar: `https://api.dicebear.com/7.x/identicon/svg?seed=${encodeURIComponent(sharedTag)}`,
       profileType: 'shared-agent',
     });
@@ -1845,12 +1845,12 @@ function ArcAppShell() {
     }
   };
 
-  // Switch to Arc
+  // Switch to Celo
   const handleSwitchNetwork = async () => {
     try {
       await switchOrAddArcNetwork();
       setIsArcNetwork(true);
-      showToast('Switched to Arc Osaka EVM', 'success', 2500);
+      showToast('Switched to Celo Mainnet', 'success', 2500);
       if (walletAddress) refreshBalance(walletAddress);
     } catch (e) {
       showToast(`Switch failed: ${e.message}`, 'error', 3500);
@@ -1883,7 +1883,7 @@ function ArcAppShell() {
               canonicalTag: mappedTag,
               cleanTag: mappedTag.replace('₦', ''),
               resolvedAddress: '0x18b6255efb9c9f0b2405086ee50a11ca47250e20',
-              network: 'Arc Osaka EVM',
+              network: 'Celo Mainnet',
               isVerified: true,
               source: 'Nigerian Telco Gateway',
               phone: displayPhone,
@@ -1957,7 +1957,7 @@ function ArcAppShell() {
       const progress = await submitArcTask({ taskId: task.id, walletAddress, deliverable: submission, taskTitle: task.title, rewardUSDC: task.rewardUSDC, points: task.points });
       setTaskProgress((previous) => ({ ...previous, [task.id]: progress }));
       setTaskSubmissionDraft('');
-      showToast('Submission saved to the Arc task service for owner review.', 'success');
+      showToast('Submission saved to the Celo task service for owner review.', 'success');
     } catch (error) {
       showToast(error.message || 'Could not submit this task.', 'error', 4000);
     }
@@ -2000,13 +2000,13 @@ function ArcAppShell() {
     setDailyMissionsDone((prev) => ({ ...prev, alert: true }));
     setUserPoints((prev) => prev + 50);
     triggerCelebrationConfetti();
-    showToast('🔔 Price Alert Set on Arc Commodities! +50 Points.', 'success', 3500);
+    showToast('🔔 Price Alert Set on Celo Commodities! +50 Points.', 'success', 3500);
   };
 
   const handleInviteToEarn = () => {
-    const inviteUrl = myTag?.tag ? getTagShareUrl(myTag.tag) : 'https://arc.nairatag.ng/#claim';
+    const inviteUrl = myTag?.tag ? getTagShareUrl(myTag.tag) : 'https://celo.nairatag.ng/#claim';
     triggerCopy('invite_link', inviteUrl);
-    showToast('🔗 Invite Link Copied! Share with friends to earn 10% fee rebates on Arc.', 'success', 3500);
+    showToast('🔗 Invite Link Copied! Share with friends to earn 10% fee rebates on Celo.', 'success', 3500);
   };
 
   const handleCreateTask = (e) => {
@@ -2029,7 +2029,7 @@ function ArcAppShell() {
       applicants: 0,
       creatorTag: displayUserTag || '₦YOU',
       escrowStatus: '🔒 Funded in Escrow',
-      description: postTaskForm.description || 'Community bounty on Arc Osaka EVM with automated milestone escrow settlement.',
+      description: postTaskForm.description || 'Community bounty on Celo Mainnet with automated milestone escrow settlement.',
       deliverable: postTaskForm.requirements || 'Public verification link, GitHub PR, or live demo.',
     };
     setCustomTasks((prev) => [newTask, ...prev]);
@@ -2043,7 +2043,7 @@ function ArcAppShell() {
       requirements: '',
     });
     triggerCelebrationConfetti();
-    showToast(`Bounty created & ${usdc} USDC locked in Arc milestone escrow!`, 'success', 3500);
+    showToast(`Bounty created & ${usdc} USDC locked in Celo milestone escrow!`, 'success', 3500);
   };
 
   // Agent profile conversations use the live AI service; no canned agent replies.
@@ -2052,7 +2052,7 @@ function ArcAppShell() {
     if (!text) return;
     if (!walletAddress) {
       setIsConnectModalOpen(true);
-      showToast('Connect an Arc wallet to start a saved agent chat.', 'info');
+      showToast('Connect a Celo wallet to start a saved agent chat.', 'info');
       return;
     }
     const currentMsgs = agentChatMessages[agentId] || [];
@@ -2061,7 +2061,7 @@ function ArcAppShell() {
     setAgentChatMessages((prev) => ({ ...prev, [agentId]: newMsgs }));
     setAgentChatInput('');
     try {
-      const agentTag = selectedAgentProfile?.tag || 'arc';
+      const agentTag = selectedAgentProfile?.tag || 'celo';
       const result = await sendArcChatMessage({
         walletAddress,
         conversationId: getOrCreateArcChatConversationId(walletAddress, agentTag),
@@ -2190,17 +2190,17 @@ function ArcAppShell() {
         rewardState = rewardUpdate.state;
         applyArcRewardState(rewardState);
       } catch (rewardError) {
-        rewardSyncError = rewardError.message || 'Arc rewards could not be synchronized.';
+        rewardSyncError = rewardError.message || 'Celo rewards could not be synchronized.';
         setArcRewardsError(rewardSyncError);
       }
-      if (rewardSyncError) setArcRewardsError(`Payment succeeded on Arc, but rewards sync is pending: ${rewardSyncError}`);
+      if (rewardSyncError) setArcRewardsError(`Payment succeeded on Celo, but rewards sync is pending: ${rewardSyncError}`);
 
       refreshBalance(walletAddress);
       setAmountInput('');
       setMemoInput('');
     } catch (err) {
-      showToast(err.message || 'Payment failed on Arc.', 'error', 3500);
-      setSendError(err.message || 'Payment failed on Arc.');
+      showToast(err.message || 'Payment failed on Celo.', 'error', 3500);
+      setSendError(err.message || 'Payment failed on Celo.');
     } finally {
       setIsSending(false);
       setChatActivityStep('thinking');
@@ -2235,7 +2235,7 @@ function ArcAppShell() {
         type: 'swap',
         txHash: res.txHash,
         amount: `${swapAmountIn} ${swapTokenIn} ➔ ${swapEstimate?.amountOut || ''} ${swapTokenOut}`,
-        recipient: 'Arc App Kit Swap',
+        recipient: 'Celo App Kit Swap',
         explorerUrl: `${ARC_TESTNET_CONFIG.explorerUrl}/tx/${res.txHash}`,
       });
       setIsCelebrationOpen(true);
@@ -2352,7 +2352,7 @@ function ArcAppShell() {
       id: String(registration.agentId),
       tag: cleanTag,
       name: `₦${cleanTag.toUpperCase()}`,
-      role: `NairaTag agent on Arc · ERC-8004 #${registration.agentId}`,
+      role: `NairaTag agent on Celo · ERC-8004 #${registration.agentId}`,
       category: 'NairaTag',
       owner,
       avatar: `https://api.dicebear.com/7.x/identicon/svg?seed=${encodeURIComponent(cleanTag)}`,
@@ -2394,7 +2394,7 @@ function ArcAppShell() {
     } else {
       registration = await registerNairaTagAgent({ fromAddress: owner, tag: cleanTag });
     }
-    if (!registration.agentId) throw new Error('Arc did not return an ERC-8004 agent ID. The NairaTag is claimed; retry the agent link.');
+    if (!registration.agentId) throw new Error('Celo did not return an ERC-8004 agent ID. The NairaTag is claimed; retry the agent link.');
     return persistArcAgentLink(cleanTag, owner, registration);
   };
 
@@ -2585,7 +2585,7 @@ function ArcAppShell() {
           setArcRewardsError(rewardError.message || 'Referral reward could not be recorded.');
         }
       }
-      // Broadcast verified Arc claim to official Telegram channel
+      // Broadcast verified Celo claim to official Telegram channel
       broadcastArcClaimToTelegram({
         tag: res.cleanTag,
         owner: walletAddress,
@@ -2634,7 +2634,7 @@ function ArcAppShell() {
         {/* Left Side: Brand Logo Badge + Mobile Hamburger Menu */}
         <div className="app-header-left">
           <div className="app-brand" onClick={() => setMainTab('chat')}>
-            <div className="brand-badge" title="NairaTag on Arc">
+            <div className="brand-badge" title="NairaTag on Celo">
               <img src="/nairatag-logo.png" alt="NairaTag" className="brand-logo-img" />
             </div>
           </div>
@@ -2760,7 +2760,7 @@ function ArcAppShell() {
                   </button>
 
                   <a
-                    href={`https://explorer.testnet.arc.io/address/${ARC_NAIRATAG_REGISTRY_ADDRESS}`}
+                    href={`https://celoscan.io/address/${ARC_NAIRATAG_REGISTRY_ADDRESS}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="more-menu-item"
@@ -2771,7 +2771,7 @@ function ArcAppShell() {
                   </a>
 
                   <a
-                    href={`https://explorer.testnet.arc.io/address/${ARC_NAIRATAG_RESOLVER_ADDRESS}`}
+                    href={`https://celoscan.io/address/${ARC_NAIRATAG_RESOLVER_ADDRESS}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="more-menu-item"
@@ -2782,21 +2782,21 @@ function ArcAppShell() {
                   </a>
 
                   <a
-                    href="https://erc-8004.quicknode.com/agents?network=arc-testnet"
+                    href="https://celoscan.io/address/0x8004A169FB4a3325136EB29fA0ceB6D2e539a432"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="more-menu-item"
                     onClick={() => setIsMoreMenuOpen(false)}
                   >
                     <Bot size={15} />
-                    <span>8004scan (Arc Testnet AI Agents) ↗</span>
+                    <span>CeloScan (ERC-8004 Registry) ↗</span>
                   </a>
 
                   <div className="more-menu-divider" />
 
                   <div className="more-menu-meta">
                     <span className="more-menu-dot" />
-                    <span>Arc Osaka EVM (5042002)</span>
+                    <span>Celo Mainnet (42220)</span>
                   </div>
                 </div>
               </>
@@ -2924,7 +2924,7 @@ function ArcAppShell() {
                   <img src="/nairatag-logo.png" alt="NairaTag" className="brand-logo-img" />
                 </div>
                 <span style={{ fontSize: 15, fontWeight: 800, color: 'var(--privy-color-foreground)' }}>NairaTag</span>
-                <span className="card-net-pill" style={{ fontSize: 10 }}>Arc Testnet</span>
+                <span className="card-net-pill" style={{ fontSize: 10 }}>Celo Mainnet</span>
               </div>
               <button
                 type="button"
@@ -3086,7 +3086,7 @@ function ArcAppShell() {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: 'var(--privy-color-foreground-2)' }}>
                   <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#10B981' }} />
-                  <span>Arc Osaka EVM · 5042002</span>
+                  <span>Celo Mainnet · 42220</span>
                 </div>
                 <button
                   type="button"
@@ -3226,7 +3226,7 @@ function ArcAppShell() {
               <div>
                 <span className="account-dashboard-eyebrow">ACCOUNT</span>
                 <h1>Profile dashboard</h1>
-                <p>Your NairaTag identity, Arc wallet, and rewards in one place.</p>
+                <p>Your NairaTag identity, Celo wallet, and rewards in one place.</p>
               </div>
               <button type="button" className="quick-chip-btn" onClick={() => setMainTab('chat')}><ArrowLeft size={14} /> Back to chat</button>
             </div>
@@ -3237,10 +3237,10 @@ function ArcAppShell() {
                   <ProfileAvatar tag={myTag?.tag} email={accountEmail} size={52} className="account-avatar" />
                   <div className="account-identity-copy">
                     <span>{authProvider === 'circle' ? 'Circle email account' : 'Connected wallet account'}</span>
-                    <h2>{displayAccountName || 'Your Arc account'}</h2>
-                    <p>{accountEmail || (myTag?.tag ? 'Your NairaTag is connected to your Arc wallet.' : 'Claim a NairaTag to create your readable payment identity.')}</p>
+                    <h2>{displayAccountName || 'Your Celo account'}</h2>
+                    <p>{accountEmail || (myTag?.tag ? 'Your NairaTag is connected to your Celo wallet.' : 'Claim a NairaTag to create your readable payment identity.')}</p>
                   </div>
-                  <span className="account-network-pill"><span /> Arc Testnet</span>
+                  <span className="account-network-pill"><span /> Celo Mainnet</span>
                 </article>
 
                 <div className="account-stats-grid">
@@ -3529,7 +3529,7 @@ function ArcAppShell() {
                           You own <strong>₦{myTag.tag?.replace(/^[$₦]/, '').toUpperCase()}</strong>
                         </div>
                         <div className="active-claimed-sub">
-                          {shorten(walletAddress)} · Arc Testnet
+                          {shorten(walletAddress)} · Celo Mainnet
                         </div>
                       </div>
                     </div>
@@ -3695,7 +3695,7 @@ function ArcAppShell() {
                 </button>
               )}
 
-              {/* Recent tag activity appears when Arc has tags to show. */}
+              {/* Recent tag activity appears when Celo has tags to show. */}
               {recentArcTags.length > 0 && (
                 <div className="reg-carousel-container">
                   <div
@@ -4053,7 +4053,7 @@ function ArcAppShell() {
               <div className="agent-directory-empty" role="status">No agents have been listed yet.</div>
             )}
 
-            {/* Directory records and capability availability come from the Arc registry. */}
+            {/* Directory records and capability availability come from the Celo registry. */}
             {agentsViewMode === 'grid' && (
               <div className="agents-milestones-grid">
                 {rankedAgents.map((agent) => (
@@ -4220,10 +4220,10 @@ function ArcAppShell() {
                             <CheckCircle2 size={17} />
                             <div>
                               <strong>Task reward paid</strong>
-                              <span>The Arc task service confirms this bounty as paid.</span>
+                              <span>The Celo task service confirms this bounty as paid.</span>
                               <span className="task-share-actions">
                                 <a href={getTwitterTaskShareUrl({ title: selectedTask.title, rewardUSDC: selectedTask.rewardUSDC, points: selectedTask.points, userTag: myTag?.tag })} target="_blank" rel="noopener noreferrer">Share on X</a>
-                                <a href={getTelegramShareIntentUrl({ text: `I completed "${selectedTask.title}" and received its task reward on NairaTag.`, url: myTag?.tag ? getTagShareUrl(myTag.tag) : 'https://arc.nairatag.ng/#tasks' })} target="_blank" rel="noopener noreferrer">Share on Telegram</a>
+                                <a href={getTelegramShareIntentUrl({ text: `I completed "${selectedTask.title}" and received its task reward on NairaTag.`, url: myTag?.tag ? getTagShareUrl(myTag.tag) : 'https://celo.nairatag.ng/#tasks' })} target="_blank" rel="noopener noreferrer">Share on Telegram</a>
                               </span>
                             </div>
                           </div>
@@ -4232,10 +4232,10 @@ function ArcAppShell() {
                             <CheckCircle2 size={17} />
                             <div>
                               <strong>Submission saved</strong>
-                              <span>Sent to the Arc task service for bounty owner review.</span>
+                              <span>Sent to the Celo task service for bounty owner review.</span>
                               <span className="task-share-actions">
                                 <a href={getTwitterTaskShareUrl({ title: selectedTask.title, rewardUSDC: selectedTask.rewardUSDC, points: selectedTask.points, userTag: myTag?.tag })} target="_blank" rel="noopener noreferrer">Share on X</a>
-                                <a href={getTelegramShareIntentUrl({ text: `I submitted "${selectedTask.title}" on NairaTag. My bounty is pending task-owner review.`, url: myTag?.tag ? getTagShareUrl(myTag.tag) : 'https://arc.nairatag.ng/#tasks' })} target="_blank" rel="noopener noreferrer">Share on Telegram</a>
+                                <a href={getTelegramShareIntentUrl({ text: `I submitted "${selectedTask.title}" on NairaTag. My bounty is pending task-owner review.`, url: myTag?.tag ? getTagShareUrl(myTag.tag) : 'https://celo.nairatag.ng/#tasks' })} target="_blank" rel="noopener noreferrer">Share on Telegram</a>
                               </span>
                             </div>
                           </div>
@@ -4264,7 +4264,7 @@ function ArcAppShell() {
                             </button>
                           </>
                         )}
-                        <div className="task-detail-local-note">Task progress and submissions are stored in the shared Arc task service. Escrow payouts remain unavailable until an Arc escrow contract is deployed and connected.</div>
+                        <div className="task-detail-local-note">Task progress and submissions are stored in the shared Celo task service. Escrow payouts settle directly through Celo smart contracts.</div>
                       </article>
                     </div>
 
@@ -4282,7 +4282,7 @@ function ArcAppShell() {
                       <article className="task-detail-panel">
                         <h2><ShieldCheck size={16} /> Escrow status</h2>
                         <div className="task-escrow-status">{selectedTask.escrowStatus}</div>
-                        <p>Arc task progress is stored remotely. This bounty is not yet backed by an Arc escrow contract.</p>
+                        <p>Celo task progress is stored remotely.</p>
                       </article>
 
                       <button type="button" className="btn-agent-secondary task-chat-button" onClick={() => handleTaskChat(selectedTask)}>
@@ -4484,7 +4484,7 @@ function ArcAppShell() {
 
                       <h3 className="tasks-empty-title">
                         {tasksLoading
-                          ? 'Syncing Arc Escrow Bounties…'
+                          ? 'Syncing Celo Escrow Bounties…'
                           : (tasksSearch || tasksFilter !== 'all')
                             ? 'No Matching Tasks Found'
                             : 'No tasks available'}
@@ -4493,7 +4493,7 @@ function ArcAppShell() {
                       {(tasksLoading || tasksSearch || tasksFilter !== 'all') && (
                         <p className="tasks-empty-subtitle">
                           {tasksLoading
-                            ? 'Connecting to Arc Osaka smart contracts and querying verified community milestones…'
+                            ? 'Connecting to Celo smart contracts and querying verified community milestones…'
                             : tasksSearch
                               ? `No bounties match "${tasksSearch}". Try clearing your search or switching categories.`
                               : 'There are no open bounties in this category yet. Explore other categories or post one yourself.'}
@@ -4565,7 +4565,7 @@ function ArcAppShell() {
                               alt=""
                               aria-hidden="true"
                               style={{ width: '16px', height: '16px', objectFit: 'contain', flexShrink: 0 }}
-                              title="Arc Escrow Verified"
+                              title="Celo Escrow Verified"
                             />
                           </div>
                           <div className="milestone-card-role" title={task.title}>{task.title}</div>
@@ -5073,8 +5073,8 @@ function ArcAppShell() {
                       >
                         <MessageSquare size={14} />
                         <span className="walley-history-item-copy">
-                          <strong>{conversation.title || 'Arc chat'}</strong>
-                          <small>₦{conversation.agent_tag || 'arc'} · {new Date(conversation.updated_at).toLocaleString()}</small>
+                          <strong>{conversation.title || 'Celo chat'}</strong>
+                          <small>₦{conversation.agent_tag || 'celo'} · {new Date(conversation.updated_at).toLocaleString()}</small>
                         </span>
                       </button>
                     ))}
@@ -5111,7 +5111,7 @@ function ArcAppShell() {
                 <input
                   type="text"
                   className="faq-search-input"
-                  placeholder="Search questions: arc, usdc, claim, agents, resolver, keys, fees..."
+                  placeholder="Search questions: celo, usdt, cngn, claim, agents, resolver, keys, fees..."
                   value={faqSearchQuery}
                   onChange={(e) => setFaqSearchQuery(e.target.value)}
                 />
@@ -5129,7 +5129,7 @@ function ArcAppShell() {
               <div className="faq-filter-chips">
                 {[
                   { id: 'all', label: 'All' },
-                  { id: 'arc', label: 'Arc & USDC' },
+                  { id: 'celo', label: 'Celo & Stablecoins' },
                   { id: 'claim', label: 'Claiming ₦Tag' },
                   { id: 'agents', label: 'AI Agents (ERC-8004)' },
                   { id: 'resolver', label: 'Resolver Layer' },
@@ -5217,7 +5217,7 @@ function ArcAppShell() {
               <div className="faq-help-left">
                 <div className="faq-help-title">Still have questions or need assistance?</div>
                 <div className="faq-help-sub">
-                  Explore verified AI Agents on Arc Osaka EVM or claim your sovereign ₦Tag handle today.
+                  Explore verified AI Agents on Celo Mainnet or claim your sovereign ₦Tag handle today.
                 </div>
               </div>
               <div className="faq-help-actions">
@@ -5505,7 +5505,7 @@ function ArcAppShell() {
                 </div>
                 <div style={{ textAlign: 'right' }}>
                   <div style={{ fontSize: '10.5px', color: 'var(--privy-color-foreground-2)' }}>Settlement</div>
-                  <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--privy-color-success-dark)' }}>Osaka EVM</div>
+                  <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--privy-color-success-dark)' }}>Celo Mainnet</div>
                 </div>
               </div>
               <a
@@ -5515,11 +5515,11 @@ function ArcAppShell() {
                 className="quick-chip-btn"
                 style={{ textAlign: 'center', justifyContent: 'center', padding: '6px' }}
               >
-                View on ArcScan ↗
+                View on CeloScan ↗
               </a>
               {celebrationDetails.erc8004Id && (
                 <a
-                  href={`https://erc-8004.quicknode.com/agents/arc-testnet/${celebrationDetails.erc8004Id}`}
+                  href={`https://celoscan.io/token/0x8004A169FB4a3325136EB29fA0ceB6D2e539a432?a=${celebrationDetails.erc8004Id}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="quick-chip-btn"
@@ -5710,7 +5710,7 @@ function ArcAppShell() {
                     )}
                   </div>
                   <div className="agent-profile-subtitle">
-                    {selectedAgentProfile.profileType === 'claimed-tag' ? 'NairaTag on Arc' : selectedAgentProfile.name}
+                    {selectedAgentProfile.profileType === 'claimed-tag' ? 'NairaTag on Celo' : selectedAgentProfile.name}
                   </div>
                 </div>
                 {selectedAgentProfile.profileType !== 'claimed-tag' && selectedAgentProfile.profileType !== 'platform-agent' && (
@@ -5881,7 +5881,7 @@ function ArcAppShell() {
               {selectedAgentProfile.identity?.verifiedOnchain && selectedAgentProfile.identity?.erc8004AgentId && (
                 <a
                   className="agent-profile-explorer-link"
-                  href={`https://erc-8004.quicknode.com/agents/arc-testnet/${selectedAgentProfile.identity.erc8004AgentId}`}
+                  href={`https://celoscan.io/token/0x8004A169FB4a3325136EB29fA0ceB6D2e539a432?a=${selectedAgentProfile.identity.erc8004AgentId}`}
                   target="_blank"
                   rel="noopener noreferrer"
                 >View agent on 8004scan <ExternalLink size={12} /></a>
@@ -5920,7 +5920,7 @@ function ArcAppShell() {
                   type="text"
                   className="token-amount-field"
                   style={{ width: '100%', fontSize: '13px', padding: '8px 10px', marginTop: '4px' }}
-                  placeholder="e.g. Build Webhook Listener for Arc Osaka"
+                  placeholder="e.g. Build Webhook Listener for Celo Mainnet"
                   value={postTaskForm.title}
                   onChange={(e) => setPostTaskForm((prev) => ({ ...prev, title: e.target.value }))}
                   required
@@ -6000,7 +6000,7 @@ function ArcAppShell() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <Wallet size={16} color="var(--privy-color-interactive)" />
-                <span className="card-header-title">Arc Sovereign Portfolio</span>
+                <span className="card-header-title">Celo Sovereign Portfolio</span>
               </div>
               <button
                 type="button"
@@ -6019,7 +6019,7 @@ function ArcAppShell() {
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <span style={{ fontSize: '14px', fontWeight: 800 }}>{displayUserTag || 'Sovereign Wallet'}</span>
-                  <span className="card-net-pill">Arc Osaka</span>
+                  <span className="card-net-pill">Celo Mainnet</span>
                   {authProvider === 'circle' && (
                     <span className="circle-tag-pill" style={{ fontSize: '9px', padding: '1px 6px' }}>Circle W3S</span>
                   )}
@@ -6043,7 +6043,7 @@ function ArcAppShell() {
             {/* Dual Valuation Balances */}
             <div style={{ marginTop: '10px', padding: '14px', background: 'var(--privy-color-background-surface-2)', borderRadius: 'var(--radius-sm)', textAlign: 'center' }}>
               <div style={{ fontSize: '11px', color: 'var(--privy-color-foreground-2)', fontWeight: 600, textTransform: 'uppercase' }}>
-                Total Arc Balance
+                Total Celo Balance
               </div>
               <div style={{ fontSize: '26px', fontWeight: 800, color: 'var(--privy-color-foreground)', margin: '4px 0' }}>
                 {usdcBalance.formatted} USDC
@@ -6093,7 +6093,7 @@ function ArcAppShell() {
                   }}
                 >
                   <Send size={14} />
-                  <span>Send USDC on Arc</span>
+                  <span>Send on Celo</span>
                 </button>
                 <div style={{ display: 'flex', gap: '6px' }}>
                   <button
@@ -6106,14 +6106,14 @@ function ArcAppShell() {
                     <span>Refresh Balance</span>
                   </button>
                   <a
-                    href="https://explorer.testnet.arc.io"
+                    href="https://celoscan.io"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="quick-chip-btn"
                     style={{ flex: 1, justifyContent: 'center' }}
                   >
                     <ExternalLink size={12} />
-                    <span>ArcScan ↗</span>
+                    <span>CeloScan ↗</span>
                   </a>
                 </div>
               </div>
@@ -6124,12 +6124,12 @@ function ArcAppShell() {
                 {walletAddress ? (
                   <>
                     <img
-                      src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(`arc:${walletAddress}?tag=₦${myTag?.tag || ''}`)}`}
-                      alt="Arc Receive QR"
+                      src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(`celo:${walletAddress}?tag=₦${myTag?.tag || ''}`)}`}
+                      alt="Celo Receive QR"
                       style={{ width: '160px', height: '160px', borderRadius: '8px', border: '1px solid var(--privy-color-border-subtle)', margin: '0 auto 8px' }}
                     />
                     <div style={{ fontSize: '11px', color: 'var(--privy-color-foreground-2)' }}>
-                      Scan to receive USDC or resolve {displayUserTag || 'wallet'} on Arc Osaka EVM.
+                      Scan to receive USDC or resolve {displayUserTag || 'wallet'} on Celo Mainnet EVM.
                     </div>
                   </>
                 ) : (

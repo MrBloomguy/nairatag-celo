@@ -20,8 +20,8 @@ function getBaseHtml() {
   const candidates = [
     path.join(process.cwd(), 'dist', 'index.html'),
     path.join(process.cwd(), 'index.html'),
-    path.join(process.cwd(), 'apps', 'arc', 'dist', 'index.html'),
-    path.join(process.cwd(), 'apps', 'arc', 'index.html')
+    path.join(process.cwd(), 'apps', 'celo', 'dist', 'index.html'),
+    path.join(process.cwd(), 'apps', 'celo', 'index.html')
   ];
   for (const p of candidates) {
     try {
@@ -54,15 +54,15 @@ export default function handler(req, res) {
     }
 
     const html = getBaseHtml();
-    const forwardedHost = req.headers['x-forwarded-host'] || req.headers.host || 'arc.nairatag.ng';
+    const forwardedHost = req.headers['x-forwarded-host'] || req.headers.host || 'celo.nairatag.ng';
     const host = String(forwardedHost).split(',')[0].trim();
     const proto = String(req.headers['x-forwarded-proto'] || 'https').split(',')[0].trim();
     const origin = `${proto}://${host}`;
     const tag = `₦${handle.toUpperCase()}`;
     const tagUrl = `${origin}/tag/${encodeURIComponent(handle)}`;
-    const imageUrl = `${origin}/cards/${encodeURIComponent(handle)}.png?mode=og&network=arc`;
-    const title = `${tag} · NairaTag on Arc`;
-    const description = `Send USDC on Arc directly to ${tag}, a human-readable NairaTag identity.`;
+    const imageUrl = `${origin}/cards/${encodeURIComponent(handle)}.png?mode=og&network=celo`;
+    const title = `${tag} · NairaTag on Celo`;
+    const description = `Send cNGN & USD₮ on Celo directly to ${tag}, a human-readable NairaTag identity.`;
 
     let page = html.includes('<title>') 
       ? html.replace(/<title>[^<]*<\/title>/i, `<title>${escapeAttribute(title)}</title>`)

@@ -2,7 +2,7 @@ import { keccak256, stringToHex } from 'viem';
 import { getCeloSessionToken } from './celoSession.js';
 
 const CELO_CHAIN_ID = 42220;
-const CELO_CHAT_API = import.meta.env.VITE_CELO_CHAT_API || 'https://nairatag.ng/api/arc-chat';
+const CELO_CHAT_API = import.meta.env.VITE_CELO_CHAT_API || 'https://nairatag.ng/api/celo-chat';
 
 export function createCeloChatConversationId() {
   return crypto.randomUUID();
@@ -10,8 +10,8 @@ export function createCeloChatConversationId() {
 
 const conversationIds = new Map();
 
-export function getOrCreateCeloChatConversationId(walletAddress, agentTag = 'arc') {
-  const key = `nairatag:arc-chat:${String(walletAddress || '').toLowerCase()}:${String(agentTag || 'arc').toLowerCase()}`;
+export function getOrCreateCeloChatConversationId(walletAddress, agentTag = 'celo') {
+  const key = `nairatag:celo-chat:${String(walletAddress || '').toLowerCase()}:${String(agentTag || 'celo').toLowerCase()}`;
   const current = conversationIds.get(key);
   if (current) return current;
   const conversationId = createCeloChatConversationId();
@@ -52,7 +52,7 @@ async function postCeloChat(payload, token = null) {
   return result;
 }
 
-export async function sendCeloChatMessage({ walletAddress, conversationId, turnId, prompt, agentTag = 'arc', title }) {
+export async function sendCeloChatMessage({ walletAddress, conversationId, turnId, prompt, agentTag = 'celo', title }) {
   if (!walletAddress) throw new Error('Connect your Celo wallet to save this conversation.');
   const token = getCeloSessionToken(walletAddress);
   if (token) return postCeloChat({ action: 'send', walletAddress, conversationId, turnId, prompt, agentTag, title }, token);
@@ -83,7 +83,6 @@ export async function clearCeloChatHistory({ walletAddress }) {
   const signed = await signCeloChatAction({ action: 'clear', walletAddress });
   return postCeloChat(signed);
 }
-
 
 // Backward compatibility aliases
 export const createArcChatConversationId = createCeloChatConversationId;

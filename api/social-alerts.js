@@ -42,7 +42,7 @@ function getSignedFields(body) {
 
 function taskMessage(body) {
   return [
-    'NairaTag Arc Tasks',
+    'NairaTag Celo Tasks',
     `Action: ${body.action}`,
     `Task: ${body.taskId}`,
     `Wallet: ${body.walletAddress.toLowerCase()}`,
@@ -53,7 +53,7 @@ function taskMessage(body) {
 
 function rewardMessage(body) {
   return [
-    'NairaTag Arc Rewards',
+    'NairaTag Celo Rewards',
     `Action: ${body.action}`,
     `Wallet: ${body.walletAddress.toLowerCase()}`,
     `Chain: ${ARC_CHAIN_ID}`,
@@ -63,7 +63,7 @@ function rewardMessage(body) {
 }
 
 async function verifyTaskAccepted(body) {
-  const url = new URL('https://nairatag.ng/api/arc-tasks');
+  const url = new URL('https://nairatag.ng/api/celo-tasks');
   url.searchParams.set('wallet', body.walletAddress);
   const response = await fetch(url, { headers: { Accept: 'application/json' } });
   const payload = await response.json().catch(() => ({}));
@@ -72,7 +72,7 @@ async function verifyTaskAccepted(body) {
     ? ['in_progress', 'submitted', 'paid']
     : body.action === 'paid' ? ['paid'] : ['submitted', 'paid'];
   if (!response.ok || !payload.ok || !acceptedStatuses.includes(status)) {
-    throw new Error('The Arc task service has not recorded this task update yet.');
+    throw new Error('The Celo task service has not recorded this task update yet.');
   }
   const task = (payload.tasks || []).find((item) => String(item.id) === String(body.taskId));
   return task ? { title: cleanText(task.title), rewardUSDC: Number(task.reward_usdc) || 0, points: Number(task.points) || 0, status } : null;
@@ -108,7 +108,7 @@ async function verifyWalletSignature(body, message) {
 async function verifyTagClaim(body) {
   if (!isAddress(body.owner) || !/^0x[a-f\d]{64}$/i.test(String(body.txHash || ''))) throw new Error('A valid tag-claim transaction is required.');
   const client = createPublicClient({ transport: http(process.env.ARC_TESTNET_RPC_URL || 'https://rpc.testnet.arc.io') });
-  if (await client.getChainId() !== ARC_CHAIN_ID) throw new Error('The configured RPC is not Arc Testnet.');
+  if (await client.getChainId() !== ARC_CHAIN_ID) throw new Error('The configured RPC is not Celo Mainnet.');
   const receipt = await client.getTransactionReceipt({ hash: body.txHash });
   if (receipt.status !== 'success') throw new Error('The tag-claim transaction did not succeed.');
   for (const log of receipt.logs) {
@@ -117,7 +117,7 @@ async function verifyTagClaim(body) {
       const event = decodeEventLog({ abi: [TAG_CLAIMED_EVENT], data: log.data, topics: log.topics });
       const eventTag = event.args.canonical || event.args.rawTag;
       if (event.eventName === 'TagClaimed' && event.args.owner.toLowerCase() === body.owner.toLowerCase() && eventTag.toLowerCase() === String(body.tag || '').toLowerCase()) {
-        return { tag: eventTag, txHash: body.txHash, owner: body.owner, explorerUrl: `https://explorer.testnet.arc.io/tx/${body.txHash}`, erc8004Id: cleanText(body.erc8004Id, 32) };
+        return { tag: eventTag, txHash: body.txHash, owner: body.owner, explorerUrl: `https://celoscan.io/tx/${body.txHash}`, erc8004Id: cleanText(body.erc8004Id, 32) };
       }
     } catch { /* Ignore unrelated registry logs. */ }
   }
@@ -131,16 +131,16 @@ function alertText(body) {
     const status = body.action === 'start' ? 'started working on' : 'submitted';
     const reward = Number(body.rewardUSDC) > 0 ? ` Potential bounty: $${Number(body.rewardUSDC)} USDC and ${Number(body.points) || 0} Protocol Points.` : '';
     const review = body.action === 'submit' ? ' Submission is pending task-owner review; no payout is confirmed yet.' : '';
-    return `NairaTag task update\n${wallet} ${status}: ${title}.${reward}${review}\nTask ID: ${cleanText(body.taskId, 90)}\nArc Testnet - https://arc.nairatag.ng/#tasks`;
+    return `NairaTag task update\n${wallet} ${status}: ${title}.${reward}${review}\nTask ID: ${cleanText(body.taskId, 90)}\nCelo Mainnet - https://celo.nairatag.ng/#tasks`;
   }
   if (body.kind === 'task_paid') {
     const title = cleanText(body.title || body.taskId);
-    return `NairaTag task reward\n${wallet} completed: ${title}.${Number(body.rewardUSDC) > 0 ? ` Reward paid: $${Number(body.rewardUSDC)} USDC and ${Number(body.points) || 0} Protocol Points.` : ' Reward status: paid.'}\nTask ID: ${cleanText(body.taskId, 90)}\nArc Testnet - https://arc.nairatag.ng/#tasks`;
+    return `NairaTag task reward\n${wallet} completed: ${title}.${Number(body.rewardUSDC) > 0 ? ` Reward paid: $${Number(body.rewardUSDC)} USDC and ${Number(body.points) || 0} Protocol Points.` : ' Reward status: paid.'}\nTask ID: ${cleanText(body.taskId, 90)}\nCelo Mainnet - https://celo.nairatag.ng/#tasks`;
   }
   if (body.kind === 'voucher') {
     const task = IN_HOUSE_TASKS[body.taskId];
     if (!task) throw new Error('Unknown NairaTag in-house task.');
-    return `NairaTag voucher claim\n${wallet} reported completing: ${task.title}.\nVoucher: ${task.reward}\nSelf-reported task claim - https://arc.nairatag.ng/#rewards`;
+    return `NairaTag voucher claim\n${wallet} reported completing: ${task.title}.\nVoucher: ${task.reward}\nSelf-reported task claim - https://celo.nairatag.ng/#rewards`;
   }
   if (body.kind === 'reward') {
     if (body.action === 'referral_signup') {
@@ -148,15 +148,15 @@ function alertText(body) {
       const referrerClean = cleanText(body.referrerTag || '', 32).replace(/^[₦$@#]/, '').trim().toUpperCase();
       const friendDisplay = friendClean ? `₦${friendClean}` : wallet;
       const referrerDisplay = referrerClean ? `₦${referrerClean}` : '₦COMMUNITY';
-      return `🎉 CONGRATULATIONS : ${friendDisplay} joined with ${referrerDisplay}. 100 Points rewarded.\n\nArc Network · https://arc.nairatag.ng/#rewards`;
+      return `🎉 CONGRATULATIONS : ${friendDisplay} joined with ${referrerDisplay}. 100 Points rewarded.\n\nCelo Network · https://celo.nairatag.ng/#rewards`;
     }
     const messages = {
       daily_claim: 'claimed a daily Protocol Points reward.',
       spin: 'won a Protocol Points spin reward.',
-      payment_confirmed: 'earned a reward spin after a confirmed Arc payment.',
+      payment_confirmed: 'earned a reward spin after a confirmed Celo payment.',
     };
     if (!messages[body.action]) throw new Error('This reward action cannot be announced.');
-    return `NairaTag reward update\n${wallet} ${messages[body.action]}\nNairaTag Rewards - https://arc.nairatag.ng/#rewards`;
+    return `NairaTag reward update\n${wallet} ${messages[body.action]}\nNairaTag Rewards - https://celo.nairatag.ng/#rewards`;
   }
   throw new Error('Unsupported alert type.');
 }
@@ -190,7 +190,7 @@ export default async function handler(req, res) {
     if (body.kind === 'claim') {
       const claim = await verifyTagClaim(body);
       const sent = await sendTelegram([
-        '🎉 NEW NAIRATAG CLAIMED ON ARC TESTNET',
+        '🎉 NEW NAIRATAG CLAIMED ON CELO MAINNET',
         '',
         `Tag: ₦${claim.tag.toUpperCase()}`,
         `Owner: ${claim.owner} (${shortAddress(claim.owner)})`,
@@ -198,7 +198,7 @@ export default async function handler(req, res) {
         `Transaction: ${claim.txHash}`,
         `Explorer: ${claim.explorerUrl}`,
         '',
-        'Claim your NairaTag: https://arc.nairatag.ng',
+        'Claim your NairaTag: https://celo.nairatag.ng',
       ].join('\n'));
       return sendJson(res, 200, { ok: true, messageId: sent });
     }

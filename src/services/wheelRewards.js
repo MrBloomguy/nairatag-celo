@@ -6,7 +6,7 @@ export async function getDailySpinStats(accountKey) {
 }
 
 export async function recordConfirmedPaymentSpin({ accountKey, txHash }) {
-  if (!accountKey || !txHash) throw new Error('A wallet and confirmed Arc transaction are required.');
+  if (!accountKey || !txHash) throw new Error('A wallet and confirmed Celo transaction are required.');
   return submitArcRewardAction({ action: 'payment_confirmed', walletAddress: accountKey, txHash });
 }
 

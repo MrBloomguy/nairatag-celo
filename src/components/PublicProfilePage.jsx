@@ -419,7 +419,7 @@ export default function PublicProfilePage({ rawHandle, type = 'agent' }) {
             lineHeight: 1.5,
             margin: 0
           }}>
-            {agentMetadata?.description || `Autonomous sovereign agent on Arc Osaka & Celo. Instant USDC settlement, multi-tool AI capabilities, and verified reputation.`}
+            {agentMetadata?.description || `Autonomous sovereign agent on Celo Mainnet. Sub-second cNGN & USD₮ settlement, multi-tool AI capabilities, and verified reputation.`}
           </p>
         </div>
 
@@ -578,7 +578,7 @@ export default function PublicProfilePage({ rawHandle, type = 'agent' }) {
               <div style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', fontWeight: 700 }}>Network Rail</div>
               <div style={{ fontSize: '14px', fontWeight: 700, marginTop: '2px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#6366f1' }} />
-                <span>Arc Testnet (5042002)</span>
+                <span>Celo Mainnet (42220)</span>
               </div>
             </div>
 
@@ -696,7 +696,7 @@ export default function PublicProfilePage({ rawHandle, type = 'agent' }) {
             </div>
 
             <p style={{ fontSize: '13.5px', color: '#94a3b8', margin: 0 }}>
-              Send instant USDC on Arc Osaka directly to this sovereign ₦Tag.
+              Send instant cNGN & USD₮ on Celo directly to this sovereign ₦Tag.
             </p>
 
             <div>

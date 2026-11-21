@@ -1,8 +1,8 @@
 /**
  * @file erc8004Service.js
- * @description Official Arc Testnet ERC-8004 Onchain AI Agent Identity, Reputation & Validation Service.
- * Reference: https://docs.arc.io/arc/tutorials/register-your-first-ai-agent.md
- *            https://docs.arc.io/arc/references/contract-addresses.md#erc-8004
+ * @description Official Celo Mainnet ERC-8004 Onchain AI Agent Identity, Reputation & Validation Service.
+ * Reference: https://docs.celo.org/developer/contract-deploy
+ *            https://celoscan.io/address/0x8004A169FB4a3325136EB29fA0ceB6D2e539a432
  */
 
 import {
@@ -35,7 +35,7 @@ export const publicClient = createPublicClient({
 });
 
 /**
- * Reads AI Agent identity (owner and metadata URI) by tokenId from Arc Testnet IdentityRegistry.
+ * Reads AI Agent identity (owner and metadata URI) by tokenId from Celo Mainnet IdentityRegistry.
  * @param {string|number|bigint} agentId
  */
 export async function getAgentDetails(agentId) {
@@ -85,7 +85,7 @@ export async function getAgentDetails(agentId) {
       metadata,
     };
   } catch (err) {
-    throw new Error(`Failed to fetch AI Agent #${agentId} on Arc: ${err.message}`);
+    throw new Error(`Failed to fetch AI Agent #${agentId} on Celo: ${err.message}`);
   }
 }
 
@@ -93,10 +93,10 @@ export async function getAgentDetails(agentId) {
 export async function findArcAgentForTag(rawTag, ownerAddress) {
   if (!ownerAddress || !isAddress(ownerAddress)) return null;
   const tag = String(rawTag || '').replace(/^[₦$@#]/, '').trim().toLowerCase();
-  const url = new URL(`https://explorer.testnet.arc.io/api/v2/tokens/${ARC_ERC8004_IDENTITY_REGISTRY}/instances`);
+  const url = new URL(`https://celoscan.io/api/v2/tokens/${ARC_ERC8004_IDENTITY_REGISTRY}/instances`);
   url.searchParams.set('holder_address_hash', getAddress(ownerAddress));
   const response = await fetch(url, { headers: { Accept: 'application/json' } });
-  if (!response.ok) throw new Error(`ArcScan agent lookup returned ${response.status}.`);
+  if (!response.ok) throw new Error(`CeloScan agent lookup returned ${response.status}.`);
   const payload = await response.json();
   for (const token of (payload.items || []).slice(0, 20)) {
     try {
@@ -108,7 +108,7 @@ export async function findArcAgentForTag(rawTag, ownerAddress) {
         id: String(token.id),
         tag,
         name: details.metadata?.name || `₦${tag}`,
-        role: details.metadata?.description || 'NairaTag agent on Arc',
+        role: details.metadata?.description || 'NairaTag agent on Celo',
         category: 'NairaTag',
         avatar: details.metadata?.image || `https://api.dicebear.com/7.x/identicon/svg?seed=${encodeURIComponent(tag)}`,
         owner: details.owner,
@@ -122,11 +122,11 @@ export async function findArcAgentForTag(rawTag, ownerAddress) {
   return null;
 }
 
-/** Build a real ERC-8004 registration file for an Arc NairaTag identity. */
+/** Build a real ERC-8004 registration file for a Celo NairaTag identity. */
 export function buildNairaTagAgentMetadataUri(rawTag, agentId = null) {
   const tag = String(rawTag || '').trim().replace(/^[₦$@#]/, '').toLowerCase();
   if (!/^[a-z0-9_]{3,32}$/.test(tag) || tag.startsWith('_') || tag.endsWith('_') || tag.includes('__')) {
-    throw new Error('A valid Arc NairaTag is required to create the ERC-8004 record.');
+    throw new Error('A valid Celo NairaTag is required to create the ERC-8004 record.');
   }
   // The ₦ prefix is the canonical on-chain identity, not presentation-only
   // formatting. Keep it in both the ERC-8004 display name and NairaTag field.
@@ -134,9 +134,9 @@ export function buildNairaTagAgentMetadataUri(rawTag, agentId = null) {
   const metadata = {
     type: 'https://eips.ethereum.org/EIPS/eip-8004#registration-v1',
     name: canonicalTag,
-    description: `NairaTag agent identity for ${canonicalTag} on Arc Testnet. Use this tag to discover the registered identity and pay its owner in USDC through NairaTag.`,
-    image: 'https://arc.nairatag.ng/nairatag-logo.png',
-    services: [{ name: 'NairaTag', endpoint: 'https://arc.nairatag.ng/' }],
+    description: `NairaTag agent identity for ${canonicalTag} on Celo Mainnet. Use this tag to discover the registered identity and pay its owner in cNGN or USD₮ through NairaTag.`,
+    image: 'https://celo.nairatag.ng/nairatag-logo.png',
+    services: [{ name: 'NairaTag', endpoint: 'https://celo.nairatag.ng/' }],
     x402Support: false,
     active: true,
     registrations: agentId === null ? [] : [{
@@ -223,7 +223,7 @@ export async function getAgentReputationLogs(agentId) {
 }
 
 /**
- * Checks validation status of a request hash from Arc Testnet ValidationRegistry.
+ * Checks validation status of a request hash from Celo Mainnet ValidationRegistry.
  * @param {string} requestHash - 32-byte hex string
  */
 export async function getValidationStatus(requestHash) {
@@ -257,7 +257,7 @@ export async function getValidationStatus(requestHash) {
 }
 
 /**
- * Registers an AI Agent on Arc Testnet via connected wallet.
+ * Registers an AI Agent on Celo Mainnet via connected wallet.
  * Calls `IdentityRegistry.register(metadataURI)` and listens for the Transfer event.
  * @param {Object} params
  * @param {string} params.fromAddress
@@ -291,7 +291,7 @@ export async function registerAiAgent({ fromAddress, metadataURI }) {
     args: [cleanURI],
   });
 
-  // Wait for deterministic sub-second receipt on Arc
+  // Wait for deterministic sub-second receipt on Celo
   const receipt = await publicClient.waitForTransactionReceipt({
     hash: txHash,
     confirmations: 1,
@@ -299,7 +299,7 @@ export async function registerAiAgent({ fromAddress, metadataURI }) {
   });
 
   if (receipt.status !== 'success') {
-    throw new Error(`Agent registration failed on Arc. Hash: ${txHash}`);
+    throw new Error(`Agent registration failed on Celo. Hash: ${txHash}`);
   }
 
   // Parse Transfer event to get assigned Agent Token ID
@@ -317,7 +317,7 @@ export async function registerAiAgent({ fromAddress, metadataURI }) {
       }
     } catch { /* Ignore non-ERC721 logs in the receipt. */ }
   }
-  if (!assignedId) throw new Error(`Registration was mined, but Arc did not return the new ERC-8004 agent ID. Transaction: ${txHash}`);
+  if (!assignedId) throw new Error(`Registration was mined, but Celo did not return the new ERC-8004 agent ID. Transaction: ${txHash}`);
 
   return {
     success: true,
@@ -330,7 +330,7 @@ export async function registerAiAgent({ fromAddress, metadataURI }) {
 }
 
 /**
- * Submits feedback/reputation for an AI Agent on Arc Testnet.
+ * Submits feedback/reputation for an AI Agent on Celo Mainnet.
  * Note: per ERC-8004 specification, the feedback provider must NOT be the agent's owner.
  * @param {Object} params
  */
@@ -367,7 +367,7 @@ export async function recordAgentFeedback({ fromAddress, agentId, score, tag, co
   });
 
   if (receipt.status !== 'success') {
-    throw new Error(`Reputation recording failed on Arc. Hash: ${txHash}`);
+    throw new Error(`Reputation recording failed on Celo. Hash: ${txHash}`);
   }
 
   return {

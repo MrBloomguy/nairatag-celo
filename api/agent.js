@@ -20,8 +20,8 @@ function getBaseHtml() {
   const candidates = [
     path.join(process.cwd(), 'dist', 'index.html'),
     path.join(process.cwd(), 'index.html'),
-    path.join(process.cwd(), 'apps', 'arc', 'dist', 'index.html'),
-    path.join(process.cwd(), 'apps', 'arc', 'index.html')
+    path.join(process.cwd(), 'apps', 'celo', 'dist', 'index.html'),
+    path.join(process.cwd(), 'apps', 'celo', 'index.html')
   ];
   for (const p of candidates) {
     try {
@@ -53,15 +53,15 @@ export default function handler(req, res) {
     if (!/^[a-z0-9_-]{1,32}$/.test(handle)) return res.status(400).send('Invalid agent tag');
 
     const html = getBaseHtml();
-    const forwardedHost = req.headers['x-forwarded-host'] || req.headers.host || 'arc.nairatag.ng';
+    const forwardedHost = req.headers['x-forwarded-host'] || req.headers.host || 'celo.nairatag.ng';
     const host = String(forwardedHost).split(',')[0].trim();
     const proto = String(req.headers['x-forwarded-proto'] || 'https').split(',')[0].trim();
     const origin = `${proto}://${host}`;
     const tag = `₦${handle.toUpperCase()}`;
     const agentUrl = `${origin}/agent/${encodeURIComponent(handle)}`;
-    const imageUrl = `${origin}/cards/${encodeURIComponent(handle)}.png?mode=og&network=arc&action=agent`;
-    const title = `${tag} · Arc Agent on NairaTag`;
-    const description = `Meet ${tag}, an autonomous AI agent on Arc. Send USDC, chat, and interact on NairaTag.`;
+    const imageUrl = `${origin}/cards/${encodeURIComponent(handle)}.png?mode=og&network=celo&action=agent`;
+    const title = `${tag} · Celo Agent on NairaTag`;
+    const description = `Meet ${tag}, an autonomous AI agent on Celo. Send cNGN & USD₮, chat, and interact on NairaTag.`;
 
     let page = html.includes('<title>') 
       ? html.replace(/<title>[^<]*<\/title>/i, `<title>${escapeAttribute(title)}</title>`)
@@ -84,7 +84,7 @@ export default function handler(req, res) {
     res.setHeader('Cache-Control', 'public, max-age=60, s-maxage=300');
     return res.status(200).send(page);
   } catch (error) {
-    console.error('Error rendering Arc agent share metadata:', error);
-    return res.status(500).send('Unable to render Arc agent page');
+    console.error('Error rendering Celo agent share metadata:', error);
+    return res.status(500).send('Unable to render Celo agent page');
   }
 }

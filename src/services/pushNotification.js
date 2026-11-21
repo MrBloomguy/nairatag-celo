@@ -1,7 +1,7 @@
 // @ts-nocheck
 /**
  * ============================================================================
- * NAIRATAG x ARC OSAKA - WEB PUSH & IN-APP NOTIFICATION ENGINE
+ * NAIRATAG x CELO MAINNET - WEB PUSH & IN-APP NOTIFICATION ENGINE
  * Configured with VAPID Authentication, Web Audio Synthesizer & Micro-interactions
  * ============================================================================
  */

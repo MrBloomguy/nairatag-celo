@@ -1,5 +1,5 @@
 /* ==========================================================================
-   NAIRATAG x ARC OSAKA - WEB PUSH SERVICE WORKER
+   NAIRATAG x CELO MAINNET - WEB PUSH SERVICE WORKER
    Handles Web Push Notifications, Action Buttons, and Background Sync
    ========================================================================== */
 
@@ -22,12 +22,12 @@ self.addEventListener('push', (event) => {
     }
   } else {
     data = {
-      title: '🎁 New Arc Reward Ready!',
-      body: 'You have a new voucher and cashback opportunity waiting on Arc Osaka.',
+      title: '🎁 New Celo Reward Ready!',
+      body: 'You have a new voucher and cashback opportunity waiting on Celo Mainnet.',
     };
   }
 
-  const title = data.title || 'NairaTag • Arc Osaka';
+  const title = data.title || 'NairaTag • Celo Mainnet';
   const options = {
     body: data.body || 'Sub-second payment settlement and reward notification.',
     icon: data.icon || '/nairatag-logo.png',

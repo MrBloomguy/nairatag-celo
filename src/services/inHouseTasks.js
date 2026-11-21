@@ -14,7 +14,7 @@ export async function syncInHouseVouchers(walletAddress) {
   const accounts = await provider.request({ method: 'eth_accounts' });
   if (!Array.isArray(accounts) || !accounts.some((account) => account.toLowerCase() === walletAddress.toLowerCase())) return getInHouseVouchers(walletAddress);
   const timestamp = Date.now();
-  const message = ['NairaTag Arc Vouchers', 'Action: list_claims', `Wallet: ${walletAddress.toLowerCase()}`, 'Chain: 5042002', `Timestamp: ${timestamp}`].join('\n');
+  const message = ['NairaTag Celo Vouchers', 'Action: list_claims', `Wallet: ${walletAddress.toLowerCase()}`, 'Chain: 42220', `Timestamp: ${timestamp}`].join('\n');
   const signature = await provider.request({ method: 'personal_sign', params: [message, walletAddress] });
   const url = new URL(CLAIM_API);
   Object.entries({ action: 'claims', walletAddress, timestamp, signature }).forEach(([key, value]) => url.searchParams.set(key, String(value)));

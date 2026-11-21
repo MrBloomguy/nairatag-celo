@@ -29,7 +29,7 @@ export async function getRecentCeloTagActivity(limit = 12) {
       fromBlock: latestBlock > 2500n ? latestBlock - 2500n : 0n,
       toBlock: latestBlock,
     }),
-    fetch(`https://explorer.testnet.arc.io/api/v2/tokens/${CELO_USDC_ADDRESS}/transfers`, {
+    fetch(`https://celoscan.io/api?module=account&action=tokentx&contractaddress=${CELO_USDC_ADDRESS}`, {
       headers: { Accept: 'application/json' },
     }),
   ]);

@@ -94,7 +94,7 @@
 }
 
 :root {
-  /* ─── Arc Electric Indigo & Cyan Theme (Uniswap / Phantom Vibe) ─── */
+  /* ─── Celo Electric Indigo & Cyan Theme (Uniswap / Phantom Vibe) ─── */
   --primary: #5B4FFF;                    /* Electric Indigo primary action */
   --primary-gradient: linear-gradient(135deg, #5B4FFF 0%, #4F46E5 100%);
   --primary-hover: #4F46E5;              /* Indigo hover */
@@ -115,9 +115,9 @@
   --brand-naira-border: #A7F3D0;
   --brand-naira-glow: rgba(5, 150, 105, 0.25);
 
-  --brand-arc: #2563EB;                  /* Circle USDC Blue */
-  --brand-arc-tint: #EFF6FF;
-  --brand-arc-border: #BFDBFE;
+  --brand-celo: #35D07F;                  /* Celo Green */
+  --brand-celo-tint: #F0FDF4;
+  --brand-celo-border: #BBF7D0;
 
   --brand-ai: #EC4899;                   /* ERC-8004 Agent Orchid Pink */
   --brand-ai-tint: #FDF2F8;
@@ -182,9 +182,9 @@
   --brand-naira-border: rgba(16, 185, 129, 0.32);
   --brand-naira-glow: rgba(16, 185, 129, 0.3);
 
-  --brand-arc: #3B82F6;
-  --brand-arc-tint: rgba(59, 130, 246, 0.14);
-  --brand-arc-border: rgba(59, 130, 246, 0.32);
+  --brand-celo: #3B82F6;
+  --brand-celo-tint: rgba(59, 130, 246, 0.14);
+  --brand-celo-border: rgba(59, 130, 246, 0.32);
 
   --brand-ai: #F472B6;
   --brand-ai-tint: rgba(244, 114, 182, 0.14);
@@ -484,9 +484,9 @@ html[data-theme="dark"] body {
   font-size: 10.5px;
   font-weight: 600;
   padding: 2px 7px;
-  background: var(--brand-arc-tint);
-  color: var(--brand-arc);
-  border: 1px solid var(--brand-arc-border);
+  background: var(--brand-celo-tint);
+  color: var(--brand-celo);
+  border: 1px solid var(--brand-celo-border);
   border-radius: var(--radius-pill);
 }
 
@@ -1082,7 +1082,7 @@ html[data-theme="dark"] body {
 }
 
 .token-selector-capsule:hover {
-  border-color: var(--brand-arc);
+  border-color: var(--brand-celo);
   background: rgba(37, 99, 235, 0.14);
   transform: translateY(-1px) scale(1.02);
   box-shadow: none;
@@ -7215,7 +7215,7 @@ body:has(.main-content-wrapper.chat-mode) #root {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
-   ARC OSAKA CLAIM SOCIAL BROADCAST & LIVE CHANNELS UI
+   CELO MAINNET CLAIM SOCIAL BROADCAST & LIVE CHANNELS UI
    ═══════════════════════════════════════════════════════════════════════ */
 
 /* Quick social buttons on the active claimed banner */
@@ -7462,7 +7462,7 @@ body:has(.main-content-wrapper.chat-mode) #root {
 }
 
 /* ═══════════════════════════════════════════════════════════════════
-   REFERENCE-ALIGNED CHAT PAGE LAYOUT (ADAPTED TO NAIRATAG ARC THEME)
+   REFERENCE-ALIGNED CHAT PAGE LAYOUT (ADAPTED TO NAIRATAG CELO THEME)
    ═══════════════════════════════════════════════════════════════════ */
 
 .ref-chat-layout {

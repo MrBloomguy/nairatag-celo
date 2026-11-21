@@ -380,7 +380,7 @@ export default function CorridorSwapCard({ walletAddress, onConnectWallet, embed
         }}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: 'var(--text-secondary, #666)', marginBottom: '6px' }}>
-          <span>You Receive {firmQuote ? '(Firm Quote)' : '(Indicative)'}</span>
+          <span>You Receive</span>
           <span>Balance: {isUsdtIn ? balances.cngn : balances.usdt} {outTokenSymbol}</span>
         </div>
 

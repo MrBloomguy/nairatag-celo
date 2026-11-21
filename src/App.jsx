@@ -3360,7 +3360,6 @@ function ArcAppShell() {
                 <div className="tag-recipient-box">
                   <div className="token-input-header">
                     <span>To</span>
-                    <span style={{ color: 'var(--privy-color-border-interactive)' }}>Direct Resolve</span>
                   </div>
                   <div className="tag-input-field-wrap">
                     <span className="tag-currency-symbol">₦</span>

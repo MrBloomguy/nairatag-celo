@@ -1249,6 +1249,7 @@ function ArcAppShell() {
   }, [isConnectModalOpen]);
 
   // Tasks & Bounties State
+  const [tasksTabSection, setTasksTabSection] = useState('tasks'); // 'tasks' | 'services'
   const [tasksFilter, setTasksFilter] = useState('all');
   useEffect(() => {
     if (tasksFilter === 'vouchers') setTasksFilter('all');
@@ -4316,6 +4317,90 @@ function ArcAppShell() {
               </section>
             ) : (
               <>
+                {/* ── Top Primary Section Switcher on Tasks Page: Tasks & Bounties vs Bookable Services ── */}
+                <div
+                  className="tasks-primary-section-switch"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    marginBottom: '18px',
+                    paddingBottom: '12px',
+                    borderBottom: '1px solid var(--border-color, rgba(0,0,0,0.06))',
+                    flexWrap: 'wrap',
+                    gap: '10px',
+                  }}
+                >
+                  <div
+                    style={{
+                      display: 'inline-flex',
+                      background: 'var(--surface-2, #f1f5f9)',
+                      padding: '4px',
+                      borderRadius: '9999px',
+                      border: '1px solid var(--border-color, rgba(0,0,0,0.06))',
+                      gap: '3px',
+                    }}
+                  >
+                    <button
+                      type="button"
+                      className={`subtoggle-pill ${tasksTabSection === 'tasks' ? 'active' : ''}`}
+                      onClick={() => setTasksTabSection('tasks')}
+                      style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+                    >
+                      <Briefcase size={13} />
+                      <span>Tasks & Bounties</span>
+                      <span style={{ fontSize: '10px', background: '#3b82f6', color: '#fff', padding: '1px 6px', borderRadius: '8px', fontWeight: 700 }}>
+                        {allTasks.length + IN_HOUSE_TASKS.length}
+                      </span>
+                    </button>
+
+                    <button
+                      type="button"
+                      className={`subtoggle-pill ${tasksTabSection === 'services' ? 'active' : ''}`}
+                      onClick={() => setTasksTabSection('services')}
+                      style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+                    >
+                      <Calendar size={13} />
+                      <span>Services</span>
+                      <span style={{ fontSize: '10px', background: '#059669', color: '#fff', padding: '1px 6px', borderRadius: '8px', fontWeight: 700 }}>
+                        Bookable
+                      </span>
+                    </button>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    {tasksTabSection === 'services' ? (
+                      <span style={{ fontSize: '12px', color: '#64748b' }}>
+                        Agents offering bookable sessions & services
+                      </span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setTasksTabSection('services')}
+                        className="quick-chip-btn"
+                        style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', padding: '6px 12px' }}
+                      >
+                        <Calendar size={13} color="#059669" />
+                        <span>Book an Agent</span>
+                        <ArrowRight size={11} />
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {tasksTabSection === 'services' ? (
+                  <div style={{ marginTop: '10px' }}>
+                    <BookingMarketplace
+                      walletAddress={walletAddress}
+                      activeAgentTag={myTag?.tag}
+                      altanaSession={null}
+                      humanSelfProof={null}
+                      onConnectWallet={() => setIsConnectModalOpen(true)}
+                      onOpenVault={() => { setPayMode('vault'); setMainTab('pay'); }}
+                    />
+                  </div>
+                ) : (
+                  <>
                 {/* Top Bar: Search and Grid/List View Toggle */}
                 <div className="agents-top-bar">
                   <div className="agents-top-controls task-top-controls" style={{ width: '100%', justifyContent: 'space-between', gap: '8px' }}>
@@ -4380,6 +4465,7 @@ function ArcAppShell() {
                 <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '4px', scrollbarWidth: 'none' }}>
                   {[
                     { id: 'all', label: 'All Tasks' },
+                    { id: 'services', label: '🗓️ Services' },
                     { id: 'dev', label: '⚡ Engineering' },
                     { id: 'design', label: '🎨 Design' },
                     { id: 'data', label: '📊 Data & AI' },
@@ -4391,7 +4477,13 @@ function ArcAppShell() {
                       key={cat.id}
                       type="button"
                       className={`task-cat-pill ${tasksFilter === cat.id ? 'active' : ''}`}
-                      onClick={() => setTasksFilter(cat.id)}
+                      onClick={() => {
+                        if (cat.id === 'services') {
+                          setTasksTabSection('services');
+                        } else {
+                          setTasksFilter(cat.id);
+                        }
+                      }}
                     >
                       {cat.label}
                     </button>
@@ -4526,7 +4618,8 @@ function ArcAppShell() {
                     })
                   )}
                 </div>
-
+                  </>
+                )}
               </>
             )}
           </div>

@@ -3333,10 +3333,6 @@ function ArcAppShell() {
                     </button>
                   </div>
                   <div className="card-header-actions">
-                    <span className="slippage-pill">
-                      <Clock size={10} />
-                      <span>&lt; 1s</span>
-                    </span>
                     <button
                       type="button"
                       className="quick-chip-btn"

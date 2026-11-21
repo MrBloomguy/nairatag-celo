@@ -313,3 +313,130 @@ test('17. Booking Engine: Accepts Service Publishing from Verified Human Owner',
   assert.equal(registered.id, 'srv-verified-pass');
   assert.equal(registered.canonicalTag, '₦STUDIO');
 });
+
+test('18. Task Bounty Escrow: Binds Payout to Verified Agent Altana Smart Wallet', async () => {
+  const agent = await getAgentLifecycleRecord('studio');
+  assert.ok(agent.altana.walletAddress);
+
+  // Build tightly bounded task payment policy targeting the agent's Altana smart account
+  const taskPolicy = buildTaskPaymentPolicy({
+    recipientAddress: agent.altana.walletAddress,
+    tokenAddress: CELO_CNGN_ADDRESS,
+    amount: '25000.0',
+    expiryDurationSeconds: 3600,
+  });
+
+  assert.equal(taskPolicy.permissions.calls[0].recipient.toLowerCase(), agent.altana.walletAddress.toLowerCase());
+  assert.equal(taskPolicy.permissions.calls[0].to.toLowerCase(), CELO_CNGN_ADDRESS.toLowerCase());
+  assert.equal(taskPolicy.permissions.spend[0].limit, 25000000000n);
+});
+
+test('19. Task Bounty Execution: Rejects Task Settlement if Worker Agent is Unverified', async () => {
+  const check = await checkAgentExecutionPermission({
+    tag: 'unverifiedbot',
+    requestedAmount: 10000,
+    token: 'cNGN',
+    action: 'task_payout',
+  });
+
+  assert.equal(check.allowed, false);
+  assert.equal(check.code, 'SELF_VERIFICATION_REQUIRED');
+  assert.match(check.reason, /Human owner identity verification required/i);
+});
+
+test('20. Full End-to-End Orchestration: Tag Claim -> Self Proof -> Altana Wallet -> Session Key -> Booking -> Vault Settlement', async () => {
+  const { registerService, PRICING_MODELS } = await import('../src/services/bookingRegistryService.js');
+  const { createBookingRequest, confirmBookingPayment } = await import('../src/services/bookingService.js');
+
+  const testTag = 'orchestrator';
+  const ownerEOA = '0x3333333333333333333333333333333333333333';
+
+  // Step 1: Claim & Draft
+  const draft = await createAgentDraft({
+    tag: testTag,
+    name: '₦ORCHESTRATOR Core Agent',
+    description: 'Autonomous protocol orchestrator on Celo Mainnet',
+    ownerAddress: ownerEOA,
+    category: 'development',
+  });
+  assert.equal(draft.status, LIFECYCLE_STATUS.VERIFICATION_REQUIRED);
+
+  // Step 2: Self Agent ID Proof Verification
+  const verified = await submitSelfVerification({
+    tag: testTag,
+    skipOnChainCheck: true,
+    proofData: {
+      nullifierHash: '0x9999999999999999999999999999999999999999999999999999999999999999',
+    },
+  });
+  assert.equal(verified.self.verified, true);
+  assert.equal(verified.status, LIFECYCLE_STATUS.WALLET_PROVISIONING_PENDING);
+
+  // Step 3: Altana Smart Wallet Provisioning
+  const walletProvisioned = await provisionAltanaWallet({ tag: testTag });
+  assert.ok(walletProvisioned.altana.walletAddress);
+
+  // Step 4: Grant Scoped Altana Session Key Policy
+  const sessionGranted = await grantAgentSessionPolicy({
+    tag: testTag,
+    sessionDurationSeconds: 86400,
+    dailyCngnLimit: '500000',
+    dailyUsdtLimit: '250',
+  });
+  assert.equal(sessionGranted.altana.sessionStatus, 'active');
+  assert.equal(sessionGranted.status, LIFECYCLE_STATUS.ACTIVE);
+
+  // Step 5: Link ERC-8004 Identity
+  const linked = await linkERC8004Identity({ tag: testTag, tokenId: '800412345' });
+  assert.equal(linked.erc8004.tokenId, '800412345');
+
+  // Step 6: Register Bookable Service
+  const serviceId = `srv-orchestrator-audit-${Date.now()}`;
+  const service = registerService(
+    {
+      id: serviceId,
+      agentTag: testTag,
+      title: 'Smart Contract Security Audit',
+      description: 'Comprehensive static and formal verification audit',
+      category: 'development',
+      pricingModel: PRICING_MODELS.FIXED,
+      price: '50.00',
+      currency: 'USDT',
+      durationMinutes: 120,
+    },
+    { tag: testTag, selfVerified: true }
+  );
+  assert.ok(service.id);
+
+  // Step 7: Create Booking Request
+  const now = Date.now();
+  const startTime = new Date(now + 3600000).toISOString();
+  const endTime = new Date(now + 3600000 + 7200000).toISOString();
+
+  const booking = await createBookingRequest({
+    serviceId: service.id,
+    customerTag: 'orchestrator',
+    customerAddress: walletProvisioned.altana.walletAddress,
+    customerName: 'Autonomous Agent Client',
+    slotStartTime: startTime,
+    slotEndTime: endTime,
+    isAgent: true,
+  });
+  assert.equal(booking.status, 'pending_payment');
+
+  // Step 8: Settle Payment via Agent Vault on Celo Rails with ERC-8021 Attribution
+  const confirmed = await confirmBookingPayment({
+    bookingId: booking.id,
+    altanaSession: {
+      active: true,
+      spendLimit: 250,
+      remainingBudget: 250,
+      expiresAt: Math.floor(Date.now() / 1000) + 86400,
+    },
+    isSimulation: true,
+  });
+
+  assert.equal(confirmed.status, 'confirmed');
+  assert.ok(confirmed.paymentTxHash);
+  assert.ok(confirmed.settledAt);
+});

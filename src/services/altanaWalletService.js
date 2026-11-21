@@ -20,6 +20,10 @@ import {
   CELO_SEPOLIA,
   createPrivateKeySigner,
   signerFromPrivateKey,
+  createHeadlessPasskey,
+  erc8004RegisterPermissions,
+  erc8004Registry,
+  isPasskeySigner,
   serializeSession,
   deserializeSession,
   keyIdForSessionOrKey,
@@ -48,6 +52,52 @@ import { publicClient } from './celoPayment.js';
 
 export const ALTANA_CELO_CHAIN_ID = 42220;
 export const ALTANA_CELO_SEPOLIA_CHAIN_ID = 11142220;
+export const ALTANA_CELO_KEYSTORE = '0x83b30935f36d6ccf9B1ec3b5E47F2866b97cd27c';
+export const TEXTILE_REACTOR_CELO_ADDRESS = '0xa9AA0a64769cBed4d3B1Ceb4Df01CdE915C235b3';
+export const ERC8004_REGISTRY_CELO_ADDRESS = '0x8004A169FB4a3325136EB29fA0ceB6D2e539a432';
+
+/**
+ * Verified on-chain contracts and function selectors for Celo Mainnet (42220).
+ * Validated against deployed bytecode and official Altana/Textile SDK ABIs.
+ */
+export const CELO_VERIFIED_PERMISSIONS = {
+  textileReactor: {
+    address: TEXTILE_REACTOR_CELO_ADDRESS,
+    name: 'Textile LimitOrderReactor (UniswapX v2)',
+    signatures: {
+      executeBatch: 'executeBatch((bytes,bytes)[])', // selector 0x0d7a16c3
+      execute: 'execute((bytes,bytes))',             // selector 0x3f62192e
+    },
+    selectors: {
+      executeBatch: '0x0d7a16c3',
+      execute: '0x3f62192e',
+    },
+  },
+  tokens: {
+    usdt: CELO_USDT_ADDRESS,
+    cngn: CELO_CNGN_ADDRESS,
+    signatures: {
+      transfer: 'transfer(address,uint256)', // selector 0xa9059cbb
+      approve: 'approve(address,uint256)',   // selector 0x095ea7b3
+    },
+    selectors: {
+      transfer: '0xa9059cbb',
+      approve: '0x095ea7b3',
+    },
+  },
+  erc8004: {
+    address: ERC8004_REGISTRY_CELO_ADDRESS,
+    name: 'ERC-8004 Agent Identity Registry',
+    signatures: {
+      register: 'register(string,(string,bytes)[])', // selector 0x8ea42286
+      setAgentURI: 'setAgentURI(uint256,string)',     // selector 0x0af28bd3
+    },
+    selectors: {
+      register: '0x8ea42286',
+      setAgentURI: '0x0af28bd3',
+    },
+  },
+};
 
 // Local persistent storage key for safe session metadata (no private keys)
 const ALTANA_SESSIONS_STORAGE_KEY = 'nairatag_altana_sessions_v1';
@@ -113,6 +163,84 @@ export async function createAltanaWallet({ adminSigner, chainId = ALTANA_CELO_CH
     adminSigner: walletResult.signer || adminSigner,
     chainId,
   };
+}
+
+/**
+ * Creates a browser WebAuthn Passkey (P256) Smart Agentic Wallet on Celo.
+ * 
+ * Flow:
+ * 1. Generates throwaway-EOA address before prompting the user for a passkey.
+ * 2. Writes the smart account address into WebAuthn credential `userHandle`.
+ * 3. Registers the P256 public key into KeyStore on Celo.
+ * 
+ * Note on Signer Architecture:
+ * Injected browser wallets (MetaMask/Rabby) lack raw EIP-7702 authorization & digest signing capabilities.
+ * WebAuthn Passkeys provide non-custodial root administrative ownership directly on the user's device.
+ * Extension wallets are used purely as external funding sources (sending gas/tokens to the wallet address).
+ * 
+ * @param {Object} [options]
+ * @param {string} [options.name='NairaTag Agent'] - Label displayed in OS biometric prompt.
+ * @param {string} [options.rpId] - Relying-Party ID (defaults to window.location.hostname in browser).
+ * @param {Object} [options.webAuthn] - Custom WebAuthn functions (for React Native / test harnesses).
+ * @param {boolean} [options.testnet=false] - Whether to provision on Celo Sepolia.
+ * @returns {Promise<{ wallet: { address: string }, address: string, adminSigner: Object, chainId: number }>}
+ */
+export async function createAltanaPasskeyWallet({ name = 'NairaTag Agent', rpId, webAuthn, testnet = false } = {}) {
+  const client = initializeAltanaClient({ testnet });
+  const result = await client.createPasskeyWallet({
+    name,
+    ...(rpId ? { rpId } : {}),
+    ...(webAuthn ? { webAuthn } : {}),
+  });
+
+  const address = getAddress(result.address);
+  return {
+    wallet: { address },
+    address,
+    adminSigner: result.signer,
+    chainId: testnet ? ALTANA_CELO_SEPOLIA_CHAIN_ID : ALTANA_CELO_CHAIN_ID,
+  };
+}
+
+/**
+ * Recovers an existing Passkey-backed Altana Smart Wallet using OS biometric keychain & on-chain KeyStore.
+ * 
+ * Flow:
+ * 1. OS biometric prompt displays saved passkeys for rpId; user selects one.
+ * 2. Reads smart account address from assertion's userHandle.
+ * 3. Reads getKeys(wallet) + getPublicKey(wallet, keyId) from Celo KeyStore (0x83b3...27c).
+ * 4. Rebuilds the PasskeySigner without ever exposing private key material.
+ * 
+ * @param {Object} [options]
+ * @param {string} [options.rpId] - Relying-Party ID.
+ * @param {Object} [options.webAuthn] - Custom WebAuthn functions.
+ * @param {number} [options.chainId=42220] - Target Celo chain ID.
+ * @returns {Promise<{ wallet: { address: string }, address: string, adminSigner: Object, chainId: number }>}
+ */
+export async function recoverAltanaPasskeyWallet({ rpId, webAuthn, chainId = ALTANA_CELO_CHAIN_ID } = {}) {
+  const client = initializeAltanaClient({ testnet: chainId === ALTANA_CELO_SEPOLIA_CHAIN_ID });
+  const result = await client.recoverFromPasskey({
+    ...(rpId ? { rpId } : {}),
+    ...(webAuthn ? { webAuthn } : {}),
+    chainId,
+  });
+
+  const address = getAddress(result.address);
+  return {
+    wallet: { address },
+    address,
+    adminSigner: result.signer,
+    chainId,
+  };
+}
+
+/**
+ * Creates a headless passkey signer for test environments, CI, or Node scripts without an OS keychain.
+ * 
+ * @returns {Object} Headless PasskeySigner
+ */
+export function createHeadlessPasskeySigner() {
+  return createHeadlessPasskey();
 }
 
 /**
@@ -278,6 +406,79 @@ export function buildSessionPolicy({
       x402TokensCount: x402Tokens.length,
     },
   };
+}
+
+/**
+ * Convenience builder for standard NairaTag Agent commerce policies on Celo.
+ * Combines verified Textile RFQ reactor execution, ERC-20 token transfers, and ERC-8004 identity maintenance.
+ * 
+ * @param {Object} [options]
+ * @param {boolean} [options.allowTextile=true] - Permit Textile LimitOrderReactor batch execution.
+ * @param {boolean} [options.allowUsdt=true] - Permit USD₮ transfers and approvals.
+ * @param {boolean} [options.allowCngn=true] - Permit cNGN transfers and approvals.
+ * @param {boolean} [options.allowIdentity=true] - Permit ERC-8004 registration and URI updates.
+ * @param {string} [options.dailyUsdtLimit='10.0'] - Daily USD₮ spend limit.
+ * @param {string} [options.dailyCngnLimit='15000.0'] - Daily cNGN spend limit.
+ * @param {string} [options.dailyCeloLimit='0.5'] - Daily native CELO spend limit (for gas/fees).
+ * @param {number} [options.expiryDurationSeconds=86400] - Duration in seconds (default 24h).
+ * @returns {{ permissions: Object, expiry: number, summary: Object }}
+ */
+export function buildStandardAgentPolicy({
+  allowTextile = true,
+  allowUsdt = true,
+  allowCngn = true,
+  allowIdentity = true,
+  dailyUsdtLimit = '10.0',
+  dailyCngnLimit = '15000.0',
+  dailyCeloLimit = '0.5',
+  expiryDurationSeconds = 86400,
+} = {}) {
+  const allowedContracts = [];
+
+  if (allowTextile) {
+    allowedContracts.push(
+      { to: TEXTILE_REACTOR_CELO_ADDRESS, signature: CELO_VERIFIED_PERMISSIONS.textileReactor.signatures.executeBatch },
+      { to: TEXTILE_REACTOR_CELO_ADDRESS, signature: CELO_VERIFIED_PERMISSIONS.textileReactor.signatures.execute }
+    );
+  }
+
+  if (allowUsdt) {
+    allowedContracts.push(
+      { to: CELO_USDT_ADDRESS, signature: CELO_VERIFIED_PERMISSIONS.tokens.signatures.transfer },
+      { to: CELO_USDT_ADDRESS, signature: CELO_VERIFIED_PERMISSIONS.tokens.signatures.approve }
+    );
+  }
+
+  if (allowCngn) {
+    allowedContracts.push(
+      { to: CELO_CNGN_ADDRESS, signature: CELO_VERIFIED_PERMISSIONS.tokens.signatures.transfer },
+      { to: CELO_CNGN_ADDRESS, signature: CELO_VERIFIED_PERMISSIONS.tokens.signatures.approve }
+    );
+  }
+
+  if (allowIdentity) {
+    const erc8004Calls = erc8004RegisterPermissions(ALTANA_CELO_CHAIN_ID);
+    for (const callRule of erc8004Calls) {
+      allowedContracts.push(callRule);
+    }
+  }
+
+  const spendLimits = [];
+  if (dailyUsdtLimit && Number(dailyUsdtLimit) > 0) {
+    spendLimits.push({ amount: dailyUsdtLimit, period: 'day', token: CELO_USDT_ADDRESS });
+  }
+  if (dailyCngnLimit && Number(dailyCngnLimit) > 0) {
+    spendLimits.push({ amount: dailyCngnLimit, period: 'day', token: CELO_CNGN_ADDRESS });
+  }
+  if (dailyCeloLimit && Number(dailyCeloLimit) > 0) {
+    spendLimits.push({ amount: dailyCeloLimit, period: 'day' });
+  }
+
+  return buildSessionPolicy({
+    allowedContracts,
+    spendLimits,
+    expiryDurationSeconds,
+  });
 }
 
 /**

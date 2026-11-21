@@ -1400,7 +1400,7 @@ function ArcAppShell() {
 
   // Pay / Send Terminal State
   const [payMode, setPayMode] = useState('send'); // 'send' | 'altana' | 'vault' | 'self'
-  const [paySubMode, setPaySubMode] = useState('direct'); // 'direct' | 'corridor'
+  const [paySubMode, setPaySubMode] = useState('corridor'); // 'corridor' | 'direct'
   const [recipientInput, setRecipientInput] = useState('');
   const [amountInput, setAmountInput] = useState('10.00');
   const [memoInput, setMemoInput] = useState('');
@@ -3248,14 +3248,14 @@ function ArcAppShell() {
           <div className="terminal-layout-centered">
             {/* Modern Segmented Control Pill Bar: 4 Clean Unified Tabs */}
             <div className="pay-mode-segmented-control">
-              {/* 1. Send & Swap */}
+              {/* 1. Swap & Send */}
               <button
                 type="button"
                 className={`pay-mode-pill-btn pill-send ${payMode === 'send' ? 'active' : ''}`}
                 onClick={() => setPayMode('send')}
               >
-                <Send size={13} />
-                <span>Send & Swap</span>
+                <TrendingUp size={13} />
+                <span>Swap & Send</span>
               </button>
 
               {/* 2. Wallets */}
@@ -3317,19 +3317,19 @@ function ArcAppShell() {
                   <div className="unified-card-subtoggle">
                     <button
                       type="button"
-                      className={`subtoggle-pill ${paySubMode === 'direct' ? 'active' : ''}`}
-                      onClick={() => setPaySubMode('direct')}
-                    >
-                      <Send size={12} />
-                      <span>Send to ₦Tag</span>
-                    </button>
-                    <button
-                      type="button"
                       className={`subtoggle-pill ${paySubMode === 'corridor' ? 'active' : ''}`}
                       onClick={() => setPaySubMode('corridor')}
                     >
                       <ArrowDownUp size={12} />
                       <span>USD₮ ⇄ cNGN</span>
+                    </button>
+                    <button
+                      type="button"
+                      className={`subtoggle-pill ${paySubMode === 'direct' ? 'active' : ''}`}
+                      onClick={() => setPaySubMode('direct')}
+                    >
+                      <Send size={12} />
+                      <span>Send to ₦Tag</span>
                     </button>
                   </div>
                   <div className="card-header-actions">

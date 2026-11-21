@@ -7,6 +7,7 @@ import ChatActivityIndicator from './components/chat/ChatActivityIndicator';
 import PersonalAgentPanel from './components/chat/PersonalAgentPanel';
 import CorridorSwapCard from './components/CorridorSwapCard';
 import AltanaSessionCard from './components/AltanaSessionCard';
+import SelfAgentVerificationCard from './components/SelfAgentVerificationCard';
 import { ClipboardCheck as ClipboardCheckIcon } from 'lucide-react';
 import { ChevronsLeftRight as ChevronsLeftRightIcon } from 'lucide-react';
 import { Car as CarIcon } from 'lucide-react';
@@ -3325,6 +3326,43 @@ function ArcAppShell() {
                   Track 4
                 </span>
               </button>
+
+              <button
+                type="button"
+                onClick={() => setPayMode('self')}
+                style={{
+                  flex: 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px',
+                  padding: '9px 14px',
+                  borderRadius: '9px',
+                  fontSize: '13px',
+                  fontWeight: 600,
+                  border: 'none',
+                  cursor: 'pointer',
+                  background: payMode === 'self' ? 'var(--card-bg, #ffffff)' : 'transparent',
+                  color: payMode === 'self' ? '#0D9488' : 'var(--privy-color-foreground-2)',
+                  boxShadow: payMode === 'self' ? '0 2px 6px rgba(0,0,0,0.06)' : 'none',
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                <Fingerprint size={14} />
+                <span>Self Agent ID</span>
+                <span
+                  style={{
+                    fontSize: '9.5px',
+                    padding: '2px 5px',
+                    borderRadius: '4px',
+                    background: '#0D9488',
+                    color: '#ffffff',
+                    fontWeight: 700,
+                  }}
+                >
+                  Track 3
+                </span>
+              </button>
             </div>
 
             {payMode === 'corridor' ? (
@@ -3337,6 +3375,13 @@ function ArcAppShell() {
             ) : payMode === 'altana' ? (
               <div style={{ maxWidth: '480px', width: '100%', margin: '0 auto' }}>
                 <AltanaSessionCard
+                  walletAddress={walletAddress}
+                  onConnectWallet={() => setIsConnectModalOpen(true)}
+                />
+              </div>
+            ) : payMode === 'self' ? (
+              <div style={{ maxWidth: '520px', width: '100%', margin: '0 auto' }}>
+                <SelfAgentVerificationCard
                   walletAddress={walletAddress}
                   onConnectWallet={() => setIsConnectModalOpen(true)}
                 />
@@ -3793,6 +3838,62 @@ function ArcAppShell() {
                   </button>
                 </div>
               </div>
+            </div>
+
+            {/* Track 3: Self Agent ID & x402 Banner */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '12px 16px',
+                borderRadius: '12px',
+                background: 'rgba(13, 148, 136, 0.08)',
+                border: '1px solid rgba(13, 148, 136, 0.25)',
+                marginBottom: '12px',
+                gap: '12px',
+                flexWrap: 'wrap',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <Fingerprint size={18} color="#0D9488" />
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span style={{ fontSize: '13px', fontWeight: 700, color: '#134e4a' }}>
+                      Self Agent ID: Zero-Knowledge Verified Agent Commerce
+                    </span>
+                    <span style={{ fontSize: '10px', background: '#0D9488', color: '#fff', padding: '1px 6px', borderRadius: '4px', fontWeight: 700 }}>
+                      Track 3
+                    </span>
+                  </div>
+                  <span style={{ fontSize: '11.5px', color: '#0f766e' }}>
+                    Verify agent identity via Self zero-knowledge passport proofs and gate paid capabilities with on-chain x402 settlement.
+                  </span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setPayMode('self');
+                  setMainTab('pay');
+                }}
+                style={{
+                  padding: '7px 14px',
+                  borderRadius: '8px',
+                  background: '#0D9488',
+                  color: '#fff',
+                  border: 'none',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                }}
+              >
+                <span>Verify & Monetize</span>
+                <ArrowRight size={13} />
+              </button>
             </div>
 
             {/* Track 4: Altana Agent Wallets Banner */}

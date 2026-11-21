@@ -18,6 +18,7 @@ import { Ticket as TicketIcon } from 'lucide-react';
 import {
   Wallet,
   ShoppingCart,
+  Fingerprint,
   CheckCircle2,
   AlertCircle,
   Copy,

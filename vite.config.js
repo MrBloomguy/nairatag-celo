@@ -38,9 +38,7 @@ export default defineConfig(({ mode }) => {
       ],
     },
     optimizeDeps: {
-      noDiscovery: true,
-      include: ['react', 'react-dom/client', 'lucide-react', 'canvas-confetti', '@circle-fin/w3s-pw-web-sdk'],
-      exclude: ['viem'],
+      include: ['react', 'react-dom/client', 'lucide-react', 'canvas-confetti', 'viem'],
     },
     build: {
       minify: process.env.VERCEL ? 'oxc' : false,

@@ -99,6 +99,11 @@ export function registerService(serviceData, callerIdentity = {}) {
     throw new Error(`Unauthorized: Agent ₦${callerTag.toUpperCase()} cannot register services for ₦${normalizedAgentTag.toUpperCase()}`);
   }
 
+  // Self Agent ID Verification Gate
+  if (callerIdentity && callerIdentity.selfVerified === false) {
+    throw new Error(`Self Agent ID Verification Required: Agent ₦${normalizedAgentTag.toUpperCase()} cannot publish bookable services until its human owner completes Self proof-of-human verification.`);
+  }
+
   const existing = servicesStore.get(serviceData.id);
   if (existing && normalizeTag(existing.agentTag) !== normalizedAgentTag) {
     throw new Error(`Service ID collision: ${serviceData.id} is already registered to ₦${existing.agentTag.toUpperCase()}`);

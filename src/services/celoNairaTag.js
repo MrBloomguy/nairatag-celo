@@ -1,6 +1,7 @@
 import { createWalletClient, custom, decodeEventLog, isAddress, parseAbiItem } from 'viem';
 import { CELO_NAIRATAG_REGISTRY_ADDRESS, CELO_NAIRATAG_RESOLVER_ADDRESS } from '../config/celo.js';
 import { activeCeloChain, getEthereumProvider, publicClient, switchOrAddCeloNetwork } from './celoPayment.js';
+import { createAgentDraft } from './agentLifecycleService.js';
 
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
 const ZERO_NODE = `0x${'0'.repeat(64)}`;
@@ -108,6 +109,18 @@ export async function claimCeloNairaTag({ rawTag, walletAddress }) {
       const decoded = decodeEventLog({ abi: [TAG_CLAIMED_EVENT], data: log.data, topics: log.topics });
       if (decoded.eventName === 'TagClaimed') claim = decoded.args;
     } catch { /* Ignore unrelated logs in the same receipt. */ }
+  }
+
+  // Automatically initialize agent identity draft for the newly claimed tag
+  try {
+    await createAgentDraft({
+      tag: cleanTag,
+      name: `₦${cleanTag.toUpperCase()}`,
+      ownerAddress: walletAddress,
+      category: 'creator',
+    });
+  } catch (draftErr) {
+    console.warn('[claimCeloNairaTag] Draft initialization notice:', draftErr.message);
   }
 
   return {

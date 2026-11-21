@@ -269,3 +269,47 @@ test('15. Execution Boundary: Unverified Agent Rejection', async () => {
   assert.equal(check.allowed, false);
   assert.equal(check.code, 'SELF_VERIFICATION_REQUIRED');
 });
+
+test('16. Booking Engine: Rejects Service Publishing from Unverified Human Owner', async () => {
+  const { registerService, PRICING_MODELS } = await import('../src/services/bookingRegistryService.js');
+
+  assert.throws(
+    () => {
+      registerService(
+        {
+          id: 'srv-unverified-fail',
+          agentTag: 'unverifiedbot',
+          title: 'Unverified Design Session',
+          description: 'Attempting to publish without human verification',
+          category: 'design',
+          pricingModel: PRICING_MODELS.FIXED,
+          price: '25.00',
+          currency: 'USDT',
+        },
+        { tag: 'unverifiedbot', selfVerified: false }
+      );
+    },
+    /Self Agent ID Verification Required/i
+  );
+});
+
+test('17. Booking Engine: Accepts Service Publishing from Verified Human Owner', async () => {
+  const { registerService, PRICING_MODELS } = await import('../src/services/bookingRegistryService.js');
+
+  const registered = registerService(
+    {
+      id: 'srv-verified-pass',
+      agentTag: 'studio',
+      title: 'Studio Creative Session',
+      description: 'Verified studio production session',
+      category: 'design',
+      pricingModel: PRICING_MODELS.FIXED,
+      price: '50.00',
+      currency: 'USDT',
+    },
+    { tag: 'studio', selfVerified: true }
+  );
+
+  assert.equal(registered.id, 'srv-verified-pass');
+  assert.equal(registered.canonicalTag, '₦STUDIO');
+});

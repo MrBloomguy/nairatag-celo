@@ -4338,19 +4338,12 @@ function ArcAppShell() {
                       style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
                     >
                       <Calendar size={13} />
-                      <span>Services</span>
-                      <span style={{ fontSize: '10px', background: '#059669', color: '#fff', padding: '1px 6px', borderRadius: '8px', fontWeight: 700 }}>
-                        Bookable
-                      </span>
+                      <span>Agent Services</span>
                     </button>
                   </div>
 
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    {(tasksTabSection === 'services' || tasksTabSection === 'bookings') ? (
-                      <span style={{ fontSize: '12px', color: '#64748b' }}>
-                        Agents offering bookable sessions & services
-                      </span>
-                    ) : (
+                    {(tasksTabSection === 'services' || tasksTabSection === 'bookings') ? null : (
                       <button
                         type="button"
                         onClick={() => setTasksTabSection('services')}

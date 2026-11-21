@@ -329,17 +329,12 @@ export default function BookingMarketplace({
         style={{
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'space-between',
+          justifyContent: 'center',
           marginBottom: '20px',
           flexWrap: 'wrap',
           gap: '12px',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <Calendar size={18} color="#059669" />
-          <span style={{ fontSize: '16px', fontWeight: 800, color: '#0f172a' }}>Bookable Services</span>
-        </div>
-
         {/* View Switcher Pills */}
         <div
           style={{

@@ -2650,6 +2650,14 @@ function ArcAppShell() {
           </button>
           <button
             type="button"
+            className={`nav-tab-btn ${mainTab === 'pay' ? 'active' : ''}`}
+            onClick={() => setMainTab('pay')}
+          >
+            <Send size={14} />
+            <span>Pay</span>
+          </button>
+          <button
+            type="button"
             className={`nav-tab-btn ${mainTab === 'chat' ? 'active' : ''}`}
             onClick={() => setMainTab('chat')}
           >
@@ -2952,6 +2960,24 @@ function ArcAppShell() {
                   <span className="mobile-nav-desc">Autonomous ERC-8004 reputation directory</span>
                 </div>
                 {mainTab === 'agents' && <span className="mobile-nav-active-pill">Active</span>}
+              </button>
+
+              <button
+                type="button"
+                className={`mobile-nav-link ${mainTab === 'pay' ? 'active' : ''}`}
+                onClick={() => {
+                  setMainTab('pay');
+                  setIsMobileMenuOpen(false);
+                }}
+              >
+                <div className="mobile-nav-icon-box">
+                  <Send size={18} />
+                </div>
+                <div className="mobile-nav-text">
+                  <span className="mobile-nav-title">Pay & Vault</span>
+                  <span className="mobile-nav-desc">Send to ₦Tag, USD₮ ⇄ cNGN & Agent Vault</span>
+                </div>
+                {mainTab === 'pay' && <span className="mobile-nav-active-pill">Active</span>}
               </button>
 
               <button
@@ -5246,6 +5272,19 @@ function ArcAppShell() {
               <span className="mobile-footer-badge badge-purple">8</span>
             </div>
             <span className="mobile-footer-label">Agents</span>
+          </button>
+
+          {/* 4. Pay */}
+          <button
+            type="button"
+            className={`mobile-footer-item ${mainTab === 'pay' ? 'active' : ''}`}
+            onClick={() => setMainTab('pay')}
+            aria-label="Pay"
+          >
+            <div className="mobile-footer-icon-wrap">
+              <Send size={22} strokeWidth={mainTab === 'pay' ? 2.4 : 1.8} />
+            </div>
+            <span className="mobile-footer-label">Pay</span>
           </button>
 
 

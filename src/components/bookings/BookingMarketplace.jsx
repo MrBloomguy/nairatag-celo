@@ -13,6 +13,7 @@ import {
   DollarSign,
   Tag,
   ChevronRight,
+  ChevronDown,
   Briefcase,
   Sparkles,
   Headphones,
@@ -89,6 +90,7 @@ export default function BookingMarketplace({
 }) {
   // Navigation Tabs: 'discover' | 'agent_chat' | 'my_bookings' | 'provider_dashboard'
   const [activeSubTab, setActiveSubTab] = useState('discover');
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   // Booking Flow Steps: 'discover' | 'details' | 'schedule' | 'review' | 'created' | 'confirmed_details'
   const [currentStep, setCurrentStep] = useState('discover');
@@ -377,106 +379,148 @@ export default function BookingMarketplace({
     }, 600);
   };
 
+  const subTabOptions = [
+    { id: 'discover', label: 'Discover Services', icon: Sparkles },
+    { id: 'agent_chat', label: 'Booking Agent', icon: Bot },
+    { id: 'my_bookings', label: 'My Bookings', icon: Calendar, badge: myBookings.length },
+    { id: 'provider_dashboard', label: 'Provider Portal', icon: Briefcase },
+  ];
+  const currentSubTabOption = subTabOptions.find((opt) => opt.id === activeSubTab) || subTabOptions[0];
+  const CurrentNavIcon = currentSubTabOption.icon;
+
   return (
     <div style={{ maxWidth: activeSubTab === 'discover' ? '1080px' : '720px', margin: '0 auto', width: '100%', fontFamily: 'inherit' }}>
-      {/* ── Sub Navigation Header ── */}
+      {/* ── Sub Navigation Dropdown Menu ── */}
       <div
         style={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           marginBottom: '20px',
-          flexWrap: 'wrap',
-          gap: '12px',
         }}
       >
-        {/* View Switcher Pills */}
-        <div
-          style={{
-            display: 'inline-flex',
-            background: '#f1f5f9',
-            padding: '3px',
-            borderRadius: '9999px',
-            border: '1px solid rgba(0,0,0,0.06)',
-          }}
-        >
+        <div style={{ position: 'relative', display: 'inline-block' }}>
           <button
             type="button"
-            onClick={() => { setActiveSubTab('discover'); setCurrentStep('discover'); }}
+            onClick={() => setIsMenuOpen(!isMenuOpen)}
             style={{
-              padding: '6px 14px',
-              borderRadius: '9999px',
-              border: 'none',
-              background: activeSubTab === 'discover' ? '#fff' : 'transparent',
-              color: activeSubTab === 'discover' ? '#059669' : '#475569',
-              fontWeight: activeSubTab === 'discover' ? 700 : 500,
-              fontSize: '12.5px',
-              cursor: 'pointer',
-              boxShadow: activeSubTab === 'discover' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
-            }}
-          >
-            Discover Services
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveSubTab('agent_chat')}
-            style={{
-              padding: '6px 14px',
-              borderRadius: '9999px',
-              border: 'none',
-              background: activeSubTab === 'agent_chat' ? '#fff' : 'transparent',
-              color: activeSubTab === 'agent_chat' ? '#059669' : '#475569',
-              fontWeight: activeSubTab === 'agent_chat' ? 700 : 500,
-              fontSize: '12.5px',
-              cursor: 'pointer',
-              boxShadow: activeSubTab === 'agent_chat' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
               display: 'flex',
               alignItems: 'center',
-              gap: '5px',
-            }}
-          >
-            <Bot size={13} />
-            <span>Booking Agent</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveSubTab('my_bookings')}
-            style={{
-              padding: '6px 14px',
-              borderRadius: '9999px',
-              border: 'none',
-              background: activeSubTab === 'my_bookings' ? '#fff' : 'transparent',
-              color: activeSubTab === 'my_bookings' ? '#059669' : '#475569',
-              fontWeight: activeSubTab === 'my_bookings' ? 700 : 500,
-              fontSize: '12.5px',
+              gap: '8px',
+              padding: '8px 16px',
+              borderRadius: '12px',
+              border: '1px solid #cbd5e1',
+              background: '#fff',
+              color: '#0f172a',
+              fontSize: '13px',
+              fontWeight: 700,
               cursor: 'pointer',
-              boxShadow: activeSubTab === 'my_bookings' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+              boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
+              transition: 'all 0.15s ease',
             }}
           >
-            <span>My Bookings</span>
-            {myBookings.length > 0 && (
-              <span style={{ marginLeft: 5, fontSize: '10px', background: '#059669', color: '#fff', padding: '1px 5px', borderRadius: '8px' }}>
-                {myBookings.length}
+            <CurrentNavIcon size={15} color="#059669" />
+            <span>{currentSubTabOption.label}</span>
+            {currentSubTabOption.badge > 0 && (
+              <span
+                style={{
+                  fontSize: '10px',
+                  background: '#059669',
+                  color: '#fff',
+                  padding: '1px 6px',
+                  borderRadius: '9999px',
+                  fontWeight: 700,
+                }}
+              >
+                {currentSubTabOption.badge}
               </span>
             )}
+            <ChevronDown size={14} color="#64748b" style={{ transform: isMenuOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s ease' }} />
           </button>
-          <button
-            type="button"
-            onClick={() => setActiveSubTab('provider_dashboard')}
-            style={{
-              padding: '6px 14px',
-              borderRadius: '9999px',
-              border: 'none',
-              background: activeSubTab === 'provider_dashboard' ? '#fff' : 'transparent',
-              color: activeSubTab === 'provider_dashboard' ? '#059669' : '#475569',
-              fontWeight: activeSubTab === 'provider_dashboard' ? 700 : 500,
-              fontSize: '12.5px',
-              cursor: 'pointer',
-              boxShadow: activeSubTab === 'provider_dashboard' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
-            }}
-          >
-            Provider Portal
-          </button>
+
+          {isMenuOpen && (
+            <>
+              {/* Invisible backdrop to dismiss dropdown on click outside */}
+              <div
+                style={{ position: 'fixed', inset: 0, zIndex: 100 }}
+                onClick={() => setIsMenuOpen(false)}
+              />
+              <div
+                style={{
+                  position: 'absolute',
+                  top: 'calc(100% + 6px)',
+                  left: '50%',
+                  transform: 'translateX(-50%)',
+                  zIndex: 101,
+                  background: '#fff',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '14px',
+                  boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.08)',
+                  padding: '6px',
+                  minWidth: '210px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '2px',
+                }}
+              >
+                {subTabOptions.map((opt) => {
+                  const Icon = opt.icon;
+                  const isSelected = activeSubTab === opt.id;
+                  return (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      onClick={() => {
+                        setActiveSubTab(opt.id);
+                        if (opt.id === 'discover') setCurrentStep('discover');
+                        setIsMenuOpen(false);
+                      }}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '9px 12px',
+                        borderRadius: '10px',
+                        border: 'none',
+                        background: isSelected ? '#ecfdf5' : 'transparent',
+                        color: isSelected ? '#059669' : '#334155',
+                        fontWeight: isSelected ? 700 : 500,
+                        fontSize: '13px',
+                        cursor: 'pointer',
+                        textAlign: 'left',
+                        transition: 'background 0.12s ease',
+                      }}
+                      onMouseEnter={(e) => {
+                        if (!isSelected) e.currentTarget.style.background = '#f8fafc';
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!isSelected) e.currentTarget.style.background = 'transparent';
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <Icon size={15} color={isSelected ? '#059669' : '#64748b'} />
+                        <span>{opt.label}</span>
+                      </div>
+                      {opt.badge > 0 && (
+                        <span
+                          style={{
+                            fontSize: '10px',
+                            background: isSelected ? '#059669' : '#e2e8f0',
+                            color: isSelected ? '#fff' : '#475569',
+                            padding: '1px 6px',
+                            borderRadius: '9999px',
+                            fontWeight: 700,
+                          }}
+                        >
+                          {opt.badge}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </>
+          )}
         </div>
       </div>
 

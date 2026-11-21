@@ -72,6 +72,34 @@ export default function PanoramicWalkthroughView({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', width: '100%' }}>
+      <style>{`
+        .panoramic-row-1 {
+          display: grid;
+          grid-template-columns: repeat(4, minmax(0, 1fr));
+          gap: 16px;
+          align-items: stretch;
+        }
+        .panoramic-row-2 {
+          display: grid;
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+          gap: 16px;
+          align-items: stretch;
+        }
+        @media (max-width: 1200px) {
+          .panoramic-row-1 {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+          }
+          .panoramic-row-2 {
+            grid-template-columns: repeat(1, minmax(0, 1fr));
+          }
+        }
+        @media (max-width: 680px) {
+          .panoramic-row-1 {
+            grid-template-columns: repeat(1, minmax(0, 1fr));
+          }
+        }
+      `}</style>
+
       {/* ── Top Notice Bar ── */}
       <div
         style={{
@@ -116,14 +144,7 @@ export default function PanoramicWalkthroughView({
       </div>
 
       {/* ── ROW 1: 4 PANELS ── */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
-          gap: '16px',
-          alignItems: 'start',
-        }}
-      >
+      <div className="panoramic-row-1">
         {/* PANEL 1: Discover Services */}
         <div style={{ background: '#fff', borderRadius: '20px', border: '1px solid #e2e8f0', padding: '18px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.03)' }}>
           <div style={{ marginBottom: '14px' }}>
@@ -533,14 +554,7 @@ export default function PanoramicWalkthroughView({
       </div>
 
       {/* ── ROW 2: 3 PANELS ── */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
-          gap: '16px',
-          alignItems: 'start',
-        }}
-      >
+      <div className="panoramic-row-2">
         {/* PANEL 5: Booking Request Created */}
         <div style={{ background: '#fff', borderRadius: '24px', border: '1px solid #e2e8f0', padding: '24px 18px', textAlign: 'center', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.03)' }}>
           <div

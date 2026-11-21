@@ -2662,11 +2662,26 @@ function ArcAppShell() {
           </button>
           <button
             type="button"
-            className={`nav-tab-btn ${mainTab === 'tasks' ? 'active' : ''}`}
-            onClick={() => setMainTab('tasks')}
+            className={`nav-tab-btn ${mainTab === 'tasks' && tasksTabSection !== 'services' && tasksTabSection !== 'bookings' ? 'active' : ''}`}
+            onClick={() => {
+              setMainTab('tasks');
+              setTasksTabSection('tasks');
+            }}
           >
             <Briefcase size={14} />
             <span>Tasks</span>
+          </button>
+          <button
+            type="button"
+            className={`nav-tab-btn ${(mainTab === 'tasks' && (tasksTabSection === 'services' || tasksTabSection === 'bookings')) || mainTab === 'bookings' ? 'active' : ''}`}
+            onClick={() => {
+              setMainTab('tasks');
+              setTasksTabSection('services');
+              try { window.location.hash = 'bookings'; } catch (_) {}
+            }}
+          >
+            <Calendar size={14} />
+            <span>Bookings</span>
           </button>
           <button
             type="button"

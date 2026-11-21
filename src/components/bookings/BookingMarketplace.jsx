@@ -91,8 +91,8 @@ export default function BookingMarketplace({
   // Navigation Tabs: 'discover' | 'agent_chat' | 'my_bookings' | 'provider_dashboard'
   const [activeSubTab, setActiveSubTab] = useState('discover');
 
-  // Booking Flow Steps: 'discover' | 'details' | 'schedule' | 'review' | 'created' | 'confirmed_details'
-  const [currentStep, setCurrentStep] = useState('discover');
+  // Booking Flow Steps: 'walkthrough' (7-view panoramic mockup default) | 'discover' | 'details' | 'schedule' | 'review' | 'created' | 'confirmed_details'
+  const [currentStep, setCurrentStep] = useState('walkthrough');
 
   // Search & Filters
   const [searchQuery, setSearchQuery] = useState('');

@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "node --max-old-space-size=4096 ./node_modules/vite/bin/vite.js build",
-    "vercel-build": "NODE_OPTIONS=--max-old-space-size=4096 vite build",
+    "vercel-build": "node --max-old-space-size=4096 ./node_modules/vite/bin/vite.js build",
     "preview": "vite preview",
     "test": "node --test test/*.test.js"
   },
@@ -24,6 +24,7 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
+    "@altananetwork/sdk": "^1.1.0",
     "@circle-fin/adapter-viem-v2": "^1.19.1",
     "@circle-fin/swap-kit": "^1.8.0",
     "@circle-fin/w3s-pw-web-sdk": "^1.1.11",

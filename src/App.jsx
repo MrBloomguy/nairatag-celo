@@ -8,6 +8,7 @@ import PersonalAgentPanel from './components/chat/PersonalAgentPanel';
 import CorridorSwapCard from './components/CorridorSwapCard';
 import AltanaSessionCard from './components/AltanaSessionCard';
 import SelfAgentVerificationCard from './components/SelfAgentVerificationCard';
+import AgentVaultCard from './components/AgentVaultCard';
 import { ClipboardCheck as ClipboardCheckIcon } from 'lucide-react';
 import { ChevronsLeftRight as ChevronsLeftRightIcon } from 'lucide-react';
 import { Car as CarIcon } from 'lucide-react';
@@ -16,6 +17,7 @@ import { HandCoins as HandCoinsIcon } from 'lucide-react';
 import { Ticket as TicketIcon } from 'lucide-react';
 import {
   Wallet,
+  ShoppingCart,
   CheckCircle2,
   AlertCircle,
   Copy,
@@ -3329,6 +3331,43 @@ function ArcAppShell() {
 
               <button
                 type="button"
+                onClick={() => setPayMode('vault')}
+                style={{
+                  flex: 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px',
+                  padding: '9px 14px',
+                  borderRadius: '9px',
+                  fontSize: '13px',
+                  fontWeight: 600,
+                  border: 'none',
+                  cursor: 'pointer',
+                  background: payMode === 'vault' ? 'var(--card-bg, #ffffff)' : 'transparent',
+                  color: payMode === 'vault' ? '#2563EB' : 'var(--privy-color-foreground-2)',
+                  boxShadow: payMode === 'vault' ? '0 2px 6px rgba(0,0,0,0.06)' : 'none',
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                <ShoppingCart size={14} />
+                <span>Agent Vault</span>
+                <span
+                  style={{
+                    fontSize: '9.5px',
+                    padding: '2px 5px',
+                    borderRadius: '4px',
+                    background: '#2563EB',
+                    color: '#ffffff',
+                    fontWeight: 700,
+                  }}
+                >
+                  Track 2
+                </span>
+              </button>
+
+              <button
+                type="button"
                 onClick={() => setPayMode('self')}
                 style={{
                   flex: 1,
@@ -3368,6 +3407,13 @@ function ArcAppShell() {
             {payMode === 'corridor' ? (
               <div style={{ maxWidth: '440px', width: '100%', margin: '0 auto' }}>
                 <CorridorSwapCard
+                  walletAddress={walletAddress}
+                  onConnectWallet={() => setIsConnectModalOpen(true)}
+                />
+              </div>
+            ) : payMode === 'vault' ? (
+              <div style={{ maxWidth: '520px', width: '100%', margin: '0 auto' }}>
+                <AgentVaultCard
                   walletAddress={walletAddress}
                   onConnectWallet={() => setIsConnectModalOpen(true)}
                 />
@@ -3838,6 +3884,62 @@ function ArcAppShell() {
                   </button>
                 </div>
               </div>
+            </div>
+
+            {/* Track 2: Agent Vault Banner */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '12px 16px',
+                borderRadius: '12px',
+                background: 'rgba(37, 99, 235, 0.08)',
+                border: '1px solid rgba(37, 99, 235, 0.25)',
+                marginBottom: '12px',
+                gap: '12px',
+                flexWrap: 'wrap',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <ShoppingCart size={18} color="#2563EB" />
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span style={{ fontSize: '13px', fontWeight: 700, color: '#1e3a8a' }}>
+                      Agent Vault: Autonomous & Human-Authorized Web Checkout
+                    </span>
+                    <span style={{ fontSize: '10px', background: '#2563EB', color: '#fff', padding: '1px 6px', borderRadius: '4px', fontWeight: 700 }}>
+                      Track 2
+                    </span>
+                  </div>
+                  <span style={{ fontSize: '11.5px', color: '#1d4ed8' }}>
+                    Autonomous web cart settlement under policy caps ($2 USD₮) with 1-click WebAuthn biometric passkey confirmation for high-value orders.
+                  </span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setPayMode('vault');
+                  setMainTab('pay');
+                }}
+                style={{
+                  padding: '7px 14px',
+                  borderRadius: '8px',
+                  background: '#2563EB',
+                  color: '#fff',
+                  border: 'none',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                }}
+              >
+                <span>Open Agent Vault</span>
+                <ArrowRight size={13} />
+              </button>
             </div>
 
             {/* Track 3: Self Agent ID & x402 Banner */}

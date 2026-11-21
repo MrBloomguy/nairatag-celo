@@ -20,6 +20,108 @@ const PERSISTENCE_FILE_NAME = '.x402_consumed_payments.json';
 const LOCAL_STORAGE_KEY = 'nairatag_x402_consumed_payments';
 const RETRY_WINDOW_SECONDS = 300; // 5 minutes
 
+// Supabase shared database configuration (for multi-instance atomic consensus)
+const SUPABASE_URL = typeof process !== 'undefined'
+  ? (process.env?.SUPABASE_URL || process.env?.NEXT_PUBLIC_SUPABASE_URL)
+  : null;
+const SUPABASE_KEY = typeof process !== 'undefined'
+  ? (process.env?.SUPABASE_SECRET_KEY || process.env?.SUPABASE_PUBLISHABLE_KEY || process.env?.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY)
+  : null;
+
+/**
+ * Checks whether shared remote database is configured for multi-instance production.
+ * @returns {boolean}
+ */
+export function isSharedDatabaseConfigured() {
+  return Boolean(SUPABASE_URL && SUPABASE_KEY);
+}
+
+/**
+ * Helper to query Supabase REST endpoint for shared multi-instance consensus.
+ * Schema:
+ * CREATE TABLE IF NOT EXISTS x402_consumed_payments (
+ *   payment_digest TEXT PRIMARY KEY,
+ *   tx_hash TEXT,
+ *   nonce TEXT NOT NULL,
+ *   amount TEXT NOT NULL,
+ *   asset TEXT NOT NULL,
+ *   pay_to TEXT NOT NULL,
+ *   resource_id TEXT NOT NULL,
+ *   agent_tag TEXT,
+ *   status TEXT NOT NULL,
+ *   timestamp BIGINT NOT NULL,
+ *   is_simulation BOOLEAN DEFAULT FALSE,
+ *   attribution_tag TEXT,
+ *   created_at TIMESTAMPTZ DEFAULT NOW()
+ * );
+ */
+async function querySharedDatabase(paymentDigest) {
+  if (!isSharedDatabaseConfigured()) return null;
+  try {
+    const res = await globalThis.fetch(
+      `${SUPABASE_URL}/rest/v1/x402_consumed_payments?payment_digest=eq.${encodeURIComponent(paymentDigest)}`,
+      {
+        headers: {
+          apikey: SUPABASE_KEY,
+          Authorization: `Bearer ${SUPABASE_KEY}`,
+          Accept: 'application/json',
+        },
+      }
+    );
+    if (!res.ok) return null;
+    const rows = await res.json().catch(() => []);
+    return rows && rows.length > 0 ? rows[0] : null;
+  } catch (err) {
+    console.warn('[DurablePaymentStore] Shared DB query warning:', err.message);
+    return null;
+  }
+}
+
+/**
+ * Atomic insert into shared database enforcing unique constraint across instances.
+ */
+async function insertSharedDatabaseAtomic(record) {
+  if (!isSharedDatabaseConfigured()) return { inserted: true, isSharedDb: false };
+  try {
+    const res = await globalThis.fetch(`${SUPABASE_URL}/rest/v1/x402_consumed_payments`, {
+      method: 'POST',
+      headers: {
+        apikey: SUPABASE_KEY,
+        Authorization: `Bearer ${SUPABASE_KEY}`,
+        'Content-Type': 'application/json',
+        Prefer: 'resolution=ignore-duplicates,return=representation',
+      },
+      body: JSON.stringify({
+        payment_digest: record.paymentDigest,
+        tx_hash: record.txHash,
+        nonce: record.nonce,
+        amount: record.amount,
+        asset: record.asset,
+        pay_to: record.payTo,
+        resource_id: record.resourceId,
+        agent_tag: record.agentTag,
+        status: record.status,
+        timestamp: record.timestamp,
+        is_simulation: record.isSimulation,
+        attribution_tag: record.attributionTag,
+      }),
+    });
+
+    if (res.status === 409) {
+      return { inserted: false, collision: true };
+    }
+    const insertedRows = await res.json().catch(() => []);
+    if (Array.isArray(insertedRows) && insertedRows.length === 0) {
+      // Ignored duplicate collision
+      return { inserted: false, collision: true };
+    }
+    return { inserted: true, isSharedDb: true };
+  } catch (err) {
+    console.warn('[DurablePaymentStore] Shared DB insert warning:', err.message);
+    return { inserted: true, fallback: true };
+  }
+}
+
 /**
  * Helper to get the file path in Node.js environments.
  */
@@ -125,70 +227,83 @@ export async function consumePaymentDigestAtomic({
     throw new Error('Payment digest is required for atomic consumption.');
   }
 
-  // 1. Concurrent In-Flight Check (Locking Mutex)
+  // 1. Concurrent In-Flight Check & Immediate Synchronous Mutex Lock
   if (inFlightLocks.has(paymentDigest)) {
     throw new Error('Concurrent payment consumption in progress: Replay attack prohibited.');
   }
-
-  // Ensure fresh state from disk/store
-  await loadDurableStore();
-
-  // 2. Check if already consumed in durable store
-  const existing = memoryCache.get(paymentDigest);
-  if (existing) {
-    if (existing.status === 'consumed') {
-      throw new Error('Payment proof has already been redeemed. Replay attacks are prohibited.');
-    }
-    if (existing.status === 'pending_execution') {
-      throw new Error('Payment consumption in progress. Replay attack prohibited.');
-    }
-    if (existing.status === 'failed') {
-      // Check if retry is within allowable window
-      const now = Math.floor(Date.now() / 1000);
-      const age = now - (existing.timestamp || now);
-      if (age <= RETRY_WINDOW_SECONDS && existing.resourceId === requirement.resourceId) {
-        // Mark for retry
-        inFlightLocks.add(paymentDigest);
-        return {
-          ok: true,
-          isRetry: true,
-          paymentDigest,
-          existingRecord: existing,
-        };
-      }
-      throw new Error(`Previous execution with this payment failed and exceeded retry window of ${RETRY_WINDOW_SECONDS}s.`);
-    }
-  }
-
-  // 3. Acquire atomic in-flight lock
   inFlightLocks.add(paymentDigest);
 
-  const nowSeconds = Math.floor(Date.now() / 1000);
-  const record = {
-    paymentDigest,
-    txHash: paymentProof.txHash || null,
-    nonce: requirement.nonce,
-    amount: paymentProof.amount || requirement.amount,
-    asset: requirement.asset,
-    payTo: requirement.payTo,
-    resourceId: requirement.resourceId,
-    agentTag: requirement.agentTag,
-    timestamp: nowSeconds,
-    status: 'pending_execution',
-    isSimulation: Boolean(paymentProof.isSimulation),
-    retryCount: 0,
-    attributionTag: requirement.attributionTag || 'celo_9f7deabd99a6',
-  };
+  try {
+    // Ensure fresh state from disk/store
+    await loadDurableStore();
 
-  memoryCache.set(paymentDigest, record);
-  await persistDurableStore();
+    // 2. Check if already consumed in durable store
+    const existing = memoryCache.get(paymentDigest);
+    if (existing) {
+      if (existing.status === 'consumed') {
+        throw new Error('Payment proof has already been redeemed. Replay attacks are prohibited.');
+      }
+      if (existing.status === 'pending_execution') {
+        throw new Error('Payment consumption in progress. Replay attack prohibited.');
+      }
+      if (existing.status === 'failed') {
+        // Check if retry is within allowable window
+        const now = Math.floor(Date.now() / 1000);
+        const age = now - (existing.timestamp || now);
+        if (age <= RETRY_WINDOW_SECONDS && existing.resourceId === requirement.resourceId) {
+          return {
+            ok: true,
+            isRetry: true,
+            paymentDigest,
+            existingRecord: existing,
+          };
+        }
+        throw new Error(`Previous execution with this payment failed and exceeded retry window of ${RETRY_WINDOW_SECONDS}s.`);
+      }
+    }
 
-  return {
-    ok: true,
-    isRetry: false,
-    paymentDigest,
-    record,
-  };
+    // 3. Check shared database if configured
+    const remoteRecord = await querySharedDatabase(paymentDigest);
+    if (remoteRecord && remoteRecord.status === 'consumed') {
+      throw new Error('Payment proof has already been redeemed across shared instances. Replay attacks are prohibited.');
+    }
+
+    const nowSeconds = Math.floor(Date.now() / 1000);
+    const record = {
+      paymentDigest,
+      txHash: paymentProof.txHash || null,
+      nonce: requirement.nonce,
+      amount: paymentProof.amount || requirement.amount,
+      asset: requirement.asset,
+      payTo: requirement.payTo,
+      resourceId: requirement.resourceId,
+      agentTag: requirement.agentTag,
+      timestamp: nowSeconds,
+      status: 'pending_execution',
+      isSimulation: Boolean(paymentProof.isSimulation),
+      retryCount: 0,
+      attributionTag: requirement.attributionTag || 'celo_9f7deabd99a6',
+    };
+
+    // Attempt shared DB atomic insert
+    const sharedDbResult = await insertSharedDatabaseAtomic(record);
+    if (sharedDbResult.collision) {
+      throw new Error('Payment proof has already been redeemed across shared instances. Replay attacks are prohibited.');
+    }
+
+    memoryCache.set(paymentDigest, record);
+    await persistDurableStore();
+
+    return {
+      ok: true,
+      isRetry: false,
+      paymentDigest,
+      record,
+    };
+  } catch (err) {
+    inFlightLocks.delete(paymentDigest);
+    throw err;
+  }
 }
 
 /**

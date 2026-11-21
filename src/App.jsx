@@ -9,6 +9,7 @@ import CorridorSwapCard from './components/CorridorSwapCard';
 import AltanaSessionCard from './components/AltanaSessionCard';
 import SelfAgentVerificationCard from './components/SelfAgentVerificationCard';
 import AgentVaultCard from './components/AgentVaultCard';
+import BookingMarketplace from './components/bookings/BookingMarketplace.jsx';
 import { ClipboardCheck as ClipboardCheckIcon } from 'lucide-react';
 import { ChevronsLeftRight as ChevronsLeftRightIcon } from 'lucide-react';
 import { Car as CarIcon } from 'lucide-react';
@@ -453,8 +454,8 @@ function ArcAppShell() {
     setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
   };
 
-  // Navigation: 'chat' (Home) | 'claim' | 'tasks' | 'agents' | 'pay' | 'faq' | 'rewards'
-  const VALID_TABS = ['claim', 'tasks', 'agents', 'pay', 'chat', 'faq', 'rewards', 'profile'];
+  // Navigation: 'chat' (Home) | 'claim' | 'tasks' | 'agents' | 'bookings' | 'pay' | 'faq' | 'rewards'
+  const VALID_TABS = ['claim', 'tasks', 'agents', 'bookings', 'pay', 'chat', 'faq', 'rewards', 'profile'];
   const [mainTab, setMainTabState] = useState(() => {
     try {
       const hash = window.location.hash.replace('#', '').toLowerCase();
@@ -1490,7 +1491,8 @@ function ArcAppShell() {
   const [agentDetailsError, setAgentDetailsError] = useState(null);
   const [agentReputationList, setAgentReputationList] = useState([]);
 
-  // Agents Directory View State (Grid vs List toggle & Profile popup)
+  // Agents Section State ('bookings' Marketplace vs 'directory' ERC-8004 list)
+  const [agentsSection, setAgentsSection] = useState('bookings'); // 'bookings' | 'directory'
   const [agentsViewMode, setAgentsViewMode] = useState('grid'); // 'grid' | 'list'
   const [agentsSearchQuery, setAgentsSearchQuery] = useState('');
   const [selectedAgentProfile, setSelectedAgentProfile] = useState(null);
@@ -3731,10 +3733,89 @@ function ArcAppShell() {
 
 
         {/* ───────────────────────────────────────────────────────────────────
-            TAB 3: AI AGENTS (GRID & LIST VIEW GROUNDED IN REFERENCES 1, 2, 3)
+            TAB 3: AI AGENTS & NATIVE BOOKING ENGINE (MARKETPLACE & DIRECTORY)
             ─────────────────────────────────────────────────────────────────── */}
-        {mainTab === 'agents' && (
+        {(mainTab === 'agents' || mainTab === 'bookings') && (
           <div className="agents-page-container">
+            {/* Top Primary Section Switcher: Book Services vs Agent Directory vs Tasks */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                marginBottom: '18px',
+                paddingBottom: '12px',
+                borderBottom: '1px solid var(--border-color, rgba(0,0,0,0.06))',
+                flexWrap: 'wrap',
+                gap: '10px',
+              }}
+            >
+              <div
+                style={{
+                  display: 'inline-flex',
+                  background: 'var(--surface-2, #f1f5f9)',
+                  padding: '4px',
+                  borderRadius: '9999px',
+                  border: '1px solid var(--border-color, rgba(0,0,0,0.06))',
+                  gap: '3px',
+                }}
+              >
+                <button
+                  type="button"
+                  className={`subtoggle-pill ${(agentsSection === 'bookings' || mainTab === 'bookings') ? 'active' : ''}`}
+                  onClick={() => {
+                    setAgentsSection('bookings');
+                    if (mainTab !== 'agents') setMainTab('agents');
+                  }}
+                  style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+                >
+                  <Calendar size={13} />
+                  <span>Book Services</span>
+                  <span style={{ fontSize: '10px', background: '#059669', color: '#fff', padding: '1px 6px', borderRadius: '8px', fontWeight: 700 }}>
+                    Marketplace
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  className={`subtoggle-pill ${agentsSection === 'directory' && mainTab !== 'bookings' ? 'active' : ''}`}
+                  onClick={() => {
+                    setAgentsSection('directory');
+                    if (mainTab !== 'agents') setMainTab('agents');
+                  }}
+                  style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+                >
+                  <Bot size={13} />
+                  <span>Agent Directory</span>
+                  <span style={{ fontSize: '10px', background: '#7c3aed', color: '#fff', padding: '1px 6px', borderRadius: '8px', fontWeight: 700 }}>
+                    8004
+                  </span>
+                </button>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setMainTab('tasks')}
+                className="quick-chip-btn"
+                style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', padding: '6px 12px' }}
+              >
+                <Briefcase size={13} />
+                <span>Tasks & Bounties</span>
+                <ArrowRight size={11} />
+              </button>
+            </div>
+
+            {(agentsSection === 'bookings' || mainTab === 'bookings') ? (
+              <BookingMarketplace
+                walletAddress={walletAddress}
+                activeAgentTag={myTag?.tag}
+                altanaSession={null}
+                humanSelfProof={null}
+                onConnectWallet={() => setIsConnectModalOpen(true)}
+                onOpenVault={() => { setPayMode('vault'); setMainTab('pay'); }}
+              />
+            ) : (
+              <>
             {/* Top Bar: Search and Grid/List View Toggle */}
             <div className="agents-top-bar">
               <div className="agents-top-controls" style={{ width: '100%', justifyContent: 'space-between' }}>
@@ -4030,6 +4111,8 @@ function ArcAppShell() {
                 ))}
                 {!filteredAgents.length && <div className="agent-directory-empty">No agents match this search.</div>}
               </div>
+            )}
+              </>
             )}
 
           </div>

@@ -131,3 +131,33 @@ export function discoverAgentsByCapability(request, agents = [], limit = 3) {
 export function isAgentDiscoveryRequest(prompt) {
   return /^\s*(?:(?:can|could|would)\s+you\s+)?(?:please\s+)?(?:find|show|search for|who is|who can|what agent|which agent)\b/i.test(String(prompt || ''));
 }
+
+/**
+ * Standard NairaTag Reusable Booking Capability Definition (Phase 5 / ERC-8004)
+ */
+export const STANDARD_BOOKING_CAPABILITY = {
+  name: 'booking',
+  version: '1.0',
+  enabled: true,
+  supports: [
+    'service_discovery',
+    'availability',
+    'booking_request',
+    'booking_confirmation',
+    'cancellation',
+    'rescheduling',
+  ],
+};
+
+/**
+ * Checks if an agent declares the standardized booking capability.
+ */
+export function isBookingCapableAgent(agent) {
+  if (!agent || isUnavailable(agent)) return false;
+  const capabilities = Array.isArray(agent.capabilities) ? agent.capabilities : [];
+  return capabilities.some((c) => {
+    if (typeof c === 'string') return c.toLowerCase() === 'booking';
+    return c?.name?.toLowerCase() === 'booking' && c.enabled !== false;
+  });
+}
+

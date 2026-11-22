@@ -104,12 +104,14 @@ export default async function handler(req, res) {
     // ──────────────────────────────────────────────────────────────────────────
     // STEP 2: x402 Payment Challenge Gate (HTTP 402)
     // ──────────────────────────────────────────────────────────────────────────
-    const requirement = createX402PaymentRequirement({
+    const targetNonce = paymentProof?.nonce || paymentProof?.paymentRequirement?.nonce;
+    const requirement = paymentProof?.paymentRequirement || createX402PaymentRequirement({
       resourceId: capability,
       agentTag,
       payTo: OFFICIAL_AGENT_WALLET,
       amount: customPrice,
       asset,
+      nonce: targetNonce,
     });
 
     // SCENARIO B: Verified Agent, but Payment Required -> Issue HTTP 402 Challenge

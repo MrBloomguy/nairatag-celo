@@ -91,7 +91,7 @@ export function createX402PaymentRequirement({
   const decimals = TOKEN_DECIMALS[cleanAsset.toLowerCase()] || 6;
   const rawAmount = parseUnits(amount, decimals).toString();
 
-  const nonce = keccak256(
+  const nonce = params.nonce || keccak256(
     stringToHex(`${resourceId}:${cleanPayTo}:${Date.now()}:${Math.random()}`)
   );
 

@@ -5593,16 +5593,13 @@ function ArcAppShell() {
               <div className="agent-profile-main-row">
                 <img className="agent-profile-avatar" src={selectedAgentProfile.avatar} alt="" />
                 <div className="agent-profile-heading-copy">
-                  <div className="agent-profile-name-line">
+                  <div className="agent-profile-name-line" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <h2>₦{selectedAgentProfile.tag.toUpperCase()}</h2>
-                    {selectedAgentProfile.identity?.verifiedOnchain && selectedAgentProfile.identity?.erc8004AgentId && (
-                      <img
-                        className="agent-profile-verified-badge"
-                        src="/verified-badge.png"
-                        alt="Verified"
-                        title="Verified agent"
-                      />
-                    )}
+                    <SelfAgentIdBadge
+                      size="sm"
+                      isVerified={selectedAgentProfile.self?.verified !== false}
+                      onClick={() => setActiveVerificationDetailAgent(selectedAgentProfile)}
+                    />
                   </div>
                   <div className="agent-profile-subtitle">
                     {selectedAgentProfile.profileType === 'claimed-tag' ? 'NairaTag on Celo' : selectedAgentProfile.name}
@@ -5657,127 +5654,36 @@ function ArcAppShell() {
                 </div>
               </div>}
 
-              {/* ───────────────────────────────────────────────────────────
-                  DEDICATED HUMAN VERIFICATION & TRUST LAYER (SELF AGENT ID)
-                  ─────────────────────────────────────────────────────────── */}
+              {/* Clean Minimal Self Agent ID Trust Strip */}
               <div
+                onClick={() => setActiveVerificationDetailAgent(selectedAgentProfile)}
                 style={{
-                  background: 'var(--surface-2, #f8fafc)',
-                  borderRadius: '16px',
-                  padding: '16px',
-                  margin: '14px 0',
-                  border: '1px solid var(--border-color, rgba(0,0,0,0.08))',
                   display: 'flex',
-                  flexDirection: 'column',
-                  gap: '12px',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '9px 12px',
+                  borderRadius: '10px',
+                  background: 'var(--surface-2, #f8fafc)',
+                  border: '1px solid var(--border-color, rgba(0,0,0,0.06))',
+                  margin: '10px 0',
+                  cursor: 'pointer',
                 }}
+                className="hover:border-emerald-500/30 transition-all"
+                title="Click to view full on-chain Self Agent ID verification details"
               >
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <div style={{ width: '28px', height: '28px', borderRadius: '8px', background: 'rgba(5, 150, 105, 0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <ShieldCheck size={16} color="#059669" />
-                    </div>
-                    <div>
-                      <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--privy-color-foreground, #111827)' }}>
-                        Human Verification · Self Agent ID
-                      </div>
-                      <div style={{ fontSize: '10.5px', color: 'var(--text-secondary, #64748b)' }}>
-                        Zero-Knowledge Proof-of-Human Identity
-                      </div>
-                    </div>
-                  </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <SelfAgentIdBadge
                     size="sm"
                     isVerified={selectedAgentProfile.self?.verified !== false}
                   />
-                </div>
-
-                <p style={{ margin: 0, fontSize: '12px', color: 'var(--privy-color-foreground-2, #475569)', lineHeight: 1.45 }}>
-                  This agent is associated with a real human who completed privacy-preserving verification through the Self App.
-                </p>
-
-                {/* Identity & Protocol Breakdown (Clearly Distinguishing The 3 Core Rails) */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '8px', marginTop: '2px' }}>
-                  <div style={{ background: 'var(--card-bg, #ffffff)', padding: '10px', borderRadius: '10px', border: '1px solid rgba(0,0,0,0.06)' }}>
-                    <div style={{ fontSize: '10px', color: '#059669', fontWeight: 700, textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      <Fingerprint size={11} /> 1. Self ID (Human)
-                    </div>
-                    <div style={{ fontSize: '12px', fontWeight: 700, marginTop: '4px' }}>
-                      #{selectedAgentProfile.self?.agentId || '1'}
-                    </div>
-                    <div style={{ fontSize: '10px', color: '#64748b' }}>ZK Human Proof</div>
-                  </div>
-
-                  <div style={{ background: 'var(--card-bg, #ffffff)', padding: '10px', borderRadius: '10px', border: '1px solid rgba(0,0,0,0.06)' }}>
-                    <div style={{ fontSize: '10px', color: '#6366f1', fontWeight: 700, textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      <Bot size={11} /> 2. ERC-8004 (Agent)
-                    </div>
-                    <div style={{ fontSize: '12px', fontWeight: 700, marginTop: '4px' }}>
-                      #{selectedAgentProfile.identity?.erc8004AgentId || selectedAgentProfile.erc8004?.agentId || selectedAgentProfile.id || '1'}
-                    </div>
-                    <div style={{ fontSize: '10px', color: '#64748b' }}>Onchain Identity</div>
-                  </div>
-
-                  <div style={{ background: 'var(--card-bg, #ffffff)', padding: '10px', borderRadius: '10px', border: '1px solid rgba(0,0,0,0.06)' }}>
-                    <div style={{ fontSize: '10px', color: '#5B4FFF', fontWeight: 700, textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      <Key size={11} /> 3. Altana (Wallet)
-                    </div>
-                    <div style={{ fontSize: '11px', fontWeight: 700, marginTop: '4px', fontFamily: 'monospace' }}>
-                      {shorten(selectedAgentProfile.altana?.walletAddress || selectedAgentProfile.owner || '0x653f...1693')}
-                    </div>
-                    <div style={{ fontSize: '10px', color: '#64748b' }}>Financial Authority</div>
-                  </div>
-                </div>
-
-                {/* Registry Link & Freshness Info */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px', color: '#64748b', paddingTop: '4px', borderTop: '1px dashed rgba(0,0,0,0.08)' }}>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <Clock size={11} color="#059669" />
-                    <span>Proof Freshness: <strong style={{ color: '#059669' }}>Active & Fresh</strong></span>
+                  <span style={{ fontSize: '11px', color: 'var(--text-secondary, #64748b)' }}>
+                    Proof-of-Human Identity
                   </span>
-                  <a
-                    href="https://celoscan.io/address/0xaC3DF9ABf80d0F5c020C06B04Cced27763355944"
-                    target="_blank"
-                    rel="noreferrer"
-                    style={{ color: '#059669', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '3px', fontWeight: 600 }}
-                  >
-                    <span>Self Registry</span>
-                    <ExternalLink size={10} />
-                  </a>
                 </div>
-
-                {/* Owner Action: Revoke Altana Session if connected */}
-                {String(selectedAgentProfile.owner || '').toLowerCase() === String(walletAddress || '').toLowerCase() && selectedAgentProfile.altana?.sessionStatus !== 'revoked' && (
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      if (!confirm(`Revoke autonomous session for ₦${selectedAgentProfile.tag.toUpperCase()}? The agent will no longer be able to spend until a fresh session is granted.`)) return;
-                      await revokeAgentSession({ tag: selectedAgentProfile.tag, reason: 'Owner manual revocation' });
-                      setSelectedAgentProfile((prev) => ({
-                        ...prev,
-                        altana: { ...(prev.altana || {}), sessionStatus: 'revoked' },
-                      }));
-                    }}
-                    style={{
-                      marginTop: '4px',
-                      padding: '5px 10px',
-                      borderRadius: '6px',
-                      border: '1px solid #fecaca',
-                      background: '#fff1f2',
-                      color: '#b91c1c',
-                      fontSize: '11px',
-                      fontWeight: 600,
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '4px',
-                    }}
-                  >
-                    <AlertTriangle size={12} />
-                    <span>Revoke Altana Session Key</span>
-                  </button>
-                )}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '3px', fontSize: '11px', color: '#059669', fontWeight: 600 }}>
+                  <span>Proof details</span>
+                  <ChevronRight size={13} />
+                </div>
               </div>
 
               <div className="agent-profile-card-actions">
@@ -5868,6 +5774,40 @@ function ArcAppShell() {
                       <ExternalLink size={11} />
                     </a>
                   </div>
+                  {String(activeVerificationDetailAgent.owner || '').toLowerCase() === String(walletAddress || '').toLowerCase() && activeVerificationDetailAgent.altana?.sessionStatus !== 'revoked' && (
+                    <div style={{ marginTop: '8px', paddingTop: '8px', borderTop: '1px dashed rgba(0,0,0,0.08)' }}>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          if (!confirm(`Revoke autonomous session for ₦${activeVerificationDetailAgent.tag.toUpperCase()}?`)) return;
+                          await revokeAgentSession({ tag: activeVerificationDetailAgent.tag, reason: 'Owner manual revocation' });
+                          setActiveVerificationDetailAgent((prev) => ({
+                            ...prev,
+                            altana: { ...(prev.altana || {}), sessionStatus: 'revoked' },
+                          }));
+                          showToast('Autonomous session revoked.', 'info', 2500);
+                        }}
+                        style={{
+                          width: '100%',
+                          padding: '6px 10px',
+                          borderRadius: '6px',
+                          border: '1px solid #fecaca',
+                          background: '#fff1f2',
+                          color: '#b91c1c',
+                          fontSize: '11px',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '4px',
+                        }}
+                      >
+                        <AlertTriangle size={12} />
+                        <span>Revoke Altana Session Key</span>
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
 

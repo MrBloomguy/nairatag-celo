@@ -616,93 +616,34 @@ export default function PublicProfilePage({ rawHandle, type = 'agent' }) {
           </div>
         </div>
 
-        {/* Dedicated Human Verification & Trust Layer (Self Agent ID) */}
+        {/* Sleek Minimal Verification Strip */}
         {type === 'agent' && (
           <div style={{
             width: '100%',
             maxWidth: '580px',
             backgroundColor: theme === 'dark' ? '#12141e' : '#ffffff',
-            borderRadius: '24px',
+            borderRadius: '16px',
             border: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}`,
-            padding: '24px',
+            padding: '12px 16px',
             display: 'flex',
-            flexDirection: 'column',
-            gap: '14px'
+            alignItems: 'center',
+            justifyContent: 'space-between',
           }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h2 style={{ fontSize: '16px', fontWeight: 700, margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <ShieldCheck size={18} color="#059669" />
-                <span>Human Verification · Self Agent ID</span>
-              </h2>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <SelfAgentIdBadge isVerified={true} size="sm" />
+              <span style={{ fontSize: '12px', color: theme === 'dark' ? '#94a3b8' : '#64748b' }}>
+                Zero-Knowledge Human Proof
+              </span>
             </div>
-
-            <p style={{ margin: 0, fontSize: '13px', color: theme === 'dark' ? '#94a3b8' : '#4b5563', lineHeight: '1.5' }}>
-              This agent is associated with a real human who completed privacy-preserving verification through the Self App using NFC passport zero-knowledge proofs.
-            </p>
-
-            {/* The 3 Sovereign Agent Identity & Execution Rails */}
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
-              gap: '10px'
-            }}>
-              <div style={{
-                backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.03)' : '#f8fafc',
-                padding: '12px',
-                borderRadius: '14px',
-                border: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)'}`
-              }}>
-                <div style={{ fontSize: '10px', color: '#059669', textTransform: 'uppercase', fontWeight: 700 }}>1. Self ID (Human)</div>
-                <div style={{ fontSize: '13px', fontWeight: 700, marginTop: '3px' }}>#1 (Verified)</div>
-                <div style={{ fontSize: '11px', color: '#94a3b8' }}>Proves human owner</div>
-              </div>
-
-              <div style={{
-                backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.03)' : '#f8fafc',
-                padding: '12px',
-                borderRadius: '14px',
-                border: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)'}`
-              }}>
-                <div style={{ fontSize: '10px', color: '#6366f1', textTransform: 'uppercase', fontWeight: 700 }}>2. ERC-8004 (Agent)</div>
-                <div style={{ fontSize: '13px', fontWeight: 700, marginTop: '3px' }}>#1 On-Chain</div>
-                <div style={{ fontSize: '11px', color: '#94a3b8' }}>Identifies agent identity</div>
-              </div>
-
-              <div style={{
-                backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.03)' : '#f8fafc',
-                padding: '12px',
-                borderRadius: '14px',
-                border: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)'}`
-              }}>
-                <div style={{ fontSize: '10px', color: '#5B4FFF', textTransform: 'uppercase', fontWeight: 700 }}>3. Altana (Wallet)</div>
-                <div style={{ fontSize: '12px', fontWeight: 700, marginTop: '3px', fontFamily: 'monospace' }}>
-                  {resolvedAddress ? `${resolvedAddress.slice(0, 6)}...${resolvedAddress.slice(-4)}` : '0x653f...1693'}
-                </div>
-                <div style={{ fontSize: '11px', color: '#94a3b8' }}>Delegated financial rail</div>
-              </div>
-            </div>
-
-            <div style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              fontSize: '11px',
-              color: '#94a3b8',
-              paddingTop: '8px',
-              borderTop: `1px dashed ${theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}`
-            }}>
-              <span>Proof Status: <strong style={{ color: '#059669' }}>Fresh on Celo Mainnet</strong></span>
-              <a
-                href="https://celoscan.io/address/0xaC3DF9ABf80d0F5c020C06B04Cced27763355944"
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{ color: '#059669', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '3px', fontWeight: 600 }}
-              >
-                <span>Registry: 0xaC3D...5944</span>
-                <ExternalLink size={10} />
-              </a>
-            </div>
+            <a
+              href="https://celoscan.io/address/0xaC3DF9ABf80d0F5c020C06B04Cced27763355944"
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ color: '#059669', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', fontWeight: 600 }}
+            >
+              <span>CeloScan Registry</span>
+              <ExternalLink size={11} />
+            </a>
           </div>
         )}
 

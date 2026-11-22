@@ -152,6 +152,9 @@ export function buildX402Response(requirement) {
 export async function verifyOnchainSettlement({
   txHash,
   expectedRequirement,
+  expectedTo,
+  expectedAmountAtomic,
+  tokenAddress,
 }) {
   if (!txHash) {
     throw new Error('On-chain transaction hash is required for settlement verification.');
@@ -169,8 +172,9 @@ export async function verifyOnchainSettlement({
     // Inspect logs for ERC-20 Transfer
     // Transfer(address indexed from, address indexed to, uint256 value)
     const transferTopic = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef';
-    const targetAsset = expectedRequirement.asset.toLowerCase();
-    const targetPayTo = expectedRequirement.payTo.toLowerCase();
+    const targetAsset = (expectedRequirement?.asset || tokenAddress || '').toLowerCase();
+    const targetPayTo = (expectedRequirement?.payTo || expectedTo || '').toLowerCase();
+    const targetAmount = BigInt(expectedRequirement?.amount || expectedAmountAtomic || 0);
 
     let matchedTransfer = false;
     let transferredAmount = BigInt(0);
@@ -189,11 +193,11 @@ export async function verifyOnchainSettlement({
     }
 
     if (!matchedTransfer) {
-      throw new Error(`Transaction ${txHash} does not contain an ERC-20 transfer to required recipient ${expectedRequirement.payTo}.`);
+      throw new Error(`Transaction ${txHash} does not contain an ERC-20 transfer to required recipient ${targetPayTo || 'specified recipient'}.`);
     }
 
-    if (transferredAmount < BigInt(expectedRequirement.amount)) {
-      throw new Error(`Transaction ${txHash} transfer value (${transferredAmount.toString()}) is less than required amount (${expectedRequirement.amount}).`);
+    if (targetAmount > 0 && transferredAmount < targetAmount) {
+      throw new Error(`Transaction ${txHash} transfer value (${transferredAmount.toString()}) is less than required amount (${targetAmount.toString()}).`);
     }
 
     return {

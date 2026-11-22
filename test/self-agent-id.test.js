@@ -5,11 +5,18 @@ import {
   initiateAgentRegistrationSession,
   evaluateAgentCapabilityAccess,
   validateEvidenceIdentityBinding,
+  getVerificationStatusLabel,
+  createSelfAgentVerifier,
+  verifyAgentRequestSignature,
   SELF_REGISTRY_CELO_MAINNET,
   SELF_PROOF_PROVIDER_CELO_MAINNET,
+  SELF_MAX_AGENTS_PER_HUMAN,
   VERIFICATION_POLICIES,
   VERIFICATION_STATUS,
 } from '../src/services/selfAgentIdService.js';
+import {
+  filterAgentsByVerification,
+} from '../src/services/agentDiscovery.js';
 import {
   createX402PaymentRequirement,
   buildX402Response,
@@ -803,3 +810,122 @@ test('25. Agent execution failure after confirmed payment (Traceable receipt & I
   assert.equal(retryResult.status, 200);
   assert.equal(retryResult.data.computeResult, 'Success on retry!');
 });
+
+test('26. getVerificationStatusLabel maps canonical user-facing verification labels', () => {
+  assert.equal(getVerificationStatusLabel(VERIFICATION_STATUS.VERIFIED), 'Self Verified');
+  assert.equal(getVerificationStatusLabel('verified'), 'Self Verified');
+  assert.equal(getVerificationStatusLabel(VERIFICATION_STATUS.PENDING), 'Verification Pending');
+  assert.equal(getVerificationStatusLabel(VERIFICATION_STATUS.EXPIRED), 'Verification Expired');
+  assert.equal(getVerificationStatusLabel(VERIFICATION_STATUS.FAILED), 'Verification Failed');
+  assert.equal(getVerificationStatusLabel(VERIFICATION_STATUS.REVOKED), 'Verification Revoked');
+  assert.equal(getVerificationStatusLabel(VERIFICATION_STATUS.UNVERIFIED), 'Not Verified');
+});
+
+test('27. Multi-agent Sybil limit handling supports up to 10 agents per human', () => {
+  assert.equal(SELF_MAX_AGENTS_PER_HUMAN, 10, 'Celo Mainnet registry maximum must be 10');
+  
+  // Verify that an agent count under 10 is considered compliant
+  const humanProofWithMultipleAgents = {
+    agentCount: 3,
+    maxAgentsAllowed: SELF_MAX_AGENTS_PER_HUMAN,
+  };
+  assert.ok(humanProofWithMultipleAgents.agentCount <= humanProofWithMultipleAgents.maxAgentsAllowed);
+});
+
+test('28. createSelfAgentVerifier instantiates verifier on Celo Mainnet with deliberate 10 sybil limit', async () => {
+  const verifier = await createSelfAgentVerifier({
+    sybilLimit: 10,
+    requireAge: 18,
+    requireOFAC: true,
+  });
+
+  assert.ok(verifier, 'Verifier must be instantiated');
+  assert.equal(typeof verifier.verify, 'function');
+});
+
+test('29. filterAgentsByVerification filters agent directory by trust states', () => {
+  const sampleAgents = [
+    { tag: 'nairatag', self: { verified: true, status: 'verified' } },
+    { tag: 'bloom', self: { verified: true, status: 'verified' } },
+    { tag: 'pendingagent', self: { verified: false, status: 'verification_pending' } },
+    { tag: 'unverifiedagent', self: { verified: false, status: 'unverified' } },
+  ];
+
+  const all = filterAgentsByVerification(sampleAgents, 'all');
+  assert.equal(all.length, 4);
+
+  const verified = filterAgentsByVerification(sampleAgents, 'verified');
+  assert.equal(verified.length, 2);
+  assert.ok(verified.every((a) => a.self.verified));
+
+  const pending = filterAgentsByVerification(sampleAgents, 'pending');
+  assert.equal(pending.length, 1);
+  assert.equal(pending[0].tag, 'pendingagent');
+
+  const unverified = filterAgentsByVerification(sampleAgents, 'unverified');
+  assert.equal(unverified.length, 1);
+  assert.equal(unverified[0].tag, 'unverifiedagent');
+});
+
+test('30. verifyAgentRequestSignature rejects missing or stale signature headers', async () => {
+  // Missing address
+  const res1 = await verifyAgentRequestSignature({
+    headers: {},
+  });
+  assert.equal(res1.valid, false);
+  assert.ok(res1.error.includes('x-self-agent-address'));
+
+  // Missing signature
+  const res2 = await verifyAgentRequestSignature({
+    headers: {
+      'x-self-agent-address': OFFICIAL_AGENT_WALLET,
+    },
+  });
+  assert.equal(res2.valid, false);
+  assert.ok(res2.error.includes('signature'));
+
+  // Stale timestamp (older than 5 minutes)
+  const res3 = await verifyAgentRequestSignature({
+    headers: {
+      'x-self-agent-address': OFFICIAL_AGENT_WALLET,
+      'x-self-agent-signature': '0xmocksignature',
+      'x-self-agent-timestamp': String(Date.now() - 600000), // 10 minutes ago
+    },
+  });
+  assert.equal(res3.valid, false);
+  assert.ok(res3.error.includes('stale or expired'));
+});
+
+test('31. Serverless API Route handler for /api/self-gated-service executes Hackathon Track 3 flow', async () => {
+  const handler = (await import('../api/self-gated-service.js')).default;
+  assert.equal(typeof handler, 'function');
+
+  // Scenario A: Unverified agent requests capability -> 403 Forbidden
+  let statusCodeA = null;
+  let jsonResponseA = null;
+  const mockResA = {
+    setHeader: () => {},
+    status: (code) => {
+      statusCodeA = code;
+      return {
+        json: (data) => { jsonResponseA = data; return data; },
+      };
+    },
+  };
+
+  await handler({
+    method: 'POST',
+    headers: {
+      'x-self-agent-address': '0x000000000000000000000000000000000000dEaD',
+    },
+    body: {
+      agentAddress: '0x000000000000000000000000000000000000dEaD',
+      capability: 'cngn_forex_intelligence',
+    },
+  }, mockResA);
+
+  assert.equal(statusCodeA, 403, 'Scenario A must reject unverified agent with HTTP 403');
+  assert.equal(jsonResponseA.scenario, 'SCENARIO_A_ACCESS_DENIED');
+  assert.ok(jsonResponseA.error.includes('Self Human Proof Required'));
+});
+

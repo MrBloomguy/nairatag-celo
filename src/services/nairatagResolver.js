@@ -281,7 +281,7 @@ export async function claimTag({
             name: 'CeloTags Protocol',
             version: '1',
             chainId: activeChainId,
-            verifyingContract: '0xb34518cC33314ee63841120bDd3Baa3BD1baf9e0',
+            verifyingContract: '0x6D3950a390c7F60287d545cC5785c594e07439F9',
           },
           types: {
             EIP712Domain: [
@@ -333,7 +333,7 @@ export async function claimTag({
       nonce: finalNonce,
       deadline: finalDeadline,
       chainId: chainId || 11142220,
-      verifyingContract: '0xb34518cC33314ee63841120bDd3Baa3BD1baf9e0',
+      verifyingContract: '0x6D3950a390c7F60287d545cC5785c594e07439F9',
       action: 'CLAIM_SOVEREIGN_IDENTITY',
     };
 

@@ -286,6 +286,59 @@ export default function SelfAgentVerificationCard({ walletAddress, onConnectWall
         </p>
       </div>
 
+      {/* ─── Hackathon Track 3: 1-Click Interactive Scenarios ─── */}
+      <div style={{ background: 'var(--surface-2, #f8fafc)', borderRadius: '10px', padding: '10px', border: '1px solid rgba(0,0,0,0.08)', marginBottom: '14px' }}>
+        <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--privy-color-foreground-2, #475569)', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+          Verified Agent Payments · Test Scenarios
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
+          <button
+            type="button"
+            onClick={() => {
+              setSelectedTag('₦unverified');
+              setAgentAddress('0x000000000000000000000000000000000000dEaD');
+              resetFlow();
+            }}
+            style={{
+              padding: '6px 8px',
+              borderRadius: '8px',
+              border: '1px solid #fecaca',
+              background: '#fff1f2',
+              color: '#dc2626',
+              fontSize: '11px',
+              fontWeight: 600,
+              cursor: 'pointer',
+              textAlign: 'left',
+            }}
+            title="Load unverified agent to verify access denial"
+          >
+            <strong>Scenario A</strong>: Unverified (403)
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setSelectedTag('₦nairatag');
+              setAgentAddress(OFFICIAL_AGENT_WALLET);
+              resetFlow();
+            }}
+            style={{
+              padding: '6px 8px',
+              borderRadius: '8px',
+              border: '1px solid #a7f3d0',
+              background: '#ecfdf5',
+              color: '#059669',
+              fontSize: '11px',
+              fontWeight: 600,
+              cursor: 'pointer',
+              textAlign: 'left',
+            }}
+            title="Load verified official agent to verify 402 challenge and execution"
+          >
+            <strong>Scenario B/C</strong>: Verified (402 → Pay)
+          </button>
+        </div>
+      </div>
+
       {/* Target Agent & Verification Status */}
       <div style={{ marginBottom: '14px' }}>
         <div style={{ display: 'flex', gap: '8px' }}>

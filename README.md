@@ -38,6 +38,8 @@ NairaTag replaces complex 42-character hexadecimal addresses (`0x71C...b1D`) wit
 
 | Contract / Asset | Address | Explorer Link |
 |---|---|---|
+| **NairaTagRegistry (Canonical)** | `0x6D3950a390c7F60287d545cC5785c594e07439F9` | [CeloScan](https://celoscan.io/address/0x6D3950a390c7F60287d545cC5785c594e07439F9) |
+| **NairaTagResolver (Canonical)** | `0xa3760573DE321DA2955573c69a4f497d57C769A2` | [CeloScan](https://celoscan.io/address/0xa3760573DE321DA2955573c69a4f497d57C769A2) |
 | **ERC-8004 Identity Registry** | `0x8004A169FB4a3325136EB29fA0ceB6D2e539a432` | [CeloScan](https://celoscan.io/address/0x8004A169FB4a3325136EB29fA0ceB6D2e539a432) |
 | **ERC-8004 Reputation Registry** | `0x8004BAa17C55a88189AE136b182e5fdA19dE9b63` | [CeloScan](https://celoscan.io/address/0x8004BAa17C55a88189AE136b182e5fdA19dE9b63) |
 | **Textile FX Router (Corridor)** | `0xa9AA0a64769cBed4d3B1Ceb4Df01CdE915C235b3` | [CeloScan](https://celoscan.io/address/0xa9AA0a64769cBed4d3B1Ceb4Df01CdE915C235b3) |

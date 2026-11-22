@@ -47,8 +47,39 @@ import { loadDurableEntityStore, persistDurableEntityStore } from './durableBook
 // In-memory persistent registry store
 const servicesStore = new Map();
 
+export const MOCK_SERVICE_IDS = [
+  'srv_nairatag_orchestration_01',
+  'srv_music_mix_01',
+  'srv_video_edit_01',
+  'srv_design_brand_01',
+  'srv_dev_consult_01',
+  'srv_ride_dispatch_01',
+  'srv_travel_concierge_01',
+  'srv_compute_cluster_01',
+];
+
+/**
+ * Purges any legacy mock/seed services from memory and durable storage.
+ */
+export function purgeMockServices() {
+  let changed = false;
+  for (const id of MOCK_SERVICE_IDS) {
+    if (servicesStore.has(id)) {
+      servicesStore.delete(id);
+      changed = true;
+    }
+  }
+  if (changed) {
+    persistDurableEntityStore('services', servicesStore).catch(() => {});
+  }
+}
+
 // Initialize durable persistence
-loadDurableEntityStore('services', servicesStore).catch(() => {});
+loadDurableEntityStore('services', servicesStore)
+  .then(() => {
+    purgeMockServices();
+  })
+  .catch(() => {});
 
 /**
  * Validates a BookableService definition.
@@ -216,155 +247,12 @@ export function searchServices({
 
 /**
  * Seeds the initial catalog of verified agent services on Celo Mainnet.
+ * Mock services have been purged. Only authentic services registered by
+ * sovereign agents and providers are preserved.
  */
 export function seedVerifiedServices() {
-  const seeds = [
-    {
-      id: 'srv_music_mix_01',
-      agentTag: 'music',
-      title: 'Music production session',
-      description: 'Recording, production and mixing with a professional producer.',
-      category: 'music',
-      pricingModel: PRICING_MODELS.FIXED,
-      price: '50000',
-      currency: 'cNGN',
-      durationMinutes: 120,
-      image: 'https://images.unsplash.com/photo-1598488035139-bdbb2231ce04?auto=format&fit=crop&w=800&q=80',
-      bookingMode: BOOKING_MODES.APPROVAL_REQUIRED,
-      availabilityMode: AVAILABILITY_MODES.WORKING_HOURS,
-      advancePaymentRequired: true,
-      humanBookingEnabled: true,
-      agentBookingEnabled: true,
-      requiresSelfVerification: false,
-      cancellationPolicy: 'Full refund if cancelled at least 24 hours prior to studio time.',
-      active: true,
-    },
-    {
-      id: 'srv_video_edit_01',
-      agentTag: 'video',
-      title: 'Video production',
-      description: 'Shoot planning and production.',
-      category: 'video',
-      pricingModel: PRICING_MODELS.PER_SESSION,
-      price: '80000',
-      currency: 'cNGN',
-      durationMinutes: 180,
-      image: 'https://images.unsplash.com/photo-1574717024653-61fd2cf4d44d?auto=format&fit=crop&w=800&q=80',
-      bookingMode: BOOKING_MODES.APPROVAL_REQUIRED,
-      availabilityMode: AVAILABILITY_MODES.WORKING_HOURS,
-      advancePaymentRequired: true,
-      humanBookingEnabled: true,
-      agentBookingEnabled: true,
-      requiresSelfVerification: false,
-      cancellationPolicy: 'Free cancellation up to 48 hours in advance.',
-      active: true,
-    },
-    {
-      id: 'srv_design_brand_01',
-      agentTag: 'design',
-      title: 'Design session',
-      description: 'Brand identity, UI/UX, and vector design system.',
-      category: 'design',
-      pricingModel: PRICING_MODELS.FIXED,
-      price: '40000',
-      currency: 'cNGN',
-      durationMinutes: 90,
-      image: 'https://images.unsplash.com/photo-1581291518857-4e27b48ff24e?auto=format&fit=crop&w=800&q=80',
-      bookingMode: BOOKING_MODES.INSTANT,
-      availabilityMode: AVAILABILITY_MODES.WORKING_HOURS,
-      advancePaymentRequired: true,
-      humanBookingEnabled: true,
-      agentBookingEnabled: true,
-      requiresSelfVerification: false,
-      cancellationPolicy: 'Instant booking with 100% money-back satisfaction guarantee.',
-      active: true,
-    },
-    {
-      id: 'srv_dev_consult_01',
-      agentTag: 'dev',
-      title: 'Smart Contract Architecture & Audit Review',
-      description: '2-hour technical deep-dive into Celo smart contracts, Altana session policies, and x402 payment rail integration.',
-      category: 'development',
-      pricingModel: PRICING_MODELS.HOURLY,
-      price: '50.00',
-      currency: 'USDT',
-      durationMinutes: 120,
-      bookingMode: BOOKING_MODES.INSTANT,
-      availabilityMode: AVAILABILITY_MODES.WORKING_HOURS,
-      advancePaymentRequired: true,
-      humanBookingEnabled: true,
-      agentBookingEnabled: true,
-      requiresSelfVerification: true, // Gated by Self Protocol ZK proof
-      cancellationPolicy: 'Reschedule anytime up to 12 hours before call.',
-      active: true,
-    },
-    {
-      id: 'srv_ride_dispatch_01',
-      agentTag: 'ride',
-      title: 'Express Airport & Inter-State Dispatch',
-      description: 'Guaranteed point-to-point dispatch reservation with live telemetry and Celo stablecoin instant settlement.',
-      category: 'transportation',
-      pricingModel: PRICING_MODELS.FIXED,
-      price: '15.00',
-      currency: 'USDT',
-      durationMinutes: 60,
-      bookingMode: BOOKING_MODES.INSTANT,
-      availabilityMode: AVAILABILITY_MODES.WORKING_HOURS,
-      advancePaymentRequired: true,
-      humanBookingEnabled: true,
-      agentBookingEnabled: true,
-      requiresSelfVerification: false,
-      cancellationPolicy: 'Free cancellation up to 2 hours before pickup.',
-      active: true,
-    },
-    {
-      id: 'srv_travel_concierge_01',
-      agentTag: 'travel',
-      title: 'Global Travel Logistics & Flight Concierge',
-      description: 'Autonomous itinerary assembly, hotel reservations, and multi-leg route planning with zero foreign exchange fees.',
-      category: 'travel',
-      pricingModel: PRICING_MODELS.FIXED,
-      price: '20.00',
-      currency: 'USDT',
-      durationMinutes: 60,
-      bookingMode: BOOKING_MODES.APPROVAL_REQUIRED,
-      availabilityMode: AVAILABILITY_MODES.WORKING_HOURS,
-      advancePaymentRequired: true,
-      humanBookingEnabled: true,
-      agentBookingEnabled: true,
-      requiresSelfVerification: false,
-      cancellationPolicy: 'Refundable until airline ticket issuance.',
-      active: true,
-    },
-    {
-      id: 'srv_compute_cluster_01',
-      agentTag: 'nairatag',
-      title: 'Dedicated L4 GPU Inference Hour',
-      description: '1-Hour dedicated high-throughput LLM inference slot on Celo decentralised compute node with low latency streaming.',
-      category: 'ai_compute',
-      pricingModel: PRICING_MODELS.HOURLY,
-      price: '2.50',
-      currency: 'USDT',
-      durationMinutes: 60,
-      bookingMode: BOOKING_MODES.INSTANT,
-      availabilityMode: AVAILABILITY_MODES.WORKING_HOURS,
-      advancePaymentRequired: true,
-      humanBookingEnabled: true,
-      agentBookingEnabled: true,
-      requiresSelfVerification: false,
-      cancellationPolicy: 'Non-refundable slot reservation.',
-      active: true,
-    },
-  ];
-
-  seeds.forEach((seed) => {
-    try {
-      registerService(seed, { role: 'admin' });
-    } catch {
-      // Ignored if already registered
-    }
-  });
+  purgeMockServices();
 }
 
-// Auto-seed on load
+// Auto-seed / purge on load
 seedVerifiedServices();

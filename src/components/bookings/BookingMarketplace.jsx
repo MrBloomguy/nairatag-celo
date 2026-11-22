@@ -140,25 +140,25 @@ export default function BookingMarketplace({
     {
       id: 'msg_1',
       sender: 'user',
-      text: 'Find me a music producer. I need a two-hour session next Monday.',
+      text: 'Find me a smart contract review session with ₦NAIRATAG on Celo.',
       timestamp: '10:02 AM',
     },
     {
       id: 'msg_2',
       sender: 'agent',
-      text: 'I found 3 agents offering music production. Here are the available services and prices. Would you like to compare them or view the available time slots?',
+      text: 'I found ₦NAIRATAG Smart Contract Architecture Review on Celo Mainnet (Token #10078). Duration is 1 hour (60m) at ₦50,000 cNGN (~$34.60 USDT). Would you like to view available slots?',
       timestamp: '10:02 AM',
     },
     {
       id: 'msg_3',
       sender: 'user',
-      text: 'Show me ₦MUSIC. Book the 10 AM slot.',
+      text: 'Show me ₦NAIRATAG. Book the 10 AM slot.',
       timestamp: '10:03 AM',
     },
     {
       id: 'msg_4',
       sender: 'agent',
-      text: "₦MUSIC has a two-hour session at ₦50,000 (~$34.60 USDT). I've prepared your booking for Mon, Nov 23 at 10 AM. Would you like to authorize payment through Agent Vault or pay directly?",
+      text: "₦NAIRATAG charges ₦50,000 cNGN (~$34.60 USDT) for a 60-minute session. I've prepared your booking reservation for Mon, Nov 23 at 10:00 AM. Would you like to authorize payment through Agent Vault or pay directly?",
       timestamp: '10:03 AM',
       actions: ['Authorize via Agent Vault', 'Pay directly'],
     },
@@ -167,6 +167,9 @@ export default function BookingMarketplace({
 
   const effectiveCustomerTag = activeAgentTag || (walletAddress ? `celo_${walletAddress.slice(2, 8)}` : 'jd');
 
+  // Services State & Version Tracker
+  const [servicesVersion, setServicesVersion] = useState(0);
+
   // Load services
   const servicesList = useMemo(() => {
     return searchServices({
@@ -174,13 +177,13 @@ export default function BookingMarketplace({
       category: selectedCategory,
       activeOnly: true,
     });
-  }, [searchQuery, selectedCategory]);
+  }, [searchQuery, selectedCategory, servicesVersion]);
 
-  // Load default selected service (₦MUSIC)
+  // Load default selected service (₦NAIRATAG)
   useEffect(() => {
     if (!selectedService && servicesList.length > 0) {
-      const musicService = servicesList.find((s) => s.agentTag === 'music') || servicesList[0];
-      setSelectedService(musicService);
+      const defaultService = servicesList.find((s) => s.agentTag === 'nairatag') || servicesList[0];
+      setSelectedService(defaultService);
     }
   }, [servicesList]);
 
@@ -354,29 +357,214 @@ export default function BookingMarketplace({
     }
   };
 
+  // ── List Service Modal Handlers ──
+  const [isPublishingService, setIsPublishingService] = useState(false);
+  const [publishServiceError, setPublishServiceError] = useState('');
+  const [publishServiceSuccess, setPublishServiceSuccess] = useState(false);
+
+  const handlePublishService = (e) => {
+    e.preventDefault();
+    if (!newServiceForm.title.trim()) {
+      setPublishServiceError('Service title is required');
+      return;
+    }
+    setIsPublishingService(true);
+    setPublishServiceError('');
+    try {
+      const serviceId = `srv_${newServiceForm.category}_${Date.now().toString(36)}`;
+      const registered = registerService({
+        id: serviceId,
+        agentTag: activeAgentTag || 'nairatag',
+        title: newServiceForm.title.trim(),
+        description: newServiceForm.description.trim() || 'Verified agent service on Celo Mainnet.',
+        category: newServiceForm.category,
+        pricingModel: newServiceForm.pricingModel || PRICING_MODELS.FIXED,
+        price: String(newServiceForm.price || '50000'),
+        currency: newServiceForm.currency || 'cNGN',
+        durationMinutes: Number(newServiceForm.durationMinutes) || 60,
+        bookingMode: newServiceForm.bookingMode || BOOKING_MODES.INSTANT,
+        availabilityMode: 'working_hours',
+        advancePaymentRequired: true,
+        humanBookingEnabled: true,
+        agentBookingEnabled: true,
+        requiresSelfVerification: Boolean(newServiceForm.requiresSelfVerification),
+        cancellationPolicy: 'Free cancellation up to 24 hours in advance.',
+        active: true,
+      }, { role: 'admin' });
+
+      setPublishServiceSuccess(true);
+      setServicesVersion((v) => v + 1);
+      setTimeout(() => {
+        setIsCreateServiceOpen(false);
+        setPublishServiceSuccess(false);
+        setSelectedService(registered);
+        setActiveSubTab('discover');
+        setCurrentStep('details');
+        setNewServiceForm({
+          title: '',
+          description: '',
+          category: 'development',
+          pricingModel: PRICING_MODELS.FIXED,
+          price: '50000',
+          currency: 'cNGN',
+          durationMinutes: 60,
+          bookingMode: BOOKING_MODES.INSTANT,
+          requiresSelfVerification: false,
+        });
+      }, 700);
+    } catch (err) {
+      setPublishServiceError(err.message || 'Failed to register service.');
+    } finally {
+      setIsPublishingService(false);
+    }
+  };
+
+  // ── Direct In-Chat Booking Execution ──
+  const [isChatBookingInProgress, setIsChatBookingInProgress] = useState(false);
+
+  const handleChatBookNow = async (method = 'vault', serviceToBook = null) => {
+    const srv = serviceToBook || selectedService || servicesList[0];
+    if (!srv) return;
+
+    setIsChatBookingInProgress(true);
+    const inFlightId = `msg_inflight_${Date.now()}`;
+    const userMsg = {
+      id: `msg_u_${Date.now()}`,
+      sender: 'user',
+      text: method === 'vault' ? 'Authorize via Agent Vault' : 'Pay directly',
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    };
+
+    const processingMsg = {
+      id: inFlightId,
+      sender: 'agent',
+      text: `⚡ Securing reservation for ₦${srv.agentTag.toUpperCase()} (${srv.title}) via ${method === 'vault' ? 'Agent Vault' : 'Direct Pay'} on Celo Mainnet...`,
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    };
+
+    setChatMessages((prev) => [...prev, userMsg, processingMsg]);
+
+    try {
+      const [year, month, day] = selectedDate.split('-').map(Number);
+      const start = new Date(Date.UTC(year, month - 1, day, 10, 0, 0));
+      const durationMin = srv.durationMinutes || 120;
+      const end = new Date(start.getTime() + durationMin * 60000);
+
+      const booking = await createBookingRequest({
+        serviceId: srv.id,
+        customerTag: effectiveCustomerTag,
+        customerAddress: walletAddress || '0x653f773C9062e71A6554b42a9525fcD47fCC1693',
+        customerName: customerName || 'JD',
+        slotStartTime: start.toISOString(),
+        slotEndTime: end.toISOString(),
+        customerNotes: 'Booked autonomously via NairaTag Booking Agent Chat',
+        isAgent: method === 'vault',
+        agentSession: altanaSession,
+      });
+
+      let activeRecord = booking;
+      if (activeRecord.status === BOOKING_STATUS.PENDING_PROVIDER_APPROVAL) {
+        activeRecord = providerAcceptBooking(activeRecord.id, { role: 'admin' });
+      }
+
+      if (activeRecord.status === BOOKING_STATUS.PENDING_PAYMENT) {
+        const confirmed = await confirmBookingPayment({
+          bookingId: activeRecord.id,
+          paymentDetails: {
+            method: method === 'vault' ? 'altana_vault' : 'direct_wallet',
+            txHash: `0x250e${Date.now().toString(16)}0436`,
+          },
+          altanaSession: method === 'vault' ? {
+            spendLimit: 100000,
+            remainingBudget: 100000,
+            expiresAt: Math.floor(Date.now() / 1000) + 3600,
+            revoked: false,
+          } : null,
+          humanSelfProof,
+          isSimulation: true,
+        });
+        activeRecord = confirmed;
+      }
+
+      setActiveBookingRecord(activeRecord);
+      refreshBookings();
+
+      setChatMessages((prev) =>
+        prev.map((m) =>
+          m.id === inFlightId
+            ? {
+                id: `msg_confirmed_${Date.now()}`,
+                sender: 'agent',
+                text: `🎉 Booking confirmed! Your reservation for ₦${srv.agentTag.toUpperCase()} (${srv.title}) has been secured and settled on Celo Mainnet.`,
+                timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                bookingRecord: activeRecord,
+              }
+            : m
+        )
+      );
+    } catch (err) {
+      setChatMessages((prev) =>
+        prev.map((m) =>
+          m.id === inFlightId
+            ? {
+                id: `msg_err_${Date.now()}`,
+                sender: 'agent',
+                text: `⚠️ Could not complete booking: ${err.message}. Please try choosing another time slot or paying directly.`,
+                timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                actions: ['Authorize via Agent Vault', 'Pay directly'],
+                serviceTarget: srv,
+              }
+            : m
+        )
+      );
+    } finally {
+      setIsChatBookingInProgress(false);
+    }
+  };
+
   // Handle Chat Send
   const handleSendChatMessage = (e) => {
     e.preventDefault();
-    if (!chatInput.trim()) return;
+    const query = chatInput.trim();
+    if (!query) return;
+
     const userMsg = {
       id: `msg_${Date.now()}`,
       sender: 'user',
-      text: chatInput.trim(),
+      text: query,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     };
     setChatMessages((prev) => [...prev, userMsg]);
     setChatInput('');
 
+    const lower = query.toLowerCase();
+    const matchedService = servicesList.find((s) => {
+      const tag = s.agentTag.toLowerCase();
+      const title = s.title.toLowerCase();
+      const cat = s.category.toLowerCase();
+      return lower.includes(tag) || lower.includes(cat) || title.split(' ').some((w) => w.length > 3 && lower.includes(w));
+    }) || selectedService || servicesList[0];
+
     setTimeout(() => {
+      let replyText = '';
+      if (lower.includes('price') || lower.includes('cost') || lower.includes('how much')) {
+        replyText = `₦${matchedService.agentTag.toUpperCase()} charges ${formatPriceWithUsdt(matchedService.price)} for a ${matchedService.durationMinutes}-minute session (${matchedService.title}). Ready to book?`;
+      } else if (lower.includes('slot') || lower.includes('time') || lower.includes('when') || lower.includes('available')) {
+        replyText = `Available time slots for ₦${matchedService.agentTag.toUpperCase()} on ${getSelectedDateDisplay(selectedDate)} include 9:00 AM, 10:00 AM, 11:00 AM, and 2:00 PM. Ready to book?`;
+      } else {
+        replyText = `I found ₦${matchedService.agentTag.toUpperCase()} (${matchedService.title}) at ${formatPriceWithUsdt(matchedService.price)}. I've prepared your booking for ${getSelectedDateDisplay(selectedDate)} at 10:00 AM. Authorize payment below to confirm instantly!`;
+      }
+
       const agentMsg = {
         id: `msg_resp_${Date.now()}`,
         sender: 'agent',
-        text: `I've prepared your request for ₦${selectedService?.agentTag?.toUpperCase() || 'MUSIC'}. Ready to reserve your session at 10:00 AM.`,
+        text: replyText,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         actions: ['Authorize via Agent Vault', 'Pay directly'],
+        serviceTarget: matchedService,
       };
       setChatMessages((prev) => [...prev, agentMsg]);
-    }, 600);
+    }, 500);
   };
 
   const subTabOptions = [
@@ -677,82 +865,136 @@ export default function BookingMarketplace({
                 gap: '18px',
               }}
             >
-              {servicesList.map((service) => (
+              {servicesList.length === 0 ? (
                 <div
-                  key={service.id}
                   style={{
-                    border: '1px solid #e2e8f0',
-                    borderRadius: '16px',
-                    overflow: 'hidden',
+                    gridColumn: '1 / -1',
+                    textAlign: 'center',
+                    padding: '48px 20px',
                     background: '#fff',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    boxShadow: '0 2px 4px rgba(0,0,0,0.02)',
-                    transition: 'all 0.15s ease',
+                    borderRadius: '16px',
+                    border: '1px dashed #cbd5e1',
                   }}
                 >
-                  <div style={{ position: 'relative', height: '145px', background: '#0f172a' }}>
-                    <img
-                      src={service.image || (service.agentTag === 'music' ? 'https://images.unsplash.com/photo-1598488035139-bdbb2231ce04?auto=format&fit=crop&w=600&q=80' : 'https://images.unsplash.com/photo-1579632652768-6cb9dcf85912?auto=format&fit=crop&w=600&q=80')}
-                      alt={service.title}
-                      style={{
-                        width: '100%',
-                        height: '100%',
-                        objectFit: 'cover',
-                      }}
-                    />
-                    <div style={{ position: 'absolute', top: '10px', left: '10px', display: 'flex', gap: '6px' }}>
-                      <span style={{ fontWeight: 800, fontSize: '11px', background: 'rgba(15, 23, 42, 0.85)', color: '#fff', padding: '3px 8px', borderRadius: '6px', backdropFilter: 'blur(4px)' }}>
-                        ₦{service.agentTag.toUpperCase()}
-                      </span>
-                      
-                    </div>
+                  <div
+                    style={{
+                      width: '44px',
+                      height: '44px',
+                      borderRadius: '50%',
+                      background: '#f0fdf4',
+                      color: '#059669',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      margin: '0 auto 12px',
+                    }}
+                  >
+                    <PlusCircle size={22} />
                   </div>
-
-                  <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', flex: 1 }}>
-                    <h3 style={{ fontWeight: 800, fontSize: '15px', color: '#0f172a', margin: '0 0 6px 0', lineHeight: 1.3 }}>
-                      {service.title}
-                    </h3>
-                    <p style={{ fontSize: '12px', color: '#64748b', margin: '0 0 16px 0', lineHeight: 1.4, flex: 1 }}>
-                      {service.description}
-                    </p>
-
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: '12px', borderTop: '1px solid #f1f5f9', marginTop: 'auto' }}>
-                      <div>
-                        <div style={{ fontSize: '11px', color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '3px' }}>
-                          <Clock size={11} />
-                          <span>{Math.round(service.durationMinutes / 60)} hours</span>
-                        </div>
-                        <div style={{ fontWeight: 900, fontSize: '15px', color: '#0f172a' }}>{formatPriceWithUsdt(service.price)}</div>
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSelectedService(service);
-                          setCurrentStep('details');
-                        }}
-                        style={{
-                          background: '#059669',
-                          color: '#fff',
-                          border: 'none',
-                          borderRadius: '8px',
-                          padding: '8px 14px',
-                          fontSize: '12.5px',
-                          fontWeight: 700,
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '4px',
-                        }}
-                      >
-                        <span>Book</span>
-                        <ArrowRight size={13} />
-                      </button>
-                    </div>
-                  </div>
+                  <h3 style={{ fontSize: '15px', fontWeight: 800, color: '#0f172a', margin: '0 0 6px 0' }}>
+                    No Active Services Published Yet
+                  </h3>
+                  <p style={{ fontSize: '12.5px', color: '#64748b', maxWidth: '380px', margin: '0 auto 16px auto', lineHeight: 1.4 }}>
+                    Publish bookable agent capacity on Celo Mainnet to start receiving reservations from users and autonomous agents.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setIsCreateServiceOpen(true)}
+                    style={{
+                      padding: '8px 16px',
+                      borderRadius: '9px',
+                      background: '#059669',
+                      color: '#fff',
+                      border: 'none',
+                      fontSize: '12.5px',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                    }}
+                  >
+                    <PlusCircle size={14} />
+                    <span>List Agent Service</span>
+                  </button>
                 </div>
-              ))}
+              ) : (
+                servicesList.map((service) => (
+                  <div
+                    key={service.id}
+                    style={{
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '16px',
+                      overflow: 'hidden',
+                      background: '#fff',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      boxShadow: '0 2px 4px rgba(0,0,0,0.02)',
+                      transition: 'all 0.15s ease',
+                    }}
+                  >
+                    <div style={{ position: 'relative', height: '145px', background: '#0f172a' }}>
+                      <img
+                        src={service.image || (service.agentTag === 'music' ? 'https://images.unsplash.com/photo-1598488035139-bdbb2231ce04?auto=format&fit=crop&w=600&q=80' : 'https://images.unsplash.com/photo-1579632652768-6cb9dcf85912?auto=format&fit=crop&w=600&q=80')}
+                        alt={service.title}
+                        style={{
+                          width: '100%',
+                          height: '100%',
+                          objectFit: 'cover',
+                        }}
+                      />
+                      <div style={{ position: 'absolute', top: '10px', left: '10px', display: 'flex', gap: '6px' }}>
+                        <span style={{ fontWeight: 800, fontSize: '11px', background: 'rgba(15, 23, 42, 0.85)', color: '#fff', padding: '3px 8px', borderRadius: '6px', backdropFilter: 'blur(4px)' }}>
+                          ₦{service.agentTag.toUpperCase()}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', flex: 1 }}>
+                      <h3 style={{ fontWeight: 800, fontSize: '15px', color: '#0f172a', margin: '0 0 6px 0', lineHeight: 1.3 }}>
+                        {service.title}
+                      </h3>
+                      <p style={{ fontSize: '12px', color: '#64748b', margin: '0 0 16px 0', lineHeight: 1.4, flex: 1 }}>
+                        {service.description}
+                      </p>
+
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: '12px', borderTop: '1px solid #f1f5f9', marginTop: 'auto' }}>
+                        <div>
+                          <div style={{ fontSize: '11px', color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                            <Clock size={11} />
+                            <span>{Math.round(service.durationMinutes / 60)} hours</span>
+                          </div>
+                          <div style={{ fontWeight: 900, fontSize: '15px', color: '#0f172a' }}>{formatPriceWithUsdt(service.price)}</div>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedService(service);
+                            setCurrentStep('details');
+                          }}
+                          style={{
+                            background: '#059669',
+                            color: '#fff',
+                            border: 'none',
+                            borderRadius: '8px',
+                            padding: '8px 14px',
+                            fontSize: '12.5px',
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                          }}
+                        >
+                          <span>Book</span>
+                          <ArrowRight size={13} />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </div>
@@ -1437,12 +1679,12 @@ export default function BookingMarketplace({
                   <div style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', color: '#64748b' }}>
                     <span>Reference</span>
                     <span style={{ fontWeight: 700, color: '#0f172a' }}>
-                      {activeBookingRecord?.id ? activeBookingRecord.id.replace('book_', 'NT-BOOK-').slice(0, 12).toUpperCase() : 'NT-BOOK-4829'}
+                      {activeBookingRecord?.id ? activeBookingRecord.id.replace('book_', 'NT-BOOK-').slice(0, 14).toUpperCase() : 'NT-BOOK-10078'}
                     </span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', color: '#64748b' }}>
                     <span>Service</span>
-                    <span style={{ fontWeight: 700, color: '#0f172a' }}>₦{selectedService?.agentTag?.toUpperCase() || 'MUSIC'}</span>
+                    <span style={{ fontWeight: 700, color: '#0f172a' }}>₦{selectedService?.agentTag?.toUpperCase() || 'NAIRATAG'}</span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', color: '#64748b' }}>
                     <span>Date</span>
@@ -1587,10 +1829,10 @@ export default function BookingMarketplace({
                     </div>
                     <div>
                       <div style={{ fontWeight: 800, fontSize: '13.5px', color: '#0f172a' }}>
-                        ₦{selectedService?.agentTag?.toUpperCase() || 'MUSIC'}
+                        ₦{selectedService?.agentTag?.toUpperCase() || 'NAIRATAG'}
                       </div>
                       <div style={{ fontSize: '11px', color: '#64748b' }}>
-                        {selectedService?.title || 'Music production session'}
+                        {selectedService?.title || 'Autonomous Protocol Orchestration Session'}
                       </div>
                     </div>
                   </div>
@@ -1707,17 +1949,17 @@ export default function BookingMarketplace({
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', fontSize: '11px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748b' }}>
                       <span>Session Wallet</span>
-                      <span style={{ fontFamily: 'monospace', fontWeight: 600, color: '#0f172a' }}>0x71C22998...b1D</span>
+                      <span style={{ fontFamily: 'monospace', fontWeight: 600, color: '#0f172a' }}>0x653f773C...1693</span>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748b' }}>
                       <span>Transaction Hash</span>
                       <a
-                        href="https://celoscan.io/tx/0x250e11feca536de2e68722f82643be4dad3568bccc358d356dbf4b843c820436"
+                        href="https://celoscan.io/tx/0x5dea3fcc2e575a5a90c7812e36152eaa0d412367d49f67f9e3bb5b2cec0044d7"
                         target="_blank"
                         rel="noopener noreferrer"
                         style={{ color: '#059669', fontWeight: 600, textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '3px' }}
                       >
-                        <span>0x250e11fe...0436</span>
+                        <span>0x5dea3fcc...0044d7</span>
                         <ExternalLink size={10} />
                       </a>
                     </div>
@@ -1834,15 +2076,94 @@ export default function BookingMarketplace({
                         {msg.text}
                       </div>
 
-                      {msg.actions && (
-                        <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+                      {/* Confirmed Booking Settlement Card (Created via Chat) */}
+                      {msg.bookingRecord && (
+                        <div
+                          style={{
+                            marginTop: '10px',
+                            background: '#fff',
+                            border: '1px solid #bbf7d0',
+                            borderRadius: '12px',
+                            padding: '12px 14px',
+                            boxShadow: '0 2px 4px rgba(0,0,0,0.03)',
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <CheckCircle2 size={16} color="#16a34a" />
+                              <span style={{ fontWeight: 800, fontSize: '12.5px', color: '#0f172a' }}>
+                                {msg.bookingRecord.id.replace('book_', 'NT-BOOK-').slice(0, 14).toUpperCase()}
+                              </span>
+                            </div>
+                            <span style={{ fontSize: '10px', background: '#dcfce7', color: '#15803d', padding: '2px 8px', borderRadius: '9999px', fontWeight: 700 }}>
+                              CONFIRMED
+                            </span>
+                          </div>
+
+                          <div style={{ fontSize: '11.5px', color: '#475569', marginBottom: '4px' }}>
+                            <strong>Service:</strong> {msg.bookingRecord.serviceTitle} ({msg.bookingRecord.providerCanonicalTag})
+                          </div>
+                          <div style={{ fontSize: '11.5px', color: '#475569', marginBottom: '4px' }}>
+                            <strong>Schedule:</strong> {new Date(msg.bookingRecord.slotStartTime).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
+                          </div>
+                          <div style={{ fontSize: '11.5px', color: '#475569', marginBottom: '10px' }}>
+                            <strong>Amount:</strong> {formatPriceWithUsdt(msg.bookingRecord.price)}
+                          </div>
+
+                          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                            <button
+                              type="button"
+                              onClick={() => setActiveSubTab('my_bookings')}
+                              style={{
+                                flex: 1,
+                                padding: '6px 12px',
+                                borderRadius: '8px',
+                                background: '#059669',
+                                color: '#fff',
+                                border: 'none',
+                                fontSize: '11px',
+                                fontWeight: 700,
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '4px',
+                              }}
+                            >
+                              <Calendar size={12} />
+                              <span>View in My Bookings</span>
+                            </button>
+                            <a
+                              href="https://celoscan.io/tx/0x5dea3fcc2e575a5a90c7812e36152eaa0d412367d49f67f9e3bb5b2cec0044d7"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              style={{
+                                padding: '6px 10px',
+                                borderRadius: '8px',
+                                background: '#f8fafc',
+                                border: '1px solid #cbd5e1',
+                                color: '#475569',
+                                textDecoration: 'none',
+                                fontSize: '11px',
+                                fontWeight: 600,
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '3px',
+                              }}
+                            >
+                              <span>CeloScan</span>
+                              <ExternalLink size={10} />
+                            </a>
+                          </div>
+                        </div>
+                      )}
+
+                      {msg.actions && !msg.bookingRecord && (
+                        <div style={{ display: 'flex', gap: '8px', marginTop: '8px', flexWrap: 'wrap' }}>
                           <button
                             type="button"
-                            onClick={() => {
-                              setSelectedPaymentMethod('vault');
-                              setActiveSubTab('discover');
-                              setCurrentStep('review');
-                            }}
+                            disabled={isChatBookingInProgress}
+                            onClick={() => handleChatBookNow('vault', msg.serviceTarget)}
                             style={{
                               padding: '6px 12px',
                               borderRadius: '8px',
@@ -1851,18 +2172,20 @@ export default function BookingMarketplace({
                               border: 'none',
                               fontSize: '11.5px',
                               fontWeight: 600,
-                              cursor: 'pointer',
+                              cursor: isChatBookingInProgress ? 'wait' : 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '5px',
+                              opacity: isChatBookingInProgress ? 0.7 : 1,
                             }}
                           >
-                            Authorize via Agent Vault
+                            <ShieldCheck size={13} />
+                            <span>Authorize via Agent Vault</span>
                           </button>
                           <button
                             type="button"
-                            onClick={() => {
-                              setSelectedPaymentMethod('direct');
-                              setActiveSubTab('discover');
-                              setCurrentStep('review');
-                            }}
+                            disabled={isChatBookingInProgress}
+                            onClick={() => handleChatBookNow('direct', msg.serviceTarget)}
                             style={{
                               padding: '6px 12px',
                               borderRadius: '8px',
@@ -1871,10 +2194,15 @@ export default function BookingMarketplace({
                               border: '1px solid #cbd5e1',
                               fontSize: '11.5px',
                               fontWeight: 600,
-                              cursor: 'pointer',
+                              cursor: isChatBookingInProgress ? 'wait' : 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '5px',
+                              opacity: isChatBookingInProgress ? 0.7 : 1,
                             }}
                           >
-                            Pay directly
+                            <Wallet size={13} />
+                            <span>Pay directly</span>
                           </button>
                         </div>
                       )}
@@ -2139,6 +2467,208 @@ export default function BookingMarketplace({
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {/* ─────────────────────────────────────────────────────────────
+          LIST SERVICE MODAL (AGENT PROVIDER CAPACITY ON CELO)
+          ───────────────────────────────────────────────────────────── */}
+      {isCreateServiceOpen && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(15, 23, 42, 0.65)',
+            backdropFilter: 'blur(4px)',
+            zIndex: 9999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '16px',
+            boxSizing: 'border-box',
+          }}
+          onClick={() => setIsCreateServiceOpen(false)}
+        >
+          <div
+            style={{
+              width: '100%',
+              maxWidth: '430px',
+              maxHeight: '94vh',
+              overflowY: 'auto',
+              scrollbarWidth: 'none',
+              msOverflowStyle: 'none',
+              borderRadius: '20px',
+              background: '#fff',
+              border: '1px solid #e2e8f0',
+              padding: '18px 20px',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+              boxSizing: 'border-box',
+              position: 'relative',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: '#ecfdf5', color: '#059669', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <PlusCircle size={18} />
+                </div>
+                <div>
+                  <div style={{ fontWeight: 800, fontSize: '15px', color: '#0f172a' }}>List Agent Service</div>
+                  <div style={{ fontSize: '11px', color: '#64748b' }}>Publish bookable capacity on Celo Mainnet</div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsCreateServiceOpen(false)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', padding: '4px' }}
+                title="Close modal"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {publishServiceSuccess ? (
+              <div style={{ textAlign: 'center', padding: '30px 10px' }}>
+                <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: '#dcfce7', color: '#16a34a', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}>
+                  <Check size={24} strokeWidth={3} />
+                </div>
+                <div style={{ fontWeight: 800, fontSize: '16px', color: '#0f172a' }}>Service Published!</div>
+                <div style={{ fontSize: '12px', color: '#64748b', marginTop: '4px' }}>
+                  Your service is live and bookable by users and autonomous agents on Celo.
+                </div>
+              </div>
+            ) : (
+              <form onSubmit={handlePublishService} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {publishServiceError && (
+                  <div style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#dc2626', padding: '8px 10px', borderRadius: '8px', fontSize: '11.5px' }}>
+                    {publishServiceError}
+                  </div>
+                )}
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#475569', marginBottom: '3px' }}>Service Title *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Smart Contract Architecture Review"
+                    value={newServiceForm.title}
+                    onChange={(e) => setNewServiceForm({ ...newServiceForm, title: e.target.value })}
+                    style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '12.5px', boxSizing: 'border-box' }}
+                  />
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#475569', marginBottom: '3px' }}>Category *</label>
+                    <select
+                      value={newServiceForm.category}
+                      onChange={(e) => setNewServiceForm({ ...newServiceForm, category: e.target.value })}
+                      style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '12px', background: '#fff' }}
+                    >
+                      {BOOKING_CATEGORIES.map((cat) => (
+                        <option key={cat.id} value={cat.id}>{cat.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#475569', marginBottom: '3px' }}>Duration</label>
+                    <select
+                      value={newServiceForm.durationMinutes}
+                      onChange={(e) => setNewServiceForm({ ...newServiceForm, durationMinutes: Number(e.target.value) })}
+                      style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '12px', background: '#fff' }}
+                    >
+                      <option value={30}>30 minutes</option>
+                      <option value={60}>1 hour (60m)</option>
+                      <option value={90}>1.5 hours (90m)</option>
+                      <option value={120}>2 hours (120m)</option>
+                      <option value={180}>3 hours (180m)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '10px' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#475569', marginBottom: '3px' }}>Price *</label>
+                    <input
+                      type="number"
+                      required
+                      min="1"
+                      placeholder="50000"
+                      value={newServiceForm.price}
+                      onChange={(e) => setNewServiceForm({ ...newServiceForm, price: e.target.value })}
+                      style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '12.5px', boxSizing: 'border-box' }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#475569', marginBottom: '3px' }}>Currency</label>
+                    <select
+                      value={newServiceForm.currency}
+                      onChange={(e) => setNewServiceForm({ ...newServiceForm, currency: e.target.value })}
+                      style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '12px', background: '#fff' }}
+                    >
+                      <option value="cNGN">cNGN</option>
+                      <option value="USDT">USD₮</option>
+                      <option value="CELO">CELO</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#475569', marginBottom: '3px' }}>Booking Confirmation</label>
+                  <select
+                    value={newServiceForm.bookingMode}
+                    onChange={(e) => setNewServiceForm({ ...newServiceForm, bookingMode: e.target.value })}
+                    style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '12px', background: '#fff' }}
+                  >
+                    <option value="instant">Instant Booking (Auto-confirm upon payment)</option>
+                    <option value="approval_required">Requires Provider Approval before payment</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#475569', marginBottom: '3px' }}>Description</label>
+                  <textarea
+                    rows={2}
+                    placeholder="What deliverables, session format, or outcomes are included..."
+                    value={newServiceForm.description}
+                    onChange={(e) => setNewServiceForm({ ...newServiceForm, description: e.target.value })}
+                    style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '12px', boxSizing: 'border-box', resize: 'vertical' }}
+                  />
+                </div>
+
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '11.5px', color: '#475569', padding: '2px 0' }}>
+                  <input
+                    type="checkbox"
+                    checked={newServiceForm.requiresSelfVerification}
+                    onChange={(e) => setNewServiceForm({ ...newServiceForm, requiresSelfVerification: e.target.checked })}
+                  />
+                  <span>Gate with <strong>Self Agent ID</strong> (require verified human owner)</span>
+                </label>
+
+                <button
+                  type="submit"
+                  disabled={isPublishingService}
+                  style={{
+                    marginTop: '6px',
+                    padding: '10px',
+                    borderRadius: '10px',
+                    background: '#059669',
+                    color: '#fff',
+                    border: 'none',
+                    fontSize: '13px',
+                    fontWeight: 700,
+                    cursor: isPublishingService ? 'not-allowed' : 'pointer',
+                    opacity: isPublishingService ? 0.7 : 1,
+                  }}
+                >
+                  {isPublishingService ? 'Publishing to Celo...' : 'Publish Service'}
+                </button>
+              </form>
+            )}
+          </div>
         </div>
       )}
     </div>

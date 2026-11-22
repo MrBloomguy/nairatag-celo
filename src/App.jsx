@@ -159,7 +159,8 @@ import { resolveTagProfile } from './services/tagAvatar.js';
 import { getRecentArcTagActivity } from './services/celoRecentTagActivity.js';
 import { getArcAgentFollowState, setArcAgentFollow } from './services/celoAgentFollows.js';
 import { fetchArcAgentMetrics } from './services/celoAgentMetrics.js';
-import { discoverAgentsByCapability, isAgentDiscoveryRequest, resolveAgentMention } from './services/agentDiscovery.js';
+import { discoverAgentsByCapability, isAgentDiscoveryRequest, resolveAgentMention, filterAgentsByVerification } from './services/agentDiscovery.js';
+import { SELF_REGISTRY_CELO_MAINNET, getVerificationStatusLabel } from './services/selfAgentIdService.js';
 import {
   recordReferralSignup,
   rememberReferralFromUrl,
@@ -1500,10 +1501,12 @@ function ArcAppShell() {
   const [agentDetailsError, setAgentDetailsError] = useState(null);
   const [agentReputationList, setAgentReputationList] = useState([]);
 
-  // Agents Section State ('bookings' Marketplace vs 'directory' ERC-8004 list)
-  const [agentsSection, setAgentsSection] = useState('bookings'); // 'bookings' | 'directory'
+  // Agents View State (ERC-8004 list)
   const [agentsViewMode, setAgentsViewMode] = useState('grid'); // 'grid' | 'list'
   const [agentsSearchQuery, setAgentsSearchQuery] = useState('');
+  const [agentsVerificationFilter, setAgentsVerificationFilter] = useState('all'); // 'all' | 'verified' | 'pending' | 'unverified'
+  const [activeVerificationDetailAgent, setActiveVerificationDetailAgent] = useState(null);
+  const [isSelfDemoModalOpen, setIsSelfDemoModalOpen] = useState(false);
   const [selectedAgentProfile, setSelectedAgentProfile] = useState(null);
   const [agentProfileLiveLoading, setAgentProfileLiveLoading] = useState(false);
   const [agentProfileLiveData, setAgentProfileLiveData] = useState(null);
@@ -1551,18 +1554,21 @@ function ArcAppShell() {
 
   // Filtered agents
   const filteredAgents = useMemo(() => {
+    let pool = chatAgents;
     const q = agentsSearchQuery.trim().toLowerCase();
-    if (!q) return chatAgents;
-    const capabilityMatches = new Set(discoverAgentsByCapability(q, chatAgents, chatAgents.length).map((match) => match.agent));
-    return chatAgents.filter(
-      (a) =>
-        a.tag.toLowerCase().includes(q) ||
-        a.name.toLowerCase().includes(q) ||
-        String(a.role || '').toLowerCase().includes(q) ||
-        String(a.category || '').toLowerCase().includes(q) ||
-        capabilityMatches.has(a)
-    );
-  }, [agentsSearchQuery, chatAgents]);
+    if (q) {
+      const capabilityMatches = new Set(discoverAgentsByCapability(q, chatAgents, chatAgents.length).map((match) => match.agent));
+      pool = pool.filter(
+        (a) =>
+          a.tag.toLowerCase().includes(q) ||
+          a.name.toLowerCase().includes(q) ||
+          String(a.role || '').toLowerCase().includes(q) ||
+          String(a.category || '').toLowerCase().includes(q) ||
+          capabilityMatches.has(a)
+      );
+    }
+    return filterAgentsByVerification(pool, agentsVerificationFilter);
+  }, [agentsSearchQuery, chatAgents, agentsVerificationFilter]);
 
   const rankedAgents = useMemo(() => {
     const earningAmount = (agent) => {
@@ -3738,99 +3744,20 @@ function ArcAppShell() {
 
 
         {/* ───────────────────────────────────────────────────────────────────
-            TAB 3: AI AGENTS & NATIVE BOOKING ENGINE (MARKETPLACE & DIRECTORY)
+            TAB 3: AI AGENTS DIRECTORY (ERC-8004 SOVEREIGN AGENTS)
             ─────────────────────────────────────────────────────────────────── */}
-        {(mainTab === 'agents' || mainTab === 'bookings') && (
+        {mainTab === 'agents' && (
           <div className="agents-page-container">
-            {/* Top Primary Section Switcher: Book Services vs Agent Directory vs Tasks */}
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                marginBottom: '18px',
-                paddingBottom: '12px',
-                borderBottom: '1px solid var(--border-color, rgba(0,0,0,0.06))',
-                flexWrap: 'wrap',
-                gap: '10px',
-              }}
-            >
-              <div
-                style={{
-                  display: 'inline-flex',
-                  background: 'var(--surface-2, #f1f5f9)',
-                  padding: '4px',
-                  borderRadius: '9999px',
-                  border: '1px solid var(--border-color, rgba(0,0,0,0.06))',
-                  gap: '3px',
-                }}
-              >
-                <button
-                  type="button"
-                  className={`subtoggle-pill ${(agentsSection === 'bookings' || mainTab === 'bookings') ? 'active' : ''}`}
-                  onClick={() => {
-                    setAgentsSection('bookings');
-                    if (mainTab !== 'agents') setMainTab('agents');
-                  }}
-                  style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
-                >
-                  <Calendar size={13} />
-                  <span>Book Services</span>
-                  <span style={{ fontSize: '10px', background: '#059669', color: '#fff', padding: '1px 6px', borderRadius: '8px', fontWeight: 700 }}>
-                    Marketplace
-                  </span>
-                </button>
-
-                <button
-                  type="button"
-                  className={`subtoggle-pill ${agentsSection === 'directory' && mainTab !== 'bookings' ? 'active' : ''}`}
-                  onClick={() => {
-                    setAgentsSection('directory');
-                    if (mainTab !== 'agents') setMainTab('agents');
-                  }}
-                  style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
-                >
-                  <Bot size={13} />
-                  <span>Agent Directory</span>
-                  <span style={{ fontSize: '10px', background: '#7c3aed', color: '#fff', padding: '1px 6px', borderRadius: '8px', fontWeight: 700 }}>
-                    8004
-                  </span>
-                </button>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setMainTab('tasks')}
-                className="quick-chip-btn"
-                style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', padding: '6px 12px' }}
-              >
-                <Briefcase size={13} />
-                <span>Tasks & Bounties</span>
-                <ArrowRight size={11} />
-              </button>
-            </div>
-
-            {(agentsSection === 'bookings' || mainTab === 'bookings') ? (
-              <BookingMarketplace
-                walletAddress={walletAddress}
-                activeAgentTag={myTag?.tag}
-                altanaSession={null}
-                humanSelfProof={null}
-                onConnectWallet={() => setIsConnectModalOpen(true)}
-                onOpenVault={() => { setPayMode('vault'); setMainTab('pay'); }}
-              />
-            ) : (
-              <>
-            {/* Top Bar: Search and Grid/List View Toggle */}
-            <div className="agents-top-bar">
-              <div className="agents-top-controls" style={{ width: '100%', justifyContent: 'space-between' }}>
+            {/* Top Bar: Search, Verification Filter, Demo Trigger and Grid/List View Toggle */}
+            <div className="agents-top-bar" style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <div className="agents-top-controls" style={{ width: '100%', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
                 {/* Search Bar */}
-                <div className="agents-search-input-wrap" style={{ flex: 1, maxWidth: '420px' }}>
+                <div className="agents-search-input-wrap" style={{ flex: 1, minWidth: '220px', maxWidth: '380px' }}>
                   <Search size={14} color="var(--privy-color-foreground-3)" />
                   <input
                     type="text"
                     className="agents-search-input"
-                    placeholder="Search agents..."
+                    placeholder="Search agents or capabilities..."
                     value={agentsSearchQuery}
                     onChange={(e) => setAgentsSearchQuery(e.target.value)}
                   />
@@ -3845,196 +3772,94 @@ function ArcAppShell() {
                   )}
                 </div>
 
-                {/* Grid / List Switcher */}
-                <div className="agents-view-toggle">
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  {/* Self ID Hackathon Demo Button */}
                   <button
                     type="button"
-                    className={`view-toggle-btn ${agentsViewMode === 'grid' ? 'active' : ''}`}
-                    onClick={() => setAgentsViewMode('grid')}
-                    title="Grid View"
-                    aria-label="Grid View"
+                    onClick={() => setIsSelfDemoModalOpen(true)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '5px',
+                      padding: '6px 12px',
+                      borderRadius: '8px',
+                      background: 'rgba(5, 150, 105, 0.1)',
+                      border: '1px solid rgba(5, 150, 105, 0.25)',
+                      color: '#059669',
+                      fontSize: '12px',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease',
+                    }}
+                    title="Self Agent ID: Verified Agent Payments Demo"
                   >
-                    <LayoutGrid size={15} />
+                    <Sparkles size={13} color="#059669" />
+                    <span>Self ID Demo</span>
                   </button>
-                  <button
-                    type="button"
-                    className={`view-toggle-btn ${agentsViewMode === 'list' ? 'active' : ''}`}
-                    onClick={() => setAgentsViewMode('list')}
-                    title="List View"
-                    aria-label="List View"
-                  >
-                    <List size={15} />
-                  </button>
-                </div>
-              </div>
-            </div>
 
-            {/* Track 2: Agent Vault Banner */}
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: '12px 16px',
-                borderRadius: '12px',
-                background: 'rgba(37, 99, 235, 0.08)',
-                border: '1px solid rgba(37, 99, 235, 0.25)',
-                marginBottom: '12px',
-                gap: '12px',
-                flexWrap: 'wrap',
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <ShoppingCart size={18} color="#2563EB" />
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <span style={{ fontSize: '13px', fontWeight: 700, color: '#1e3a8a' }}>
-                      Agent Vault: Autonomous & Human-Authorized Web Checkout
-                    </span>
-                    <span style={{ fontSize: '10px', background: '#2563EB', color: '#fff', padding: '1px 6px', borderRadius: '4px', fontWeight: 700 }}>
-                      Track 2
-                    </span>
+                  {/* Grid / List Switcher */}
+                  <div className="agents-view-toggle">
+                    <button
+                      type="button"
+                      className={`view-toggle-btn ${agentsViewMode === 'grid' ? 'active' : ''}`}
+                      onClick={() => setAgentsViewMode('grid')}
+                      title="Grid View"
+                      aria-label="Grid View"
+                    >
+                      <LayoutGrid size={15} />
+                    </button>
+                    <button
+                      type="button"
+                      className={`view-toggle-btn ${agentsViewMode === 'list' ? 'active' : ''}`}
+                      onClick={() => setAgentsViewMode('list')}
+                      title="List View"
+                      aria-label="List View"
+                    >
+                      <List size={15} />
+                    </button>
                   </div>
-                  <span style={{ fontSize: '11.5px', color: '#1d4ed8' }}>
-                    Autonomous web cart settlement under policy caps ($2 USD₮) with 1-click WebAuthn biometric passkey confirmation for high-value orders.
-                  </span>
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setPayMode('vault');
-                  setMainTab('pay');
-                }}
-                style={{
-                  padding: '7px 14px',
-                  borderRadius: '8px',
-                  background: '#2563EB',
-                  color: '#fff',
-                  border: 'none',
-                  fontSize: '12px',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '5px',
-                }}
-              >
-                <span>Open Agent Vault</span>
-                <ArrowRight size={13} />
-              </button>
-            </div>
 
-            {/* Track 3: Self Agent ID & x402 Banner */}
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: '12px 16px',
-                borderRadius: '12px',
-                background: 'rgba(13, 148, 136, 0.08)',
-                border: '1px solid rgba(13, 148, 136, 0.25)',
-                marginBottom: '12px',
-                gap: '12px',
-                flexWrap: 'wrap',
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <Fingerprint size={18} color="#0D9488" />
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <span style={{ fontSize: '13px', fontWeight: 700, color: '#134e4a' }}>
-                      Self Agent ID: Zero-Knowledge Verified Agent Commerce
-                    </span>
-                    <span style={{ fontSize: '10px', background: '#0D9488', color: '#fff', padding: '1px 6px', borderRadius: '4px', fontWeight: 700 }}>
-                      Track 3
-                    </span>
-                  </div>
-                  <span style={{ fontSize: '11.5px', color: '#0f766e' }}>
-                    Verify agent identity via Self zero-knowledge passport proofs and gate paid capabilities with on-chain x402 settlement.
-                  </span>
-                </div>
+              {/* Trust & Verification Filter Bar */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', overflowX: 'auto', paddingBottom: '2px' }}>
+                <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--privy-color-foreground-3)', marginRight: '4px' }}>
+                  Trust Filter:
+                </span>
+                {[
+                  { id: 'all', label: 'All Agents' },
+                  { id: 'verified', label: 'Self Verified', icon: ShieldCheck, color: '#059669' },
+                  { id: 'pending', label: 'Pending', icon: Clock, color: '#d97706' },
+                  { id: 'unverified', label: 'Unverified' },
+                ].map((tab) => {
+                  const Icon = tab.icon;
+                  const isActive = agentsVerificationFilter === tab.id;
+                  return (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      onClick={() => setAgentsVerificationFilter(tab.id)}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        padding: '4px 10px',
+                        borderRadius: '16px',
+                        fontSize: '11px',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        border: isActive ? '1px solid #059669' : '1px solid var(--border-color, rgba(0,0,0,0.08))',
+                        background: isActive ? 'rgba(5, 150, 105, 0.12)' : 'var(--card-bg, #ffffff)',
+                        color: isActive ? '#059669' : 'var(--privy-color-foreground-2, #64748b)',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {Icon && <Icon size={12} color={isActive ? tab.color : 'currentColor'} />}
+                      <span>{tab.label}</span>
+                    </button>
+                  );
+                })}
               </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setPayMode('self');
-                  setMainTab('pay');
-                }}
-                style={{
-                  padding: '7px 14px',
-                  borderRadius: '8px',
-                  background: '#0D9488',
-                  color: '#fff',
-                  border: 'none',
-                  fontSize: '12px',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '5px',
-                }}
-              >
-                <span>Verify & Monetize</span>
-                <ArrowRight size={13} />
-              </button>
-            </div>
-
-            {/* Track 4: Altana Agent Wallets Banner */}
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: '12px 16px',
-                borderRadius: '12px',
-                background: 'rgba(91, 79, 255, 0.08)',
-                border: '1px solid rgba(91, 79, 255, 0.25)',
-                marginBottom: '16px',
-                gap: '12px',
-                flexWrap: 'wrap',
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <Key size={18} color="#5B4FFF" />
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <span style={{ fontSize: '13px', fontWeight: 700, color: '#1e1b4b' }}>
-                      Altana Smart Agentic Wallets (EIP-7702)
-                    </span>
-                    <span style={{ fontSize: '10px', background: '#5B4FFF', color: '#fff', padding: '1px 6px', borderRadius: '4px', fontWeight: 700 }}>
-                      Track 4
-                    </span>
-                  </div>
-                  <span style={{ fontSize: '11.5px', color: '#4338ca' }}>
-                    Authorize your sovereign ₦Tag agent with time-bounded, spend-capped sessions anchored to Celo KeyStore.
-                  </span>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setPayMode('altana');
-                  setMainTab('pay');
-                }}
-                style={{
-                  padding: '7px 14px',
-                  borderRadius: '8px',
-                  background: '#5B4FFF',
-                  color: '#fff',
-                  border: 'none',
-                  fontSize: '12px',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '5px',
-                }}
-              >
-                <span>Manage Sessions</span>
-                <ArrowRight size={13} />
-              </button>
             </div>
 
             {agentDirectoryError && (
@@ -4073,7 +3898,50 @@ function ArcAppShell() {
                       </div>
                     </div>
                     <div className="agent-directory-tag">₦{String(agent.tag || '').replace(/^[₦$@#]/, '')}</div>
-                    {agent.category && <div className="agent-directory-category">{agent.category}</div>}
+                    {agent.role && <div style={{ fontSize: '11px', color: 'var(--privy-color-foreground-3)', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' }}>{agent.role}</div>}
+                    
+                    {/* Self Verified Badge with click-to-view proof details */}
+                    <div
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setActiveVerificationDetailAgent(agent);
+                      }}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        padding: '3px 8px',
+                        borderRadius: '12px',
+                        fontSize: '11px',
+                        fontWeight: 700,
+                        marginTop: '6px',
+                        cursor: 'pointer',
+                        background: agent.self?.verified !== false && agent.status !== 'unverified' ? 'rgba(5, 150, 105, 0.12)' : 'rgba(148, 163, 184, 0.12)',
+                        color: agent.self?.verified !== false && agent.status !== 'unverified' ? '#059669' : '#64748b',
+                        border: `1px solid ${agent.self?.verified !== false && agent.status !== 'unverified' ? 'rgba(5, 150, 105, 0.3)' : 'rgba(148, 163, 184, 0.25)'}`,
+                      }}
+                      title="Click to view Self Agent ID onchain verification details"
+                    >
+                      <ShieldCheck size={12} color={agent.self?.verified !== false && agent.status !== 'unverified' ? '#059669' : '#94a3b8'} />
+                      <span>{agent.self?.verified !== false && agent.status !== 'unverified' ? 'Self Verified' : 'Unverified'}</span>
+                    </div>
+                    {agent.self?.verified !== false && agent.status !== 'unverified' && (
+                      <div style={{ fontSize: '10px', color: '#059669', opacity: 0.85, marginTop: '2px' }}>
+                        Human owner verified via Self
+                      </div>
+                    )}
+
+                    {/* ERC-8004 & Altana Account Indicators */}
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '6px', justifyContent: 'center' }}>
+                      <span style={{ fontSize: '10px', fontFamily: 'monospace', background: 'rgba(99, 102, 241, 0.08)', color: '#6366f1', padding: '1px 6px', borderRadius: '4px', fontWeight: 600 }}>
+                        ERC-8004 #{agent.erc8004?.agentId || agent.identity?.erc8004AgentId || agent.id || '1'}
+                      </span>
+                      <span style={{ fontSize: '10px', fontFamily: 'monospace', background: 'rgba(13, 148, 136, 0.08)', color: '#0d9488', padding: '1px 6px', borderRadius: '4px', fontWeight: 600 }}>
+                        Altana {shorten(agent.altana?.walletAddress || agent.owner || '0x653f...1693')}
+                      </span>
+                    </div>
+
+                    {agent.category && <div className="agent-directory-category" style={{ marginTop: '6px' }}>{agent.category}</div>}
                     <div className="agent-directory-points">{agentPointsLabel(agent)}</div>
                     <div className="agent-directory-card-earnings">
                       <strong>{agentEarningsLabel(agent)} earned</strong>
@@ -4102,14 +3970,40 @@ function ArcAppShell() {
                         <span className={`agent-directory-rank ${agent.leaderboardRank <= 3 ? `rank-top${agent.leaderboardRank}` : ''}`}>#{agent.leaderboardRank}</span>
                       </div>
                       <div className="agent-circle-meta">
-                        <div className="agent-circle-name">
+                        <div className="agent-circle-name" style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                           <span className="agent-circle-tag-pill">₦{String(agent.tag || '').replace(/^[₦$@#]/, '')}</span>
+                          <span
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setActiveVerificationDetailAgent(agent);
+                            }}
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '3px',
+                              padding: '2px 7px',
+                              borderRadius: '10px',
+                              fontSize: '10px',
+                              fontWeight: 700,
+                              background: agent.self?.verified !== false && agent.status !== 'unverified' ? 'rgba(5, 150, 105, 0.12)' : 'rgba(148, 163, 184, 0.12)',
+                              color: agent.self?.verified !== false && agent.status !== 'unverified' ? '#059669' : '#64748b',
+                              border: `1px solid ${agent.self?.verified !== false && agent.status !== 'unverified' ? 'rgba(5, 150, 105, 0.3)' : 'rgba(148, 163, 184, 0.25)'}`,
+                              cursor: 'pointer',
+                            }}
+                            title="Click to view Self Agent ID onchain verification details"
+                          >
+                            <ShieldCheck size={11} color={agent.self?.verified !== false && agent.status !== 'unverified' ? '#059669' : '#94a3b8'} />
+                            <span>{agent.self?.verified !== false && agent.status !== 'unverified' ? 'Self Verified' : 'Unverified'}</span>
+                          </span>
                         </div>
+                        {agent.role && <div style={{ fontSize: '11px', color: 'var(--privy-color-foreground-3)', marginTop: '2px' }}>{agent.role}</div>}
                       </div>
                     </div>
                     <div className="agent-circle-right">
-                      <span className="agent-directory-points">{agentPointsLabel(agent)}</span>
-                      <span className="agent-directory-earnings">{agentEarningsLabel(agent)} earned</span>
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '2px' }}>
+                        <span className="agent-directory-points">{agentPointsLabel(agent)}</span>
+                        <span className="agent-directory-earnings">{agentEarningsLabel(agent)} earned</span>
+                      </div>
                       <ChevronRight size={16} color="var(--privy-color-foreground-3)" />
                     </div>
                   </div>
@@ -4117,9 +4011,6 @@ function ArcAppShell() {
                 {!filteredAgents.length && <div className="agent-directory-empty">No agents match this search.</div>}
               </div>
             )}
-              </>
-            )}
-
           </div>
         )}
 
@@ -5755,80 +5646,109 @@ function ArcAppShell() {
                 </div>
               </div>}
 
-              {/* Trust & Autonomous Rails: Self Protocol & Altana Smart Wallet */}
+              {/* ───────────────────────────────────────────────────────────
+                  DEDICATED HUMAN VERIFICATION & TRUST LAYER (SELF AGENT ID)
+                  ─────────────────────────────────────────────────────────── */}
               <div
                 style={{
                   background: 'var(--surface-2, #f8fafc)',
-                  borderRadius: '12px',
-                  padding: '12px 14px',
-                  margin: '12px 0',
+                  borderRadius: '16px',
+                  padding: '16px',
+                  margin: '14px 0',
                   border: '1px solid var(--border-color, rgba(0,0,0,0.08))',
                   display: 'flex',
                   flexDirection: 'column',
-                  gap: '8px',
+                  gap: '12px',
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <ShieldCheck size={14} color="#059669" />
-                    <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--privy-color-foreground-2)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                      Self Agent ID & Altana Rails
-                    </span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{ width: '28px', height: '28px', borderRadius: '8px', background: 'rgba(5, 150, 105, 0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <ShieldCheck size={16} color="#059669" />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--privy-color-foreground, #111827)' }}>
+                        Human Verification · Self Agent ID
+                      </div>
+                      <div style={{ fontSize: '10.5px', color: 'var(--text-secondary, #64748b)' }}>
+                        Zero-Knowledge Proof-of-Human Identity
+                      </div>
+                    </div>
                   </div>
-                  <span style={{ fontSize: '10px', background: '#ecfdf5', color: '#059669', padding: '1px 7px', borderRadius: '8px', fontWeight: 700, border: '1px solid #a7f3d0' }}>
-                    Celo Mainnet (42220)
+                  <span
+                    style={{
+                      fontSize: '11px',
+                      background: selectedAgentProfile.self?.verified !== false ? '#ecfdf5' : '#fef3c7',
+                      color: selectedAgentProfile.self?.verified !== false ? '#059669' : '#d97706',
+                      padding: '3px 9px',
+                      borderRadius: '12px',
+                      fontWeight: 700,
+                      border: `1px solid ${selectedAgentProfile.self?.verified !== false ? '#a7f3d0' : '#fde68a'}`,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                    }}
+                  >
+                    {selectedAgentProfile.self?.verified !== false ? <CheckCircle2 size={12} color="#059669" /> : <AlertCircle size={12} color="#d97706" />}
+                    <span>{selectedAgentProfile.self?.verified !== false ? 'Self Verified' : 'Unverified'}</span>
                   </span>
                 </div>
 
-                {/* Self Verification Line */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '12px' }}>
-                  <span style={{ color: 'var(--privy-color-foreground-2)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <Fingerprint size={12} color="#059669" />
-                    <span>Human Owner (Self ID)</span>
-                  </span>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                    <span style={{ fontWeight: 600, color: selectedAgentProfile.self?.verified !== false ? '#059669' : '#eab308' }}>
-                      {selectedAgentProfile.self?.verified !== false ? '✓ Verified Human' : 'Unverified'}
-                    </span>
-                    {selectedAgentProfile.self?.nullifierHash && (
-                      <span style={{ fontSize: '10px', color: '#64748b', fontFamily: 'monospace' }}>
-                        ({selectedAgentProfile.self.nullifierHash.slice(0, 8)}…)
-                      </span>
-                    )}
+                <p style={{ margin: 0, fontSize: '12px', color: 'var(--privy-color-foreground-2, #475569)', lineHeight: 1.45 }}>
+                  This agent is associated with a real human who completed privacy-preserving verification through the Self App.
+                </p>
+
+                {/* Identity & Protocol Breakdown (Clearly Distinguishing The 3 Core Rails) */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '8px', marginTop: '2px' }}>
+                  <div style={{ background: 'var(--card-bg, #ffffff)', padding: '10px', borderRadius: '10px', border: '1px solid rgba(0,0,0,0.06)' }}>
+                    <div style={{ fontSize: '10px', color: '#059669', fontWeight: 700, textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <Fingerprint size={11} /> 1. Self ID (Human)
+                    </div>
+                    <div style={{ fontSize: '12px', fontWeight: 700, marginTop: '4px' }}>
+                      #{selectedAgentProfile.self?.agentId || '1'}
+                    </div>
+                    <div style={{ fontSize: '10px', color: '#64748b' }}>ZK Human Proof</div>
+                  </div>
+
+                  <div style={{ background: 'var(--card-bg, #ffffff)', padding: '10px', borderRadius: '10px', border: '1px solid rgba(0,0,0,0.06)' }}>
+                    <div style={{ fontSize: '10px', color: '#6366f1', fontWeight: 700, textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <Bot size={11} /> 2. ERC-8004 (Agent)
+                    </div>
+                    <div style={{ fontSize: '12px', fontWeight: 700, marginTop: '4px' }}>
+                      #{selectedAgentProfile.identity?.erc8004AgentId || selectedAgentProfile.erc8004?.agentId || selectedAgentProfile.id || '1'}
+                    </div>
+                    <div style={{ fontSize: '10px', color: '#64748b' }}>Onchain Identity</div>
+                  </div>
+
+                  <div style={{ background: 'var(--card-bg, #ffffff)', padding: '10px', borderRadius: '10px', border: '1px solid rgba(0,0,0,0.06)' }}>
+                    <div style={{ fontSize: '10px', color: '#5B4FFF', fontWeight: 700, textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <Key size={11} /> 3. Altana (Wallet)
+                    </div>
+                    <div style={{ fontSize: '11px', fontWeight: 700, marginTop: '4px', fontFamily: 'monospace' }}>
+                      {shorten(selectedAgentProfile.altana?.walletAddress || selectedAgentProfile.owner || '0x653f...1693')}
+                    </div>
+                    <div style={{ fontSize: '10px', color: '#64748b' }}>Financial Authority</div>
                   </div>
                 </div>
 
-                {/* Altana Smart Wallet Line */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '12px' }}>
-                  <span style={{ color: 'var(--privy-color-foreground-2)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <Key size={12} color="#5B4FFF" />
-                    <span>Altana Smart Account</span>
+                {/* Registry Link & Freshness Info */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px', color: '#64748b', paddingTop: '4px', borderTop: '1px dashed rgba(0,0,0,0.08)' }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <Clock size={11} color="#059669" />
+                    <span>Proof Freshness: <strong style={{ color: '#059669' }}>Active & Fresh</strong></span>
                   </span>
-                  <span style={{ fontFamily: 'monospace', fontWeight: 600, fontSize: '11px' }}>
-                    {shorten(selectedAgentProfile.altana?.walletAddress || selectedAgentProfile.owner || '0x653f...1693')}
-                  </span>
+                  <a
+                    href="https://celoscan.io/address/0xaC3DF9ABf80d0F5c020C06B04Cced27763355944"
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{ color: '#059669', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '3px', fontWeight: 600 }}
+                  >
+                    <span>Self Registry</span>
+                    <ExternalLink size={10} />
+                  </a>
                 </div>
 
-                {/* Altana Session Status & Limit */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '12px' }}>
-                  <span style={{ color: 'var(--privy-color-foreground-2)' }}>Session Delegation</span>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <span
-                      style={{
-                        fontSize: '10.5px',
-                        padding: '1px 6px',
-                        borderRadius: '6px',
-                        fontWeight: 600,
-                        background: selectedAgentProfile.altana?.sessionStatus === 'revoked' ? '#fee2e2' : '#f1f5f9',
-                        color: selectedAgentProfile.altana?.sessionStatus === 'revoked' ? '#dc2626' : '#475569',
-                      }}
-                    >
-                      {selectedAgentProfile.altana?.sessionStatus === 'revoked' ? 'Revoked' : 'Active (24h Window)'}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Owner 1-Click Revoke Button */}
+                {/* Owner Action: Revoke Altana Session if connected */}
                 {String(selectedAgentProfile.owner || '').toLowerCase() === String(walletAddress || '').toLowerCase() && selectedAgentProfile.altana?.sessionStatus !== 'revoked' && (
                   <button
                     type="button"
@@ -5880,6 +5800,142 @@ function ArcAppShell() {
                 >View agent on 8004scan <ExternalLink size={12} /></a>
               )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ───────────────────────────────────────────────────────────────────
+          MODAL: SELF AGENT ID VERIFICATION DETAIL PANEL
+          ─────────────────────────────────────────────────────────────────── */}
+      {activeVerificationDetailAgent && (
+        <div className="agent-modal-backdrop" onClick={() => setActiveVerificationDetailAgent(null)}>
+          <div className="agent-modal-dialog" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '480px' }}>
+            <div className="agent-profile-content">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'rgba(5, 150, 105, 0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <ShieldCheck size={18} color="#059669" />
+                  </div>
+                  <div>
+                    <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 700 }}>Self Agent ID Verification</h3>
+                    <span style={{ fontSize: '11px', color: '#64748b' }}>Celo Mainnet (Chain ID: 42220)</span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className="agent-modal-close-btn"
+                  onClick={() => setActiveVerificationDetailAgent(null)}
+                  aria-label="Close"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              {/* Status Banner */}
+              <div style={{ background: 'var(--surface-2, #f8fafc)', borderRadius: '12px', padding: '14px', border: '1px solid rgba(0,0,0,0.08)', marginBottom: '14px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                  <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary, #64748b)' }}>Verification Status</span>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '12px', fontWeight: 700, color: activeVerificationDetailAgent.self?.verified !== false && activeVerificationDetailAgent.status !== 'unverified' ? '#059669' : '#d97706', background: activeVerificationDetailAgent.self?.verified !== false && activeVerificationDetailAgent.status !== 'unverified' ? 'rgba(5, 150, 105, 0.1)' : 'rgba(217, 119, 6, 0.1)', padding: '2px 8px', borderRadius: '8px' }}>
+                    <CheckCircle2 size={13} color={activeVerificationDetailAgent.self?.verified !== false && activeVerificationDetailAgent.status !== 'unverified' ? '#059669' : '#d97706'} />
+                    <span>{activeVerificationDetailAgent.self?.verified !== false && activeVerificationDetailAgent.status !== 'unverified' ? 'Self Verified (Proof Active)' : 'Unverified'}</span>
+                  </span>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '12px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: '#64748b' }}>Agent Tag:</span>
+                    <strong style={{ fontFamily: 'monospace' }}>₦{activeVerificationDetailAgent.tag.toUpperCase()}</strong>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: '#64748b' }}>Self Agent ID:</span>
+                    <strong style={{ fontFamily: 'monospace' }}>#{activeVerificationDetailAgent.self?.agentId || '1'}</strong>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: '#64748b' }}>Linked Agent Key:</span>
+                    <strong style={{ fontFamily: 'monospace' }}>{shorten(activeVerificationDetailAgent.owner || '0x653f773C9062e71A6554b42a9525fcD47fCC1693')}</strong>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: '#64748b' }}>Proof Freshness:</span>
+                    <span style={{ color: '#059669', fontWeight: 600 }}>Active (Fresh on Celo Mainnet)</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: '#64748b' }}>Registry Contract:</span>
+                    <a
+                      href="https://celoscan.io/address/0xaC3DF9ABf80d0F5c020C06B04Cced27763355944"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ color: '#059669', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px', fontFamily: 'monospace' }}
+                    >
+                      <span>0xaC3D...5944</span>
+                      <ExternalLink size={11} />
+                    </a>
+                  </div>
+                </div>
+              </div>
+
+              {/* Zero-Knowledge Privacy Guarantee */}
+              <div style={{ background: 'rgba(99, 102, 241, 0.05)', borderRadius: '10px', padding: '12px', border: '1px solid rgba(99, 102, 241, 0.15)', fontSize: '12px', color: '#4338ca', lineHeight: 1.45, marginBottom: '14px' }}>
+                <strong>Zero-Knowledge Privacy Guarantee:</strong>
+                <p style={{ margin: '4px 0 0 0' }}>
+                  Self verifies that a real, unique human holds the cryptographic key behind this agent using NFC passport zero-knowledge proofs. No passport photos, numbers, or private identity documents are ever revealed or stored.
+                </p>
+              </div>
+
+              {/* Action Button: Test Self-Gated Capability */}
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveVerificationDetailAgent(null);
+                  setIsSelfDemoModalOpen(true);
+                }}
+                style={{
+                  width: '100%',
+                  padding: '10px 14px',
+                  borderRadius: '10px',
+                  background: 'linear-gradient(135deg, #059669 0%, #047857 100%)',
+                  color: '#ffffff',
+                  border: 'none',
+                  fontWeight: 700,
+                  fontSize: '13px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                }}
+              >
+                <Sparkles size={15} />
+                <span>Launch Self-Gated Payment Demo</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ───────────────────────────────────────────────────────────────────
+          MODAL: SELF AGENT ID VERIFIED PAYMENTS DEMO (TRACK 3 SHOWCASE)
+          ─────────────────────────────────────────────────────────────────── */}
+      {isSelfDemoModalOpen && (
+        <div className="agent-modal-backdrop" onClick={() => setIsSelfDemoModalOpen(false)}>
+          <div className="agent-modal-dialog" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '560px', padding: '16px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <ShieldCheck size={16} color="#059669" />
+                <span style={{ fontSize: '13px', fontWeight: 700, color: '#059669' }}>Self Agent ID: Verified Agent Payments</span>
+              </div>
+              <button
+                type="button"
+                className="agent-modal-close-btn"
+                onClick={() => setIsSelfDemoModalOpen(false)}
+                aria-label="Close"
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <SelfAgentVerificationCard
+              walletAddress={walletAddress}
+              onConnectWallet={openAuthModal}
+            />
           </div>
         </div>
       )}

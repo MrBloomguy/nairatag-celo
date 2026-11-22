@@ -102,14 +102,18 @@ function getToolText(tool) {
   ].filter(Boolean).join(' '));
 }
 
-export function discoverAgentsByCapability(request, agents = [], limit = 3) {
+export function discoverAgentsByCapability(request, agents = [], limit = 3, options = {}) {
   const requestTerms = normalizeText(request)
     .split(' ')
     .filter((term) => term.length > 2 && !STOP_WORDS.has(term));
   if (!requestTerms.length) return [];
 
-  return agents
-    .filter((agent) => !isUnavailable(agent))
+  let candidatePool = agents.filter((agent) => !isUnavailable(agent));
+  if (options.selfVerifiedOnly) {
+    candidatePool = candidatePool.filter((agent) => agent.self?.verified === true || agent.status === 'verified');
+  }
+
+  return candidatePool
     .map((agent) => {
       const matchedTools = getCallableTools(agent).map((tool) => ({ tool, text: getToolText(tool) }))
         .map(({ tool, text }) => ({ tool, matches: requestTerms.filter((term) => hasPhrase(text, term)) }))
@@ -126,6 +130,36 @@ export function discoverAgentsByCapability(request, agents = [], limit = 3) {
     .filter((match) => match.score > 0)
     .sort((a, b) => b.score - a.score || String(a.agent.tag).localeCompare(String(b.agent.tag)))
     .slice(0, Math.max(1, limit));
+}
+
+/**
+ * Filters agents by their authoritative Self Agent ID verification status.
+ * Supports: 'all', 'verified' (Self Verified), 'pending' (Verification Pending), 'unverified' (Not Verified).
+ * 
+ * @param {Array} agents - Candidate agents
+ * @param {string} [filter='all'] - Target filter key
+ * @returns {Array} Filtered agents
+ */
+export function filterAgentsByVerification(agents = [], filter = 'all') {
+  if (!Array.isArray(agents)) return [];
+  const normalizedFilter = String(filter || 'all').toLowerCase().trim();
+  if (normalizedFilter === 'all') return agents;
+
+  return agents.filter((agent) => {
+    const isVerified = agent.self?.verified === true || agent.status === 'verified';
+    const isPending = agent.self?.status === 'verification_pending' || agent.status === 'verification_pending';
+
+    if (normalizedFilter === 'verified' || normalizedFilter === 'self_verified') {
+      return isVerified;
+    }
+    if (normalizedFilter === 'pending' || normalizedFilter === 'verification_pending') {
+      return isPending;
+    }
+    if (normalizedFilter === 'unverified') {
+      return !isVerified && !isPending;
+    }
+    return true;
+  });
 }
 
 export function isAgentDiscoveryRequest(prompt) {

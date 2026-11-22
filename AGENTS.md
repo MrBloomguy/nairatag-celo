@@ -22,8 +22,17 @@
    - On-chain x402 digital dollar settlement with atomic replay protection.
 3. **Track 3: Self Agent ID: Verified Agent Payments**
    - Universal proof-of-human identity association for every NairaTag agent owner via `SelfAgentRegistry` (`0xaC3DF9ABf80d0F5c020C06B04Cced27763355944`).
-   - Zero-knowledge nullifier verification without exposing sensitive passport credentials.
-   - Gated execution boundaries: unverified agents cannot publish bookable services, accept task escrow bounties, or authorize agent-to-agent spend.
+   - Powered by `@selfxyz/agent-sdk@^0.3.1` with Celo Mainnet Sybil limit explicitly configured to `10` (`maxAgentsPerHuman = 10`).
+   - Zero-knowledge nullifier verification without exposing sensitive passport credentials (`hasHumanProof && isProofFresh`).
+   - Dedicated sovereign layer separation:
+     * **Self Agent ID**: Verifies the human owner behind the agent via NFC passport zero-knowledge proof.
+     * **ERC-8004**: Verifies and discovers the autonomous agent onchain (`0x8004A169FB4a3325136EB29fA0ceB6D2e539a432`).
+     * **Altana**: Grants the agent non-custodial wallet authority and delegated session keys.
+   - Gated execution boundaries & x402 digital dollar settlement:
+     * **Scenario A (Unverified)**: HTTP 403 Forbidden (`SCENARIO_A_ACCESS_DENIED`).
+     * **Scenario B (Verified, No Payment)**: HTTP 402 Payment Required (`SCENARIO_B_PAYMENT_REQUIRED`) with canonical x402 challenge headers.
+     * **Scenario C (Payment Settled)**: Releases protected capability with cryptographic settlement receipt and ERC-8021 attribution suffix `celo_9f7deabd99a6`.
+   - Live Serverless API endpoint: `/api/self-gated-service`.
 4. **Track 4: Altana Agent Wallets**
    - Non-custodial smart agent accounts derived on Celo Mainnet (keystore `0x83b30935f36d6ccf9B1ec3b5E47F2866b97cd27c`).
    - Scoped session keys with daily token spend caps, contract execution allowlists, and cryptographic validity windows.
@@ -77,10 +86,10 @@ Built as a native, shared platform primitive — not hardcoded into individual a
 
 ---
 
-## 5. Automated Test Suite (99 / 99 Tests Passing)
+## 5. Automated Test Suite (105 / 105 Tests Passing)
 
 ```bash
-# Run all 99 automated tests across all 7 test suites
+# Run all 105 automated tests across all 7 test suites
 node --max-old-space-size=4096 --test test/*.test.js
 
 # Build production bundle
@@ -93,10 +102,10 @@ npm run build
 | `test/agent-vault.test.js` | **11** | `PASSED` | Autonomous checkout, passkey step-up, replay protection, ERC-8021 attribution |
 | `test/altana-wallet.test.js` | **15** | `PASSED` | Session policy builder, contract allowlists, passkey signing, ERC-20 approve rejection |
 | `test/booking.test.js` | **15** | `PASSED` | Range-aware slot collision, atomic double-booking mutex, 15m hold auto-expiry |
-| `test/self-agent-id.test.js` | **25** | `PASSED` | On-chain registry verification, x402 HTTP 402 flow, replay protection, fail-closed boundaries |
+| `test/self-agent-id.test.js` | **31** | `PASSED` | Official `@selfxyz/agent-sdk`, 10-agent Sybil limit, verifier creation, x402 HTTP 402 flow, replay protection, fail-closed boundaries |
 | `test/agent-discovery.test.js` | **8** | `PASSED` | Capability discovery, voice alias matching, disambiguation |
 | `test/textile-corridor.test.js` | **5** | `PASSED` | Live Textile FX v2 RFQ previews (USD₮ ⇄ cNGN), EIP-712 taker signatures |
-| **Total** | **99** | `ALL PASS` | `duration: 7.96s` |
+| **Total** | **105** | `ALL PASS` | `duration: 7.96s` |
 
 ---
 

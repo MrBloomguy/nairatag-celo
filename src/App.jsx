@@ -6,7 +6,6 @@ import ProfileAvatar from './components/ProfileAvatar';
 import ChatActivityIndicator from './components/chat/ChatActivityIndicator';
 import PersonalAgentPanel from './components/chat/PersonalAgentPanel';
 import CorridorSwapCard from './components/CorridorSwapCard';
-import AltanaSessionCard from './components/AltanaSessionCard';
 import SelfAgentVerificationCard from './components/SelfAgentVerificationCard';
 import SelfAgentIdBadge, { SelfIcon } from './components/SelfAgentIdBadge.jsx';
 import ChatVerificationCard from './components/chat/ChatVerificationCard.jsx';
@@ -1466,7 +1465,6 @@ function ArcAppShell() {
     : null;
 
   // Pay / Send Terminal State
-  const [payMode, setPayMode] = useState('send'); // 'send' | 'altana' | 'self'
   const [paySubMode, setPaySubMode] = useState('corridor'); // 'corridor' | 'direct'
   const [recipientInput, setRecipientInput] = useState('');
   const [amountInput, setAmountInput] = useState('10.00');
@@ -3362,246 +3360,197 @@ function ArcAppShell() {
             ─────────────────────────────────────────────────────────────────── */}
         {mainTab === 'pay' && (
           <div className="terminal-layout-centered">
-            {/* Modern Segmented Control Pill Bar: 4 Clean Unified Tabs */}
-            <div className="pay-mode-segmented-control">
-              {/* 1. Swap & Send */}
-              <button
-                type="button"
-                className={`pay-mode-pill-btn pill-send ${payMode === 'send' ? 'active' : ''}`}
-                onClick={() => setPayMode('send')}
-              >
-                <TrendingUp size={13} />
-                <span>Swap & Send</span>
-              </button>
-
-              {/* 2. Wallets */}
-              <button
-                type="button"
-                className={`pay-mode-pill-btn pill-altana ${payMode === 'altana' ? 'active' : ''}`}
-                onClick={() => setPayMode('altana')}
-              >
-                <Key size={13} />
-                <span>Wallets</span>
-              </button>
-
-              {/* 3. Self ID */}
-              <button
-                type="button"
-                className={`pay-mode-pill-btn pill-self ${payMode === 'self' ? 'active' : ''}`}
-                onClick={() => setPayMode('self')}
-              >
-                <Fingerprint size={13} />
-                <span>Self ID</span>
-              </button>
-            </div>
-
-            {payMode === 'altana' ? (
-              <div style={{ maxWidth: '480px', width: '100%', margin: '0 auto' }}>
-                <AltanaSessionCard
-                  walletAddress={walletAddress}
-                  onConnectWallet={() => setIsConnectModalOpen(true)}
-                />
-              </div>
-            ) : payMode === 'self' ? (
-              <div style={{ maxWidth: '520px', width: '100%', margin: '0 auto' }}>
-                <SelfAgentVerificationCard
-                  walletAddress={walletAddress}
-                  onConnectWallet={() => setIsConnectModalOpen(true)}
-                />
-              </div>
-            ) : (
-              <div className="crypto-card-terminal">
-                {/* Unified Card Header Bar with In-Card Mode Switcher */}
-                <div className="card-header-bar" style={{ gap: '8px', flexWrap: 'wrap' }}>
-                  <div className="unified-card-subtoggle">
-                    <button
-                      type="button"
-                      className={`subtoggle-pill ${paySubMode === 'corridor' ? 'active' : ''}`}
-                      onClick={() => setPaySubMode('corridor')}
-                    >
-                      <ArrowDownUp size={12} />
-                      <span>USD₮ ⇄ cNGN</span>
-                    </button>
-                    <button
-                      type="button"
-                      className={`subtoggle-pill ${paySubMode === 'direct' ? 'active' : ''}`}
-                      onClick={() => setPaySubMode('direct')}
-                    >
-                      <Send size={12} />
-                      <span>Send to ₦Tag</span>
-                    </button>
-                  </div>
-                  <div className="card-header-actions">
-                    <button
-                      type="button"
-                      className="quick-chip-btn"
-                      onClick={() => setMainTab('claim')}
-                    >
-                      + Claim ₦Tag
-                    </button>
-                  </div>
+            <div className="crypto-card-terminal">
+              {/* Unified Card Header Bar with In-Card Mode Switcher */}
+              <div className="card-header-bar" style={{ gap: '8px', flexWrap: 'wrap' }}>
+                <div className="unified-card-subtoggle">
+                  <button
+                    type="button"
+                    className={`subtoggle-pill ${paySubMode === 'corridor' ? 'active' : ''}`}
+                    onClick={() => setPaySubMode('corridor')}
+                  >
+                    <ArrowDownUp size={12} />
+                    <span>USD₮ ⇄ cNGN</span>
+                  </button>
+                  <button
+                    type="button"
+                    className={`subtoggle-pill ${paySubMode === 'direct' ? 'active' : ''}`}
+                    onClick={() => setPaySubMode('direct')}
+                  >
+                    <Send size={12} />
+                    <span>Send to ₦Tag</span>
+                  </button>
                 </div>
+                <div className="card-header-actions">
+                  <button
+                    type="button"
+                    className="quick-chip-btn"
+                    onClick={() => setMainTab('claim')}
+                  >
+                    + Claim ₦Tag
+                  </button>
+                </div>
+              </div>
 
-                {paySubMode === 'corridor' ? (
-                  <CorridorSwapCard
-                    embedded={true}
-                    walletAddress={walletAddress}
-                    onConnectWallet={() => setIsConnectModalOpen(true)}
-                  />
-                ) : (
-                  <>
+              {paySubMode === 'corridor' ? (
+                <CorridorSwapCard
+                  embedded={true}
+                  walletAddress={walletAddress}
+                  onConnectWallet={() => setIsConnectModalOpen(true)}
+                />
+              ) : (
+                <>
 
-                {/* 1. Recipient ₦Tag Input Box */}
-                <div className="tag-recipient-box">
-                  <div className="token-input-header">
-                    <span>To</span>
-                  </div>
-                  <div className="tag-input-field-wrap">
-                    <span className="tag-currency-symbol">₦</span>
-                    <input
-                      type="text"
-                      className="tag-text-field"
-                      placeholder="Enter name (e.g. SEGUN, FOOD)"
-                      value={recipientInput.replace(/^[$₦]/, '')}
-                      onChange={(e) => setRecipientInput(e.target.value)}
-                    />
-                    {resolution.loading && <RefreshCw size={14} className="animate-spin" color="var(--privy-color-border-interactive)" />}
-                  </div>
+                  {/* 1. Recipient ₦Tag Input Box */}
+                  <div className="tag-recipient-box">
+                    <div className="token-input-header">
+                      <span>To</span>
+                    </div>
+                    <div className="tag-input-field-wrap">
+                      <span className="tag-currency-symbol">₦</span>
+                      <input
+                        type="text"
+                        className="tag-text-field"
+                        placeholder="Enter name (e.g. SEGUN, FOOD)"
+                        value={recipientInput.replace(/^[$₦]/, '')}
+                        onChange={(e) => setRecipientInput(e.target.value)}
+                      />
+                      {resolution.loading && <RefreshCw size={14} className="animate-spin" color="var(--privy-color-border-interactive)" />}
+                    </div>
 
-                  {/* Quick suggestions chips */}
-                  <div className="quick-tag-suggestions">
-                    <span style={{ fontSize: '10.5px', color: 'var(--privy-color-foreground-3)' }}>Suggestions:</span>
-                    {['segun', 'alice', 'food', 'ride', 'pay'].map((tag) => (
-                      <button
-                        key={tag}
-                        type="button"
-                        className="tag-suggestion-chip"
-                        onClick={() => setRecipientInput(`₦${tag}`)}
-                      >
-                        ₦{tag}
-                      </button>
-                    ))}
-                  </div>
+                    {/* Quick suggestions chips */}
+                    <div className="quick-tag-suggestions">
+                      <span style={{ fontSize: '10.5px', color: 'var(--privy-color-foreground-3)' }}>Suggestions:</span>
+                      {['segun', 'alice', 'food', 'ride', 'pay'].map((tag) => (
+                        <button
+                          key={tag}
+                          type="button"
+                          className="tag-suggestion-chip"
+                          onClick={() => setRecipientInput(`₦${tag}`)}
+                        >
+                          ₦{tag}
+                        </button>
+                      ))}
+                    </div>
 
-                  {/* Resolved Recipient Card */}
-                  {resolution.data && resolution.data.resolvedAddress && (
-                    <div className="resolved-recipient-card">
-                      <div className="resolved-left">
-                        <div className="resolved-avatar">
-                          {resolution.data.tag ? resolution.data.tag.slice(1, 2) : '₦'}
-                        </div>
-                        <div>
-                          <div className="resolved-title">
-                            {resolution.data.tag || 'Verified Recipient'}
-                            <span style={{ marginLeft: '6px', fontSize: '10px', color: 'var(--privy-color-success-dark)', fontWeight: 600 }}>
-                              ● RESOLVED
-                            </span>
+                    {/* Resolved Recipient Card */}
+                    {resolution.data && resolution.data.resolvedAddress && (
+                      <div className="resolved-recipient-card">
+                        <div className="resolved-left">
+                          <div className="resolved-avatar">
+                            {resolution.data.tag ? resolution.data.tag.slice(1, 2) : '₦'}
                           </div>
-                          {resolution.data.phone && (
-                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '10.5px', color: '#047857', fontWeight: 700, margin: '2px 0' }}>
-                              <Phone size={10} />
-                              <span>{resolution.data.phone} (Nigerian Telco Gateway)</span>
+                          <div>
+                            <div className="resolved-title">
+                              {resolution.data.tag || 'Verified Recipient'}
+                              <span style={{ marginLeft: '6px', fontSize: '10px', color: 'var(--privy-color-success-dark)', fontWeight: 600 }}>
+                                ● RESOLVED
+                              </span>
                             </div>
-                          )}
-                          <div className="resolved-sub">
-                            {shorten(resolution.data.resolvedAddress)}
+                            {resolution.data.phone && (
+                              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '10.5px', color: '#047857', fontWeight: 700, margin: '2px 0' }}>
+                                <Phone size={10} />
+                                <span>{resolution.data.phone} (Nigerian Telco Gateway)</span>
+                              </div>
+                            )}
+                            <div className="resolved-sub">
+                              {shorten(resolution.data.resolvedAddress)}
+                            </div>
                           </div>
                         </div>
+                        <button
+                          type="button"
+                          className="quick-chip-btn"
+                          onClick={() => triggerCopy('resolved_copy', resolution.data.resolvedAddress)}
+                        >
+                          <Copy size={11} />
+                          <span>{copiedKey === 'resolved_copy' ? 'Copied' : 'Copy'}</span>
+                        </button>
                       </div>
+                    )}
+
+                    {resolution.error && (
+                      <div style={{ fontSize: '11px', color: 'var(--privy-color-error)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <AlertCircle size={12} />
+                        <span>{resolution.error}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 2. Amount Input Box */}
+                  <div className="token-input-box">
+                    <div className="token-input-header">
+                      <span>You Send</span>
+                      <span>Balance: {usdcBalance.formatted} CELO</span>
+                    </div>
+                    <div className="token-input-row">
+                      <input
+                        type="number"
+                        step="any"
+                        className="token-amount-field"
+                        placeholder="0.00"
+                        value={amountInput}
+                        onChange={(e) => setAmountInput(e.target.value)}
+                      />
+                      <div className="token-selector-capsule">
+                        <span className="token-icon-round token-icon-usdc" style={{ background: '#35D07F', color: '#042f2e' }}>C</span>
+                        <span>CELO</span>
+                      </div>
+                    </div>
+                    <div className="token-input-footer" style={{ justifyContent: 'flex-end' }}>
+                      <div className="balance-quick-chips">
+                        <button type="button" className="quick-chip-btn" onClick={() => setAmountInput('0.1')}>0.1</button>
+                        <button type="button" className="quick-chip-btn" onClick={() => setAmountInput('0.5')}>0.5</button>
+                        <button type="button" className="quick-chip-btn" onClick={() => setAmountInput('1.0')}>1.0</button>
+                        <button
+                          type="button"
+                          className="quick-chip-btn"
+                          onClick={() => setAmountInput(usdcBalance.formatted !== '0.00' ? usdcBalance.formatted : '1.0')}
+                        >
+                          MAX
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 3. Optional Memo */}
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
                       <button
                         type="button"
-                        className="quick-chip-btn"
-                        onClick={() => triggerCopy('resolved_copy', resolution.data.resolvedAddress)}
+                        style={{ background: 'none', border: 'none', color: 'var(--privy-color-border-interactive)', fontSize: '11px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '3px' }}
+                        onClick={() => setShowMemoField(!showMemoField)}
                       >
-                        <Copy size={11} />
-                        <span>{copiedKey === 'resolved_copy' ? 'Copied' : 'Copy'}</span>
+                        <span>{showMemoField ? '− Hide Memo' : '+ Add Memo (Optional)'}</span>
                       </button>
                     </div>
-                  )}
-
-                  {resolution.error && (
-                    <div style={{ fontSize: '11px', color: 'var(--privy-color-error)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      <AlertCircle size={12} />
-                      <span>{resolution.error}</span>
-                    </div>
-                  )}
-                </div>
-
-                {/* 2. Amount Input Box */}
-                <div className="token-input-box">
-                  <div className="token-input-header">
-                    <span>You Send</span>
-                    <span>Balance: {usdcBalance.formatted} CELO</span>
+                    {showMemoField && (
+                      <input
+                        type="text"
+                        className="tag-text-field"
+                        style={{ background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', padding: '8px 10px', fontSize: '12.5px', width: '100%', textTransform: 'none' }}
+                        placeholder="e.g. Lunch / Invoice #104"
+                        value={memoInput}
+                        onChange={(e) => setMemoInput(e.target.value)}
+                      />
+                    )}
                   </div>
-                  <div className="token-input-row">
-                    <input
-                      type="number"
-                      step="any"
-                      className="token-amount-field"
-                      placeholder="0.00"
-                      value={amountInput}
-                      onChange={(e) => setAmountInput(e.target.value)}
-                    />
-                    <div className="token-selector-capsule">
-                      <span className="token-icon-round token-icon-usdc" style={{ background: '#35D07F', color: '#042f2e' }}>C</span>
-                      <span>CELO</span>
-                    </div>
-                  </div>
-                  <div className="token-input-footer" style={{ justifyContent: 'flex-end' }}>
-                    <div className="balance-quick-chips">
-                      <button type="button" className="quick-chip-btn" onClick={() => setAmountInput('0.1')}>0.1</button>
-                      <button type="button" className="quick-chip-btn" onClick={() => setAmountInput('0.5')}>0.5</button>
-                      <button type="button" className="quick-chip-btn" onClick={() => setAmountInput('1.0')}>1.0</button>
-                      <button
-                        type="button"
-                        className="quick-chip-btn"
-                        onClick={() => setAmountInput(usdcBalance.formatted !== '0.00' ? usdcBalance.formatted : '1.0')}
-                      >
-                        MAX
-                      </button>
-                    </div>
-                  </div>
-                </div>
 
-                {/* 3. Optional Memo */}
-                <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                    <button
-                      type="button"
-                      style={{ background: 'none', border: 'none', color: 'var(--privy-color-border-interactive)', fontSize: '11px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '3px' }}
-                      onClick={() => setShowMemoField(!showMemoField)}
-                    >
-                      <span>{showMemoField ? '− Hide Memo' : '+ Add Memo (Optional)'}</span>
-                    </button>
-                  </div>
-                  {showMemoField && (
-                    <input
-                      type="text"
-                      className="tag-text-field"
-                      style={{ background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', padding: '8px 10px', fontSize: '12.5px', width: '100%', textTransform: 'none' }}
-                      placeholder="e.g. Lunch / Invoice #104"
-                      value={memoInput}
-                      onChange={(e) => setMemoInput(e.target.value)}
-                    />
-                  )}
-                </div>
-
-                {/* Action Button */}
-                <button
-                  type="button"
-                  className="btn-action-primary"
-                  disabled={resolution.loading && !recipientInput.startsWith('0x')}
-                  onClick={handleInitiateSend}
-                >
-                  <Send size={15} />
-                  <span>Review & Send</span>
-                </button>
-              </>
-            )}
+                  {/* Action Button */}
+                  <button
+                    type="button"
+                    className="btn-action-primary"
+                    disabled={resolution.loading && !recipientInput.startsWith('0x')}
+                    onClick={handleInitiateSend}
+                  >
+                    <Send size={15} />
+                    <span>Review & Send</span>
+                  </button>
+                </>
+              )}
+            </div>
           </div>
         )}
-      </div>
-    )}
 
         {/* ───────────────────────────────────────────────────────────────────
             TAB 2: CLAIM NAIRATAG IDENTITY
@@ -3921,7 +3870,7 @@ function ArcAppShell() {
                     </div>
                     <div className="agent-directory-tag">₦{String(agent.tag || '').replace(/^[₦$@#]/, '')}</div>
                     {agent.role && <div style={{ fontSize: '11px', color: 'var(--privy-color-foreground-3)', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' }}>{agent.role}</div>}
-                    
+
                     {/* Official Self Agent ID Badge with click-to-view proof details */}
                     <div style={{ marginTop: '6px' }}>
                       <SelfAgentIdBadge
@@ -4254,223 +4203,223 @@ function ArcAppShell() {
                   </div>
                 ) : (
                   <>
-                {/* Top Bar: Search and Grid/List View Toggle */}
-                <div className="agents-top-bar">
-                  <div className="agents-top-controls task-top-controls" style={{ width: '100%', justifyContent: 'space-between', gap: '8px' }}>
-                    {/* Search Bar (reduced compact length to leave maximum room for Create Task) */}
-                    <div className="agents-search-input-wrap task-search-wrap" style={{ flex: '0 1 110px', maxWidth: '120px', minWidth: '70px' }}>
-                      <Search size={13} color="var(--privy-color-foreground-3)" style={{ flexShrink: 0 }} />
-                      <input
-                        type="text"
-                        className="agents-search-input task-search-input"
-                        placeholder="Search..."
-                        value={tasksSearch}
-                        onChange={(e) => setTasksSearch(e.target.value)}
-                        style={{ minWidth: 0, width: '100%' }}
-                      />
-                      {tasksSearch && (
-                        <button
-                          type="button"
-                          style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: 'var(--privy-color-foreground-3)', flexShrink: 0 }}
-                          onClick={() => setTasksSearch('')}
-                        >
-                          <X size={12} />
-                        </button>
-                      )}
-                    </div>
-
-                    {/* Create Task Button */}
-                    <div className="task-header-actions" style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0, marginLeft: 'auto' }}>
-                      <button
-                        type="button"
-                        className="btn-agent-primary create-task-header-btn"
-                        style={{ padding: '6px 11px', fontSize: '11.5px', display: 'flex', alignItems: 'center', gap: '5px', whiteSpace: 'nowrap', flexShrink: 0 }}
-                        onClick={() => setIsPostTaskOpen(true)}
-                      >
-                        <Plus size={13} />
-                        <span>Create Task</span>
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Metrics Overview Row (Compact 4-in-a-row matching Agents stats grid) */}
-                <div className="agents-stats-grid">
-                  <div className="agents-stat-card">
-                    <span className="agents-stat-card-label">Active Tasks</span>
-                    <span className="agents-stat-card-value">{allTasks.length + IN_HOUSE_TASKS.length}</span>
-                  </div>
-                  <div className="agents-stat-card">
-                    <span className="agents-stat-card-label">Total Agents</span>
-                    <span className="agents-stat-card-value">{chatAgents.length}</span>
-                  </div>
-                  <div className="agents-stat-card">
-                    <span className="agents-stat-card-label">Total Earned</span>
-                    <span className="agents-stat-card-value" style={{ color: '#059669' }}>{userPoints.toLocaleString()} Pts</span>
-                  </div>
-                  <div className="agents-stat-card">
-                    <span className="agents-stat-card-label">Your Points</span>
-                    <span className="agents-stat-card-value" style={{ color: '#059669' }}>{userPoints} Pts</span>
-                  </div>
-                </div>
-
-                {/* Category Filter Pills Row */}
-                <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '4px', scrollbarWidth: 'none' }}>
-                  {[
-                    { id: 'all', label: 'All Tasks' },
-                    { id: 'services', label: '🗓️ Services' },
-                    { id: 'dev', label: '⚡ Engineering' },
-                    { id: 'design', label: '🎨 Design' },
-                    { id: 'data', label: '📊 Data & AI' },
-                    { id: 'content', label: '✍️ Content' },
-                    { id: 'test', label: '🧪 Testing' },
-                    { id: 'community', label: '📱 Community' },
-                  ].map((cat) => (
-                    <button
-                      key={cat.id}
-                      type="button"
-                      className={`task-cat-pill ${tasksFilter === cat.id ? 'active' : ''}`}
-                      onClick={() => {
-                        if (cat.id === 'services') {
-                          setTasksTabSection('services');
-                        } else {
-                          setTasksFilter(cat.id);
-                        }
-                      }}
-                    >
-                      {cat.label}
-                    </button>
-                  ))}
-                </div>
-
-                <div className="agents-milestones-grid">
-                  {filteredTasks.length === 0 ? (
-                    <div className="tasks-empty-state-card" style={{ gridColumn: '1 / -1' }}>
-                      <div className="tasks-empty-badge-glow">
-                        <div className="tasks-empty-icon-wrap">
-                          {tasksLoading ? (
-                            <RefreshCw size={26} color="#5B4FFF" className="spin-anim" />
-                          ) : (tasksSearch || tasksFilter !== 'all') ? (
-                            <Search size={24} color="#5B4FFF" />
-                          ) : (
-                            <Sparkles size={26} color="#5B4FFF" />
+                    {/* Top Bar: Search and Grid/List View Toggle */}
+                    <div className="agents-top-bar">
+                      <div className="agents-top-controls task-top-controls" style={{ width: '100%', justifyContent: 'space-between', gap: '8px' }}>
+                        {/* Search Bar (reduced compact length to leave maximum room for Create Task) */}
+                        <div className="agents-search-input-wrap task-search-wrap" style={{ flex: '0 1 110px', maxWidth: '120px', minWidth: '70px' }}>
+                          <Search size={13} color="var(--privy-color-foreground-3)" style={{ flexShrink: 0 }} />
+                          <input
+                            type="text"
+                            className="agents-search-input task-search-input"
+                            placeholder="Search..."
+                            value={tasksSearch}
+                            onChange={(e) => setTasksSearch(e.target.value)}
+                            style={{ minWidth: 0, width: '100%' }}
+                          />
+                          {tasksSearch && (
+                            <button
+                              type="button"
+                              style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: 'var(--privy-color-foreground-3)', flexShrink: 0 }}
+                              onClick={() => setTasksSearch('')}
+                            >
+                              <X size={12} />
+                            </button>
                           )}
                         </div>
-                      </div>
 
-                      <h3 className="tasks-empty-title">
-                        {tasksLoading
-                          ? 'Syncing Celo Escrow Bounties…'
-                          : (tasksSearch || tasksFilter !== 'all')
-                            ? 'No Matching Tasks Found'
-                            : 'No tasks available'}
-                      </h3>
-
-                      {(tasksLoading || tasksSearch || tasksFilter !== 'all') && (
-                        <p className="tasks-empty-subtitle">
-                          {tasksLoading
-                            ? 'Connecting to Celo smart contracts and querying verified community milestones…'
-                            : tasksSearch
-                              ? `No bounties match "${tasksSearch}". Try clearing your search or switching categories.`
-                              : 'There are no open bounties in this category yet. Explore other categories or post one yourself.'}
-                        </p>
-                      )}
-
-                      <div className="tasks-empty-actions">
-                        {(tasksSearch || tasksFilter !== 'all') && (
+                        {/* Create Task Button */}
+                        <div className="task-header-actions" style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0, marginLeft: 'auto' }}>
                           <button
                             type="button"
-                            className="btn-agent-secondary"
-                            onClick={() => { setTasksSearch(''); setTasksFilter('all'); }}
-                          >
-                            Clear Filters
-                          </button>
-                        )}
-                        {!tasksLoading && (
-                          <button
-                            type="button"
-                            className="btn-agent-primary"
+                            className="btn-agent-primary create-task-header-btn"
+                            style={{ padding: '6px 11px', fontSize: '11.5px', display: 'flex', alignItems: 'center', gap: '5px', whiteSpace: 'nowrap', flexShrink: 0 }}
                             onClick={() => setIsPostTaskOpen(true)}
                           >
-                            <Plus size={14} />
+                            <Plus size={13} />
                             <span>Create Task</span>
                           </button>
-                        )}
-                        {!tasksLoading && (
-                          <button
-                            type="button"
-                            className="btn-agent-secondary"
-                            onClick={() => setTasksRefreshKey((key) => key + 1)}
-                            title="Refresh tasks list"
-                          >
-                            <RefreshCw size={13} />
-                            <span>Refresh</span>
-                          </button>
-                        )}
+                        </div>
                       </div>
                     </div>
-                  ) : (
-                    filteredTasks.map((task, idx) => {
-                      const voucherClaim = task.isVoucherTask
-                        ? inHouseVouchers.find((voucher) => voucher.taskId === task.voucherTask.id)
-                        : null;
-                      const isDone = task.isVoucherTask
-                        ? voucherClaim?.status === 'approved'
-                        : taskProgress[task.id]?.status === 'paid';
-                      const rankLabel = task.rank || `#${idx + 1}`;
-                      return (
-                        <div
-                          key={task.id}
-                          className="agent-milestone-card"
-                          onClick={() => setSelectedTaskId(task.id)}
-                          role="button"
-                          tabIndex={0}
-                          onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') setSelectedTaskId(task.id); }}
-                          style={{ cursor: 'pointer' }}
+
+                    {/* Metrics Overview Row (Compact 4-in-a-row matching Agents stats grid) */}
+                    <div className="agents-stats-grid">
+                      <div className="agents-stat-card">
+                        <span className="agents-stat-card-label">Active Tasks</span>
+                        <span className="agents-stat-card-value">{allTasks.length + IN_HOUSE_TASKS.length}</span>
+                      </div>
+                      <div className="agents-stat-card">
+                        <span className="agents-stat-card-label">Total Agents</span>
+                        <span className="agents-stat-card-value">{chatAgents.length}</span>
+                      </div>
+                      <div className="agents-stat-card">
+                        <span className="agents-stat-card-label">Total Earned</span>
+                        <span className="agents-stat-card-value" style={{ color: '#059669' }}>{userPoints.toLocaleString()} Pts</span>
+                      </div>
+                      <div className="agents-stat-card">
+                        <span className="agents-stat-card-label">Your Points</span>
+                        <span className="agents-stat-card-value" style={{ color: '#059669' }}>{userPoints} Pts</span>
+                      </div>
+                    </div>
+
+                    {/* Category Filter Pills Row */}
+                    <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '4px', scrollbarWidth: 'none' }}>
+                      {[
+                        { id: 'all', label: 'All Tasks' },
+                        { id: 'services', label: '🗓️ Services' },
+                        { id: 'dev', label: '⚡ Engineering' },
+                        { id: 'design', label: '🎨 Design' },
+                        { id: 'data', label: '📊 Data & AI' },
+                        { id: 'content', label: '✍️ Content' },
+                        { id: 'test', label: '🧪 Testing' },
+                        { id: 'community', label: '📱 Community' },
+                      ].map((cat) => (
+                        <button
+                          key={cat.id}
+                          type="button"
+                          className={`task-cat-pill ${tasksFilter === cat.id ? 'active' : ''}`}
+                          onClick={() => {
+                            if (cat.id === 'services') {
+                              setTasksTabSection('services');
+                            } else {
+                              setTasksFilter(cat.id);
+                            }
+                          }}
                         >
-                          <span className="card-rank-tag">{rankLabel}</span>
+                          {cat.label}
+                        </button>
+                      ))}
+                    </div>
 
-                          <div className="milestone-badge-stage">
-                            <AgentMedallion type={task.badgeType || (idx % 2 === 0 ? 'emerald' : 'cyan')} size={46} />
+                    <div className="agents-milestones-grid">
+                      {filteredTasks.length === 0 ? (
+                        <div className="tasks-empty-state-card" style={{ gridColumn: '1 / -1' }}>
+                          <div className="tasks-empty-badge-glow">
+                            <div className="tasks-empty-icon-wrap">
+                              {tasksLoading ? (
+                                <RefreshCw size={26} color="#5B4FFF" className="spin-anim" />
+                              ) : (tasksSearch || tasksFilter !== 'all') ? (
+                                <Search size={24} color="#5B4FFF" />
+                              ) : (
+                                <Sparkles size={26} color="#5B4FFF" />
+                              )}
+                            </div>
                           </div>
 
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
-                            <h3 className="milestone-card-title" style={{ margin: 0 }}>₦{task.creatorTag.replace(/^₦/, '').toUpperCase()}</h3>
-                            <img
-                              src="/verified-badge.png"
-                              alt=""
-                              aria-hidden="true"
-                              style={{ width: '16px', height: '16px', objectFit: 'contain', flexShrink: 0 }}
-                              title="Celo Escrow Verified"
-                            />
-                          </div>
-                          <div className="milestone-card-role" title={task.title}>{task.title}</div>
+                          <h3 className="tasks-empty-title">
+                            {tasksLoading
+                              ? 'Syncing Celo Escrow Bounties…'
+                              : (tasksSearch || tasksFilter !== 'all')
+                                ? 'No Matching Tasks Found'
+                                : 'No tasks available'}
+                          </h3>
 
-                          <div className="milestone-task-status">
-                            <span>{task.categoryLabel} • {task.deadline}</span>
-                          </div>
+                          {(tasksLoading || tasksSearch || tasksFilter !== 'all') && (
+                            <p className="tasks-empty-subtitle">
+                              {tasksLoading
+                                ? 'Connecting to Celo smart contracts and querying verified community milestones…'
+                                : tasksSearch
+                                  ? `No bounties match "${tasksSearch}". Try clearing your search or switching categories.`
+                                  : 'There are no open bounties in this category yet. Explore other categories or post one yourself.'}
+                            </p>
+                          )}
 
-                          <div className="milestone-progress-bar-wrap">
-                            <div
-                              className="milestone-progress-bar-fill"
-                              style={{
-                                width: isDone ? '100%' : '75%',
-                                background: isDone ? '#10B981' : 'var(--primary, #0052FF)'
-                              }}
-                            />
-                          </div>
-
-                          <div className="milestone-earnings-row">
-                            <span className="milestone-earnings-label">Reward</span>
-                            <span className="milestone-earnings-value" style={{ color: isDone ? '#10B981' : 'var(--primary, #0052FF)' }}>
-                              {isDone ? 'Paid' : `$${task.rewardUSDC} USDC`}
-                            </span>
+                          <div className="tasks-empty-actions">
+                            {(tasksSearch || tasksFilter !== 'all') && (
+                              <button
+                                type="button"
+                                className="btn-agent-secondary"
+                                onClick={() => { setTasksSearch(''); setTasksFilter('all'); }}
+                              >
+                                Clear Filters
+                              </button>
+                            )}
+                            {!tasksLoading && (
+                              <button
+                                type="button"
+                                className="btn-agent-primary"
+                                onClick={() => setIsPostTaskOpen(true)}
+                              >
+                                <Plus size={14} />
+                                <span>Create Task</span>
+                              </button>
+                            )}
+                            {!tasksLoading && (
+                              <button
+                                type="button"
+                                className="btn-agent-secondary"
+                                onClick={() => setTasksRefreshKey((key) => key + 1)}
+                                title="Refresh tasks list"
+                              >
+                                <RefreshCw size={13} />
+                                <span>Refresh</span>
+                              </button>
+                            )}
                           </div>
                         </div>
-                      );
-                    })
-                  )}
-                </div>
+                      ) : (
+                        filteredTasks.map((task, idx) => {
+                          const voucherClaim = task.isVoucherTask
+                            ? inHouseVouchers.find((voucher) => voucher.taskId === task.voucherTask.id)
+                            : null;
+                          const isDone = task.isVoucherTask
+                            ? voucherClaim?.status === 'approved'
+                            : taskProgress[task.id]?.status === 'paid';
+                          const rankLabel = task.rank || `#${idx + 1}`;
+                          return (
+                            <div
+                              key={task.id}
+                              className="agent-milestone-card"
+                              onClick={() => setSelectedTaskId(task.id)}
+                              role="button"
+                              tabIndex={0}
+                              onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') setSelectedTaskId(task.id); }}
+                              style={{ cursor: 'pointer' }}
+                            >
+                              <span className="card-rank-tag">{rankLabel}</span>
+
+                              <div className="milestone-badge-stage">
+                                <AgentMedallion type={task.badgeType || (idx % 2 === 0 ? 'emerald' : 'cyan')} size={46} />
+                              </div>
+
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+                                <h3 className="milestone-card-title" style={{ margin: 0 }}>₦{task.creatorTag.replace(/^₦/, '').toUpperCase()}</h3>
+                                <img
+                                  src="/verified-badge.png"
+                                  alt=""
+                                  aria-hidden="true"
+                                  style={{ width: '16px', height: '16px', objectFit: 'contain', flexShrink: 0 }}
+                                  title="Celo Escrow Verified"
+                                />
+                              </div>
+                              <div className="milestone-card-role" title={task.title}>{task.title}</div>
+
+                              <div className="milestone-task-status">
+                                <span>{task.categoryLabel} • {task.deadline}</span>
+                              </div>
+
+                              <div className="milestone-progress-bar-wrap">
+                                <div
+                                  className="milestone-progress-bar-fill"
+                                  style={{
+                                    width: isDone ? '100%' : '75%',
+                                    background: isDone ? '#10B981' : 'var(--primary, #0052FF)'
+                                  }}
+                                />
+                              </div>
+
+                              <div className="milestone-earnings-row">
+                                <span className="milestone-earnings-label">Reward</span>
+                                <span className="milestone-earnings-value" style={{ color: isDone ? '#10B981' : 'var(--primary, #0052FF)' }}>
+                                  {isDone ? 'Paid' : `$${task.rewardUSDC} USDC`}
+                                </span>
+                              </div>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
                   </>
                 )}
               </>

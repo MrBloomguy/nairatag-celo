@@ -14,6 +14,7 @@ import {
 import {
   processNairaTagChatMessage,
   isVerificationQuery,
+  isWalletQuery,
   extractReferencedAgentTag,
   OFFICIAL_PLATFORM_AGENT,
 } from '../src/services/nairatagChatEngine.js';
@@ -161,4 +162,30 @@ test('11. Chat Engine: Sovereign Agent Leaderboard Query', async () => {
   assert.ok(result.widget);
   assert.equal(result.widget.type, 'points_leaderboard');
   assert.ok(Array.isArray(result.widget.leaderboard));
+});
+
+test('12. Chat Engine: Altana Smart Wallet Intent Detection', () => {
+  assert.equal(isWalletQuery('How do I get a wallet for my agent?'), true);
+  assert.equal(isWalletQuery('Claim Altana wallet'), true);
+  assert.equal(isWalletQuery('What is the smart account address of @bloom?'), true);
+  assert.equal(isWalletQuery('Does my agent have an active session key?'), true);
+  assert.equal(isWalletQuery('What is the weather today?'), false);
+});
+
+test('13. Chat Engine: Altana In-Chat Wallet Retrieval & Widget Emission', async () => {
+  const result = await processNairaTagChatMessage({
+    prompt: 'What is the Altana wallet address for @bloom?',
+    walletAddress: '0xc519729BF6D15e5984702BBa2C553f1c74A73C95',
+    currentAgent: OFFICIAL_PLATFORM_AGENT,
+    allAgents: [OFFICIAL_PLATFORM_AGENT],
+  });
+
+  assert.ok(result.reply.includes('Altana Smart Account for ₦BLOOM'));
+  assert.ok(result.reply.includes('Non-Custodial Smart Account'));
+  assert.ok(result.reply.toLowerCase().includes('0x7c264210d5c992b8ea3224eb6b39f477a493af26'));
+  assert.ok(result.widget, 'Widget must be attached');
+  assert.equal(result.widget.type, 'altana_wallet');
+  assert.equal(result.widget.agentTag, 'bloom');
+  assert.equal(result.widget.walletAddress.toLowerCase(), '0x7c264210d5c992b8ea3224eb6b39f477a493af26');
+  assert.equal(result.widget.hasWallet, true);
 });

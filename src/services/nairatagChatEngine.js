@@ -21,6 +21,7 @@
 import { getAgentVerificationStatus, VERIFICATION_STATUS } from './selfAgentIdService.js';
 import { getAgentPoints, awardVerificationPoints, getPointsLeaderboard } from './agentPointsService.js';
 import { getAgentRecord, listAgentRecords } from './agentIdentityStore.js';
+import { getAgentLifecycleRecord } from './agentLifecycleService.js';
 import { OFFICIAL_AGENT_WALLET, CELO_ATTRIBUTION_TAG } from '../config/celo.js';
 
 export const OFFICIAL_PLATFORM_AGENT = {
@@ -55,6 +56,26 @@ export function isVerificationQuery(prompt = '') {
     p.includes('trust score') ||
     p.includes('sybil') ||
     p.includes('passport')
+  );
+}
+
+/**
+ * Checks if a chat prompt contains an inquiry regarding Altana smart wallets, session keys, or claiming a wallet.
+ */
+export function isWalletQuery(prompt = '') {
+  const p = prompt.toLowerCase();
+  return (
+    p.includes('wallet') ||
+    p.includes('altana') ||
+    p.includes('smart account') ||
+    p.includes('session key') ||
+    p.includes('claim wallet') ||
+    p.includes('get wallet') ||
+    p.includes('create wallet') ||
+    p.includes('my address') ||
+    p.includes('agent address') ||
+    p.includes('spending cap') ||
+    p.includes('spend limit')
   );
 }
 
@@ -195,7 +216,84 @@ export async function processNairaTagChatMessage({
   }
 
   // ──────────────────────────────────────────────────────────────────────────
-  // 2. LEADERBOARD & POINTS QUERIES
+  // 2. ALTANA SMART AGENT WALLET & SESSION KEY INQUIRIES
+  // ──────────────────────────────────────────────────────────────────────────
+  if (isWalletQuery(cleanPrompt)) {
+    let targetTag = extractReferencedAgentTag(cleanPrompt, null);
+    if (!targetTag || lowerPrompt.includes('my wallet') || lowerPrompt.includes('my agent') || lowerPrompt.includes('get wallet') || lowerPrompt.includes('claim wallet')) {
+      const ownedAgent = allAgents.find((a) => a.ownerAddress?.toLowerCase() === walletAddress.toLowerCase());
+      targetTag = ownedAgent?.tag || activeAgent.tag;
+    }
+
+    let lifecycle = null;
+    try {
+      lifecycle = await getAgentLifecycleRecord(targetTag);
+    } catch (err) {
+      console.warn('[NairaTagChatEngine] Lifecycle record query fallback:', err.message);
+    }
+
+    const KNOWN_ALTANA_WALLETS = {
+      nairatag: OFFICIAL_AGENT_WALLET,
+      bloom: '0x7c264210D5C992b8ea3224eb6B39F477a493AF26',
+      defillama: '0xbfA115E28aE09eBf5a11484C2161A4E45B956Ce6',
+      meteo: '0x235d64821815b3c37eeB7A755D96B9b671a5ae36',
+      coingecko: '0x1abfD1865F9a7Eb23C02aBEf113a07Fa8A690Ef8',
+    };
+
+    const altanaWalletAddress = lifecycle?.altana?.walletAddress || KNOWN_ALTANA_WALLETS[targetTag] || null;
+
+    const sessionStatus = lifecycle?.altana?.sessionStatus || (altanaWalletAddress ? 'active' : 'unprovisioned');
+    const hasWallet = !!altanaWalletAddress;
+
+    let replyText = '';
+    if (hasWallet) {
+      replyText = `### Altana Smart Account for ₦${targetTag.toUpperCase()}\n\n` +
+        `🛡️ **Smart Agent Wallet**: \`${altanaWalletAddress}\`\n` +
+        `• **Network**: Celo Mainnet (Chain ID 42220)\n` +
+        `• **Architecture**: Non-Custodial Smart Account (EIP-7702 / ERC-4337)\n` +
+        `• **Root Authority**: Human Owner via WebAuthn Passkey (P256) / Privy MPC\n` +
+        `• **Delegated Session Status**: ${sessionStatus === 'active' ? '🟢 Active Session Key' : '🟡 Ready for Delegation'}\n` +
+        `• **Daily Spend Limit**: **50 USD₮ / 75,000 cNGN**\n` +
+        `• **Allowed Contracts**: Textile RFQ LimitOrderReactor, Escrow & ERC-8004\n` +
+        `• **Monotonic Revocation**: 1-click on-chain revocation by human owner\n\n` +
+        `The agent holds only a time-bounded, permission-scoped session key. Your personal wallet remains secure as the root admin.`;
+    } else {
+      replyText = `### Altana Smart Account for ₦${targetTag.toUpperCase()}\n\n` +
+        `⚠️ **Smart Wallet Not Yet Provisioned**\n\n` +
+        `To provision a non-custodial Altana Smart Agent Account on Celo Mainnet:\n` +
+        `1. **Verify with Self Agent ID**: Every agent must have verifiable human backing (earns **+500 Trust Points**).\n` +
+        `2. **Claim & Provision Altana Account**: Your browser initializes a hardware-backed WebAuthn Passkey as root admin, generating the counterfactual agent wallet.\n` +
+        `3. **Delegate Session Policy**: Grant your agent autonomous spend permissions (up to 50 USD₮/day).\n\n` +
+        `You can start verification and claim your wallet using the card below:`;
+    }
+
+    const widget = {
+      type: 'altana_wallet',
+      title: `Altana Smart Wallet · ₦${targetTag.toUpperCase()}`,
+      badge: hasWallet ? (sessionStatus === 'active' ? 'Active Session' : 'Smart Wallet') : 'Provisioning Required',
+      agentTag: targetTag,
+      walletAddress: altanaWalletAddress || walletAddress,
+      ownerAddress: lifecycle?.ownerAddress || walletAddress,
+      sessionStatus,
+      spendLimit: '50 USD₮ / 75,000 cNGN daily',
+      chainId: 42220,
+      hasWallet,
+      explorerUrl: altanaWalletAddress ? `https://celoscan.io/address/${altanaWalletAddress}` : null,
+      actionText: hasWallet ? 'View on CeloScan ↗' : 'Verify & Claim Wallet',
+      actionPrompt: hasWallet ? null : `Verify ₦${targetTag} with Self Agent ID`,
+    };
+
+    return {
+      reply: replyText,
+      widget,
+      agentTag: activeAgent.tag,
+      agentName: activeAgent.name,
+      avatar: activeAgent.avatar,
+    };
+  }
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // 3. LEADERBOARD & POINTS QUERIES
   // ──────────────────────────────────────────────────────────────────────────
   if (lowerPrompt.includes('leaderboard') || lowerPrompt.includes('top agents') || lowerPrompt.includes('rank')) {
     const leaderboard = await getPointsLeaderboard();

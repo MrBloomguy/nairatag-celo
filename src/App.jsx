@@ -4731,6 +4731,59 @@ function ArcAppShell() {
                               ]);
                             }}
                           />
+                        ) : msg.widget.type === 'altana_wallet' ? (
+                          <div className="walley-widget-card" style={{ border: '1px solid rgba(16, 185, 129, 0.3)', background: 'var(--card-bg, #ffffff)' }}>
+                            <div className="walley-widget-header">
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <ShieldCheck size={16} color="#10B981" />
+                                <span className="walley-widget-title">{msg.widget.title}</span>
+                              </div>
+                              <span className="walley-widget-badge" style={{ background: 'rgba(16, 185, 129, 0.1)', color: '#059669', border: '1px solid rgba(16, 185, 129, 0.2)' }}>
+                                {msg.widget.badge}
+                              </span>
+                            </div>
+                            <div className="walley-widget-body" style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '12px' }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 10px', background: 'var(--input-bg, #f8fafc)', borderRadius: '8px', fontFamily: 'monospace' }}>
+                                <span>{msg.widget.walletAddress ? `${msg.widget.walletAddress.slice(0, 10)}...${msg.widget.walletAddress.slice(-8)}` : 'Pending'}</span>
+                                {msg.widget.walletAddress && (
+                                  <button
+                                    type="button"
+                                    onClick={() => copyToClipboard(msg.widget.walletAddress, `chat-wallet-${msg.id}`)}
+                                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--primary, #5B4FFF)' }}
+                                    title="Copy Address"
+                                  >
+                                    {copiedKey === `chat-wallet-${msg.id}` ? <Check size={13} color="#10B981" /> : <Copy size={13} />}
+                                  </button>
+                                )}
+                              </div>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: 'var(--privy-color-foreground-2)' }}>
+                                <span>Spend Limit:</span>
+                                <span style={{ fontWeight: 600 }}>{msg.widget.spendLimit}</span>
+                              </div>
+                            </div>
+                            <div className="walley-widget-actions" style={{ marginTop: '10px' }}>
+                              {msg.widget.explorerUrl ? (
+                                <a
+                                  href={msg.widget.explorerUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="walley-widget-action-btn"
+                                  style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+                                >
+                                  <span>{msg.widget.actionText}</span>
+                                  <ExternalLink size={12} />
+                                </a>
+                              ) : (
+                                <button
+                                  type="button"
+                                  className="walley-widget-action-btn"
+                                  onClick={() => handleWidgetAction(msg.widget)}
+                                >
+                                  <span>{msg.widget.actionText}</span>
+                                </button>
+                              )}
+                            </div>
+                          </div>
                         ) : (
                           <div className="walley-widget-card">
                             <div className="walley-widget-header">

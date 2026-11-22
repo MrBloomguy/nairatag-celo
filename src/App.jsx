@@ -2860,14 +2860,6 @@ function ArcAppShell() {
             <MessageSquare size={14} />
             <span>Chat</span>
           </button>
-          <button
-            type="button"
-            className={`nav-tab-btn ${mainTab === 'rewards' ? 'active' : ''}`}
-            onClick={() => setMainTab('rewards')}
-          >
-            <Gift size={14} />
-            <span>Rewards</span>
-          </button>
         </nav>
 
         {/* Right Side: Search Icon + More (···) + Connect Pill */}
@@ -2886,7 +2878,7 @@ function ArcAppShell() {
           )}
 
           {/* More Button (···) */}
-          <div className="header-more-wrapper desktop-only">
+          <div className="header-more-wrapper">
             <button
               type="button"
               className={`header-icon-btn more-trigger-btn ${isMoreMenuOpen ? 'active' : ''}`}
@@ -2902,6 +2894,18 @@ function ArcAppShell() {
               <>
                 <div className="more-menu-backdrop" onClick={() => setIsMoreMenuOpen(false)} />
                 <div className="more-menu-popover" onClick={(e) => e.stopPropagation()}>
+                  <button
+                    type="button"
+                    className="more-menu-item"
+                    onClick={() => {
+                      setMainTab('rewards');
+                      setIsMoreMenuOpen(false);
+                    }}
+                  >
+                    <Gift size={15} />
+                    <span>Rewards</span>
+                  </button>
+
                   <button
                     type="button"
                     className="more-menu-item"
@@ -5260,19 +5264,6 @@ function ArcAppShell() {
               <span className="mobile-footer-badge badge-green" style={{ width: 8, height: 8, padding: 0, minWidth: 8, borderRadius: '50%' }} />
             </div>
             <span className="mobile-footer-label">Chat</span>
-          </button>
-
-          {/* 6. Rewards */}
-          <button
-            type="button"
-            className={`mobile-footer-item ${mainTab === 'rewards' ? 'active' : ''}`}
-            onClick={() => setMainTab('rewards')}
-            aria-label="Rewards"
-          >
-            <div className="mobile-footer-icon-wrap">
-              <Gift size={22} strokeWidth={mainTab === 'rewards' ? 2.4 : 1.8} />
-            </div>
-            <span className="mobile-footer-label">Rewards</span>
           </button>
         </nav>
       )}

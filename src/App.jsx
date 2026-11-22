@@ -3858,30 +3858,6 @@ function ArcAppShell() {
                 </div>
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  {/* Self ID Hackathon Demo Button */}
-                  <button
-                    type="button"
-                    onClick={() => setIsSelfDemoModalOpen(true)}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '5px',
-                      padding: '6px 12px',
-                      borderRadius: '8px',
-                      background: 'rgba(5, 150, 105, 0.1)',
-                      border: '1px solid rgba(5, 150, 105, 0.25)',
-                      color: '#059669',
-                      fontSize: '12px',
-                      fontWeight: 700,
-                      cursor: 'pointer',
-                      transition: 'all 0.15s ease',
-                    }}
-                    title="Self Agent ID: Verified Agent Payments Demo"
-                  >
-                    <Sparkles size={13} color="#059669" />
-                    <span>Self ID Demo</span>
-                  </button>
-
                   {/* Grid / List Switcher */}
                   <div className="agents-view-toggle">
                     <button
@@ -3904,46 +3880,6 @@ function ArcAppShell() {
                     </button>
                   </div>
                 </div>
-              </div>
-
-              {/* Trust & Verification Filter Bar */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', overflowX: 'auto', paddingBottom: '2px' }}>
-                <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--privy-color-foreground-3)', marginRight: '4px' }}>
-                  Trust Filter:
-                </span>
-                {[
-                  { id: 'all', label: 'All Agents' },
-                  { id: 'verified', label: 'Self Verified', icon: ShieldCheck, color: '#059669' },
-                  { id: 'pending', label: 'Pending', icon: Clock, color: '#d97706' },
-                  { id: 'unverified', label: 'Unverified' },
-                ].map((tab) => {
-                  const Icon = tab.icon;
-                  const isActive = agentsVerificationFilter === tab.id;
-                  return (
-                    <button
-                      key={tab.id}
-                      type="button"
-                      onClick={() => setAgentsVerificationFilter(tab.id)}
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '4px',
-                        padding: '4px 10px',
-                        borderRadius: '16px',
-                        fontSize: '11px',
-                        fontWeight: 600,
-                        cursor: 'pointer',
-                        border: isActive ? '1px solid #059669' : '1px solid var(--border-color, rgba(0,0,0,0.08))',
-                        background: isActive ? 'rgba(5, 150, 105, 0.12)' : 'var(--card-bg, #ffffff)',
-                        color: isActive ? '#059669' : 'var(--privy-color-foreground-2, #64748b)',
-                        whiteSpace: 'nowrap',
-                      }}
-                    >
-                      {Icon && <Icon size={12} color={isActive ? tab.color : 'currentColor'} />}
-                      <span>{tab.label}</span>
-                    </button>
-                  );
-                })}
               </div>
             </div>
 
@@ -4627,45 +4563,8 @@ function ArcAppShell() {
 
                 {/* Friendly Subtitle */}
                 <p className="ref-chat-sub">
-                  Chat with ₦NAIRATAG Master Protocol Agent or verify your sovereign agent below.
+                  How can I help you today?
                 </p>
-
-                {/* Self Agent ID Verification & Rewards Banner */}
-                <div
-                  onClick={() => handleSendChatPrompt('Verify my agent with Self Agent ID and check Trust Points')}
-                  style={{
-                    margin: '0 auto 16px auto',
-                    maxWidth: '420px',
-                    width: '100%',
-                    padding: '12px 16px',
-                    borderRadius: '16px',
-                    background: 'linear-gradient(135deg, rgba(5, 150, 105, 0.15) 0%, rgba(16, 185, 129, 0.06) 100%)',
-                    border: '1px solid rgba(16, 185, 129, 0.3)',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    gap: '12px',
-                    transition: 'all 0.2s ease',
-                  }}
-                  className="hover:scale-[1.01] active:scale-[0.99]"
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'rgba(5, 150, 105, 0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <ShieldCheck size={20} color="#10B981" />
-                    </div>
-                    <div style={{ textAlign: 'left' }}>
-                      <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary, #ffffff)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <span>Verify with Self</span>
-                        <span style={{ fontSize: '10px', padding: '1px 6px', borderRadius: '6px', background: '#eab308', color: '#000000', fontWeight: 800 }}>+500 PTS</span>
-                      </div>
-                      <div style={{ fontSize: '11px', color: 'var(--text-secondary, #94a3b8)' }}>
-                        Proof-of-Human ZK Passport Verification
-                      </div>
-                    </div>
-                  </div>
-                  <ChevronRight size={16} color="#10B981" />
-                </div>
 
                 {/* 3x2 Quick-Action Grid */}
                 <div className="ref-action-grid">

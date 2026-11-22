@@ -11,5 +11,6 @@ broadcast
 *.jsonl
 .x402_consumed_payments.json
 .nairatag_*_store.json
+.nairatag_agent_points.json
 
 .vercel

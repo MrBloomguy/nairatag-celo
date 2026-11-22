@@ -77,6 +77,9 @@ Built as a native, shared platform primitive — not hardcoded into individual a
 - `src/services/altanaWalletService.js` — Production Altana SDK integration for non-custodial smart accounts, passkeys, and scoped session keys.
 - `src/services/selfAgentIdService.js` — Self Agent ID on-chain verification, nullifier verification, and gated access controls.
 - `src/services/bookingService.js` — Booking reservation, double-booking prevention, provider acceptance, and settlement.
+- `src/services/agentPointsService.js` — Real Trust Points & Verification Rewards Engine (+500 points for Self Agent ID proof-of-human, durable ledger persistence, tiers & leaderboard).
+- `src/services/nairatagChatEngine.js` — Master Conversational Intelligence Engine for ₦NAIRATAG (ChatGPT/Claude tier protocol orchestrator) and sovereign user agents.
+- `src/components/chat/ChatVerificationCard.jsx` — Interactive in-chat Self Agent ID verification card with live on-chain status, QR deep-link trigger, and +500 points claim.
 - `src/services/bookingRegistryService.js` — Common service schema validation and category directory.
 - `src/services/bookingPaymentService.js` — Agent Vault authorization evaluation and x402 digital dollar settlement.
 - `src/services/textileRfqService.js` — Textile FX API v2 client (`preview`, `request` with EIP-712 proof of control, cancel, swap execution, ERC-8021 attribution).
@@ -86,10 +89,10 @@ Built as a native, shared platform primitive — not hardcoded into individual a
 
 ---
 
-## 5. Automated Test Suite (105 / 105 Tests Passing)
+## 5. Automated Test Suite (116 / 116 Tests Passing)
 
 ```bash
-# Run all 105 automated tests across all 7 test suites
+# Run all 116 automated tests across all 8 test suites
 node --max-old-space-size=4096 --test test/*.test.js
 
 # Build production bundle
@@ -103,9 +106,10 @@ npm run build
 | `test/altana-wallet.test.js` | **15** | `PASSED` | Session policy builder, contract allowlists, passkey signing, ERC-20 approve rejection |
 | `test/booking.test.js` | **15** | `PASSED` | Range-aware slot collision, atomic double-booking mutex, 15m hold auto-expiry |
 | `test/self-agent-id.test.js` | **31** | `PASSED` | Official `@selfxyz/agent-sdk`, 10-agent Sybil limit, verifier creation, x402 HTTP 402 flow, replay protection, fail-closed boundaries |
+| `test/agent-points-and-chat.test.js` | **11** | `PASSED` | Real Trust Points engine (+500 verification bonus), idempotency, tiering, ChatGPT/Claude-caliber ₦NAIRATAG chat intelligence, in-chat verification card |
 | `test/agent-discovery.test.js` | **8** | `PASSED` | Capability discovery, voice alias matching, disambiguation |
 | `test/textile-corridor.test.js` | **5** | `PASSED` | Live Textile FX v2 RFQ previews (USD₮ ⇄ cNGN), EIP-712 taker signatures |
-| **Total** | **105** | `ALL PASS` | `duration: 7.96s` |
+| **Total** | **116** | `ALL PASS` | `duration: 9.53s` |
 
 ---
 

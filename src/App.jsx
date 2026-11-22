@@ -8,8 +8,18 @@ import PersonalAgentPanel from './components/chat/PersonalAgentPanel';
 import CorridorSwapCard from './components/CorridorSwapCard';
 import AltanaSessionCard from './components/AltanaSessionCard';
 import SelfAgentVerificationCard from './components/SelfAgentVerificationCard';
+import ChatVerificationCard from './components/chat/ChatVerificationCard.jsx';
 import AgentVaultCard from './components/AgentVaultCard';
 import BookingMarketplace from './components/bookings/BookingMarketplace.jsx';
+import {
+  processNairaTagChatMessage,
+  isVerificationQuery,
+  OFFICIAL_PLATFORM_AGENT,
+} from './services/nairatagChatEngine.js';
+import {
+  getAgentPoints,
+  awardVerificationPoints,
+} from './services/agentPointsService.js';
 import { ClipboardCheck as ClipboardCheckIcon } from 'lucide-react';
 import { ChevronsLeftRight as ChevronsLeftRightIcon } from 'lucide-react';
 import { Car as CarIcon } from 'lucide-react';
@@ -486,6 +496,16 @@ function ArcAppShell() {
         if (hash === 'bookings' || hash === 'services') {
           setMainTabState('tasks');
           setTasksTabSection('bookings');
+        } else if (hash.startsWith('chat')) {
+          setMainTabState('chat');
+          const agentParam = new URLSearchParams(window.location.hash.split('?')[1] || '').get('agent');
+          if (agentParam && chatAgents.length) {
+            const found = chatAgents.find((a) => a.tag?.toLowerCase() === agentParam.toLowerCase());
+            if (found) {
+              setCurrentTaggedAgent(found);
+              setIsChatConversationOpen(true);
+            }
+          }
         } else if (VALID_TABS.includes(hash)) {
           setMainTabState(hash);
         }
@@ -962,11 +982,11 @@ function ArcAppShell() {
     const capabilityMatches = discoveryRequest ? discoverAgentsByCapability(textToSend, chatAgents) : [];
     let replyText = '';
     let toolEvents = [];
-    let replyAgentTag = currentTaggedAgent ? currentTaggedAgent.tag : 'ArcAgent';
-    let replyAgentName = currentTaggedAgent ? currentTaggedAgent.name : 'Celo Sovereign Agent';
+    let replyAgentTag = currentTaggedAgent ? currentTaggedAgent.tag : 'nairatag';
+    let replyAgentName = currentTaggedAgent ? currentTaggedAgent.name : '₦NAIRATAG Master Protocol Agent';
     let replyAvatar = currentTaggedAgent
       ? currentTaggedAgent.avatar
-      : 'https://api.dicebear.com/7.x/identicon/svg?seed=celo-agent';
+      : 'https://api.dicebear.com/7.x/identicon/svg?seed=nairatag-master';
     let widget = null;
 
     if (foundAgent) {
@@ -1002,37 +1022,72 @@ function ArcAppShell() {
         replyAgentTag = 'discovery';
         replyAgentName = 'NairaTag Discovery';
         replyAvatar = 'https://api.dicebear.com/7.x/identicon/svg?seed=nairatag-discovery';
+      } else if (isVerificationQuery(textToSend)) {
+        // High-level Self Agent ID & Trust Points Conversational Intelligence
+        const nairatagResult = await processNairaTagChatMessage({
+          prompt: textToSend,
+          walletAddress,
+          currentAgent: foundAgent || currentTaggedAgent || OFFICIAL_PLATFORM_AGENT,
+          allAgents: chatAgents,
+        });
+        replyText = nairatagResult.reply;
+        widget = nairatagResult.widget;
+        replyAgentTag = nairatagResult.agentTag;
+        replyAgentName = nairatagResult.agentName;
+        replyAvatar = nairatagResult.avatar;
       } else {
         const agentPrompt = fileToSend
           ? `${textToSend || 'I attached a file.'}\n\nThe attached file is ${fileToSend.name} (${fileToSend.size}); its contents are not included in this chat request.`
           : textToSend;
-        const selectedAgent = foundAgent || currentTaggedAgent;
-        const agentTag = selectedAgent?.tag || 'celo';
+        const selectedAgent = foundAgent || currentTaggedAgent || OFFICIAL_PLATFORM_AGENT;
+        const agentTag = selectedAgent?.tag || 'nairatag';
         const conversationId = getOrCreateArcChatConversationId(walletAddress, agentTag);
         setActiveChatConversationId(conversationId);
-        const chatResult = await sendArcChatMessage({
-          walletAddress,
-          conversationId,
-          turnId: crypto.randomUUID(),
-          prompt: agentPrompt,
-          agentTag,
-          title: agentPrompt,
-        });
-        replyText = chatResult.reply;
-        toolEvents = chatResult.toolEvents || [];
-        if (selectedAgent) {
-          replyAgentTag = selectedAgent.tag;
-          replyAgentName = selectedAgent.name;
-          replyAvatar = selectedAgent.avatar;
-        } else {
-          replyAgentTag = chatResult.personalAgent?.tag || 'ArcAgent';
-          replyAgentName = chatResult.personalAgent?.name || 'Celo Sovereign Agent';
-          replyAvatar = 'https://api.dicebear.com/7.x/identicon/svg?seed=celo-agent';
+        try {
+          const chatResult = await sendArcChatMessage({
+            walletAddress,
+            conversationId,
+            turnId: crypto.randomUUID(),
+            prompt: agentPrompt,
+            agentTag,
+            title: agentPrompt,
+          });
+          replyText = chatResult.reply;
+          toolEvents = chatResult.toolEvents || [];
+          if (selectedAgent) {
+            replyAgentTag = selectedAgent.tag;
+            replyAgentName = selectedAgent.name;
+            replyAvatar = selectedAgent.avatar;
+          } else {
+            replyAgentTag = chatResult.personalAgent?.tag || 'nairatag';
+            replyAgentName = chatResult.personalAgent?.name || '₦NAIRATAG Master Protocol Agent';
+            replyAvatar = 'https://api.dicebear.com/7.x/identicon/svg?seed=nairatag-master';
+          }
+        } catch (serverErr) {
+          // Seamless fallback to ChatGPT / Claude tier NairaTag Conversational Intelligence
+          const nairatagResult = await processNairaTagChatMessage({
+            prompt: agentPrompt,
+            walletAddress,
+            currentAgent: selectedAgent,
+            allAgents: chatAgents,
+          });
+          replyText = nairatagResult.reply;
+          widget = nairatagResult.widget;
+          replyAgentTag = nairatagResult.agentTag;
+          replyAgentName = nairatagResult.agentName;
+          replyAvatar = nairatagResult.avatar;
         }
       }
-      widget = null;
     } catch (err) {
-      replyText = `I couldn't send or save that message: ${err.message}`;
+      // Ultimate safety fallback
+      const nairatagResult = await processNairaTagChatMessage({
+        prompt: textToSend,
+        walletAddress,
+        currentAgent: foundAgent || currentTaggedAgent || OFFICIAL_PLATFORM_AGENT,
+        allAgents: chatAgents,
+      });
+      replyText = nairatagResult.reply;
+      widget = nairatagResult.widget;
     }
 
     const botReply = {
@@ -2067,7 +2122,26 @@ function ArcAppShell() {
     setAgentChatMessages((prev) => ({ ...prev, [agentId]: newMsgs }));
     setAgentChatInput('');
     try {
-      const agentTag = selectedAgentProfile?.tag || 'celo';
+      if (isVerificationQuery(text)) {
+        const result = await processNairaTagChatMessage({
+          prompt: text,
+          walletAddress,
+          currentAgent: selectedAgentProfile,
+          allAgents: chatAgents,
+        });
+        setAgentChatMessages((prev) => ({
+          ...prev,
+          [agentId]: [...(prev[agentId] || newMsgs), {
+            sender: 'agent',
+            text: result.reply,
+            widget: result.widget,
+            time: 'Just now',
+          }],
+        }));
+        return;
+      }
+
+      const agentTag = selectedAgentProfile?.tag || 'nairatag';
       const result = await sendArcChatMessage({
         walletAddress,
         conversationId: getOrCreateArcChatConversationId(walletAddress, agentTag),
@@ -2081,9 +2155,20 @@ function ArcAppShell() {
         [agentId]: [...(prev[agentId] || newMsgs), { sender: 'agent', text: result.reply, time: 'Just now' }],
       }));
     } catch (error) {
+      const result = await processNairaTagChatMessage({
+        prompt: text,
+        walletAddress,
+        currentAgent: selectedAgentProfile,
+        allAgents: chatAgents,
+      });
       setAgentChatMessages((prev) => ({
         ...prev,
-        [agentId]: [...(prev[agentId] || newMsgs), { sender: 'agent', text: `I couldn't send or save that message: ${error.message}`, time: 'Just now' }],
+        [agentId]: [...(prev[agentId] || newMsgs), {
+          sender: 'agent',
+          text: result.reply,
+          widget: result.widget,
+          time: 'Just now',
+        }],
       }));
     }
   };
@@ -4542,8 +4627,45 @@ function ArcAppShell() {
 
                 {/* Friendly Subtitle */}
                 <p className="ref-chat-sub">
-                  How can I help?
+                  Chat with ₦NAIRATAG Master Protocol Agent or verify your sovereign agent below.
                 </p>
+
+                {/* Self Agent ID Verification & Rewards Banner */}
+                <div
+                  onClick={() => handleSendChatPrompt('Verify my agent with Self Agent ID and check Trust Points')}
+                  style={{
+                    margin: '0 auto 16px auto',
+                    maxWidth: '420px',
+                    width: '100%',
+                    padding: '12px 16px',
+                    borderRadius: '16px',
+                    background: 'linear-gradient(135deg, rgba(5, 150, 105, 0.15) 0%, rgba(16, 185, 129, 0.06) 100%)',
+                    border: '1px solid rgba(16, 185, 129, 0.3)',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: '12px',
+                    transition: 'all 0.2s ease',
+                  }}
+                  className="hover:scale-[1.01] active:scale-[0.99]"
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'rgba(5, 150, 105, 0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <ShieldCheck size={20} color="#10B981" />
+                    </div>
+                    <div style={{ textAlign: 'left' }}>
+                      <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary, #ffffff)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span>Verify with Self</span>
+                        <span style={{ fontSize: '10px', padding: '1px 6px', borderRadius: '6px', background: '#eab308', color: '#000000', fontWeight: 800 }}>+500 PTS</span>
+                      </div>
+                      <div style={{ fontSize: '11px', color: 'var(--text-secondary, #94a3b8)' }}>
+                        Proof-of-Human ZK Passport Verification
+                      </div>
+                    </div>
+                  </div>
+                  <ChevronRight size={16} color="#10B981" />
+                </div>
 
                 {/* 3x2 Quick-Action Grid */}
                 <div className="ref-action-grid">
@@ -4695,24 +4817,43 @@ function ArcAppShell() {
                         </div>
                       )}
 
-                      {/* Generative Interactive Task Widget */}
+                      {/* Generative Interactive Task & Verification Widget */}
                       {msg.widget && (
-                        <div className="walley-widget-card">
-                          <div className="walley-widget-header">
-                            <span className="walley-widget-title">{msg.widget.title}</span>
-                            <span className="walley-widget-badge">{msg.widget.badge}</span>
+                        msg.widget.type === 'self_verification' ? (
+                          <ChatVerificationCard
+                            widget={msg.widget}
+                            onLaunchSelfModal={(tag) => {
+                              setIsSelfDemoModalOpen(true);
+                            }}
+                            onAddSystemMessage={(sysMsg) => {
+                              setChatMessages((prev) => [
+                                ...prev,
+                                {
+                                  id: 'sys-' + Date.now(),
+                                  time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                                  ...sysMsg,
+                                },
+                              ]);
+                            }}
+                          />
+                        ) : (
+                          <div className="walley-widget-card">
+                            <div className="walley-widget-header">
+                              <span className="walley-widget-title">{msg.widget.title}</span>
+                              <span className="walley-widget-badge">{msg.widget.badge}</span>
+                            </div>
+                            <div className="walley-widget-body">{msg.widget.body}</div>
+                            <div className="walley-widget-actions">
+                              <button
+                                type="button"
+                                className="walley-widget-action-btn"
+                                onClick={() => handleWidgetAction(msg.widget)}
+                              >
+                                <span>{msg.widget.actionText}</span>
+                              </button>
+                            </div>
                           </div>
-                          <div className="walley-widget-body">{msg.widget.body}</div>
-                          <div className="walley-widget-actions">
-                            <button
-                              type="button"
-                              className="walley-widget-action-btn"
-                              onClick={() => handleWidgetAction(msg.widget)}
-                            >
-                              <span>{msg.widget.actionText}</span>
-                            </button>
-                          </div>
-                        </div>
+                        )
                       )}
                     </div>
                   </div>

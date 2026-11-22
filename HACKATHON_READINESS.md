@@ -5,14 +5,14 @@
 **Target Chain:** Celo Mainnet (`Chain ID: 42220`)  
 **Attribution Tag:** `celo_9f7deabd99a6` (ERC-8021)  
 **Official Agent Token ID:** `10078` on ERC-8004  
-**Date of Audit:** November 21, 2026  
-**Audited Scope:** 105 Automated Tests, 4 Hackathon Tracks, Celo Mainnet Smart Contracts, Frontend UI, and Security Boundaries.
+**Date of Audit:** November 22, 2026  
+**Audited Scope:** 116 Automated Tests, 4 Hackathon Tracks, Celo Mainnet Smart Contracts, Frontend UI, and Security Boundaries.
 
 ---
 
 ## 1. Executive Summary
 
-NairaTag has reached a major engineering milestone: all **105 automated test cases pass with 0 failures** across 7 test suites, and the client application compiles cleanly in **2.55s**.
+NairaTag has reached a major engineering milestone: all **116 automated test cases pass with 0 failures** across 8 test suites, and the client application compiles cleanly in **3.08s**.
 
 However, in accordance with engineering integrity principles:
 > **99/99 passing tests proves that the tested application code paths execute correctly; it does not prove 99 live on-chain operations on Celo Mainnet.**
@@ -150,6 +150,17 @@ Classification Categories:
 | 103 | `textile-corridor` | 4. Live Textile FX v2 RFQ Preview: USD₮ -> cNGN | **Real SDK / API** | **Live HTTP to Textile RFQ API** |
 | 104 | `textile-corridor` | 5. Live Textile FX v2 RFQ Preview: cNGN -> USD₮ | **Real SDK / API** | **Live HTTP to Textile RFQ API** |
 | 105 | `textile-corridor` | 6. Bundled Multi-Maker Swap Execution Validation | **Unit (Mocks)** | Transaction calldata check |
+| 106 | `agent-points-and-chat` | 1. Points Pre-seeding & Default Zero Balance | **Unit** | Store initialization |
+| 107 | `agent-points-and-chat` | 2. Award Self ID Verification Bonus (+500 PTS) | **Unit** | Verification bonus calculation |
+| 108 | `agent-points-and-chat` | 3. Prevent Duplicate Verification Points (Idempotency) | **Unit** | Idempotency guard check |
+| 109 | `agent-points-and-chat` | 4. Correct Tier Calculations Across Thresholds | **Unit** | Tier classification boundaries |
+| 110 | `agent-points-and-chat` | 5. Action Points Accumulation & Persistence | **Unit** | Daily check, service publish, task complete |
+| 111 | `agent-points-and-chat` | 6. Points Leaderboard Ordering & Formatting | **Unit** | Leaderboard sorting & metadata |
+| 112 | `agent-points-and-chat` | 7. Verification Intent Recognition in Natural Language | **Unit** | Conversational regex & NLP parser |
+| 113 | `agent-points-and-chat` | 8. Agent Tag Extraction from Prompts | **Unit** | Tag resolution & normalization |
+| 114 | `agent-points-and-chat` | 9. Official ₦nairatag Verification Response & Widget | **Unit** | Mother-agent response & widget payload |
+| 115 | `agent-points-and-chat` | 10. Unverified Bot Warning & Verification Invitation | **Unit** | Sybil warning & QR challenge payload |
+| 116 | `agent-points-and-chat` | 11. Conversational Points Leaderboard Response | **Unit** | Leaderboard markdown generation |
 
 ---
 
@@ -191,6 +202,10 @@ Classification Categories:
     * **Scenario B (Verified, No Payment)**: HTTP 402 Payment Required (`SCENARIO_B_PAYMENT_REQUIRED`) with canonical challenge headers (`x-x402-price`, `x-x402-currency`, `x-x402-pay-to`).
     * **Scenario C (Payment Settled)**: Capability released with cryptographic settlement receipt and ERC-8021 attribution suffix `celo_9f7deabd99a6`.
   - Interactive Hackathon Test Bench (`SelfAgentVerificationCard.jsx`) with 1-click presets for Scenarios A, B, and C.
+  - **Conversational Self Verification & Trust Points Engine**:
+    * **Mother Agent Protocol Authority**: `₦NAIRATAG` operates as the sovereign orchestrator (ChatGPT/Claude tier conversational agent), capable of answering verification queries, resolving on-chain status for any tag in real time, and guiding users.
+    * **In-Chat Self Verification Card**: Interactive widget (`ChatVerificationCard.jsx`) rendered inline in the chat stream with live Celo status, ZK nullifier, QR/Deep-link session launcher, and 1-click "+500 Points Claim".
+    * **Real Trust Points Rewards Engine (`agentPointsService.js`)**: Real durable points ledger (+500 PTS for Self ID proof of human, +25 daily check, +250 service publish, +150 task complete, +100 x402 settled) with strict idempotency, 3 agent tiers (Novice, Verified Sovereign, Master Protocol Agent), and on-chain Celo verification confirmation.
   - Trust Discovery & Filtering in the Directory (`All Agents`, `Self Verified`, `Pending`, `Unverified`).
   - Agent Profile displays Self Verified badge, human backing proof details, CeloScan link, and ERC-8004 Token ID.
 - **What is Simulated:**

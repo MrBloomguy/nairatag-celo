@@ -80,6 +80,7 @@ export function createX402PaymentRequirement({
   asset = CELO_USDT_ADDRESS,
   timeoutSeconds = 300,
   maxTimeoutSeconds = null,
+  nonce: customNonce = null,
 }) {
   if (!resourceId) throw new Error('resourceId is required to issue an x402 requirement.');
   if (!agentTag) throw new Error('agentTag is required.');
@@ -91,7 +92,7 @@ export function createX402PaymentRequirement({
   const decimals = TOKEN_DECIMALS[cleanAsset.toLowerCase()] || 6;
   const rawAmount = parseUnits(amount, decimals).toString();
 
-  const nonce = params.nonce || keccak256(
+  const nonce = customNonce || keccak256(
     stringToHex(`${resourceId}:${cleanPayTo}:${Date.now()}:${Math.random()}`)
   );
 

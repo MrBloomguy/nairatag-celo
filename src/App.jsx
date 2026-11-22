@@ -3433,53 +3433,43 @@ function ArcAppShell() {
         )}
 
         {/* ───────────────────────────────────────────────────────────────────
-            TAB 1: PAY & RESOLVE TERMINAL
+            TAB 1: PAY & RESOLVE TERMINAL (SWAP & DIRECT SEND)
             ─────────────────────────────────────────────────────────────────── */}
         {mainTab === 'pay' && (
-          <div className="terminal-layout-centered">
-            <div className="crypto-card-terminal">
-              {/* Unified Card Header Bar with In-Card Mode Switcher */}
-              <div className="card-header-bar" style={{ gap: '8px', flexWrap: 'wrap' }}>
-                <div className="unified-card-subtoggle">
-                  <button
-                    type="button"
-                    className={`subtoggle-pill ${paySubMode === 'corridor' ? 'active' : ''}`}
-                    onClick={() => setPaySubMode('corridor')}
-                  >
-                    <ArrowDownUp size={12} />
-                    <span>USD₮ ⇄ cNGN</span>
-                  </button>
-                  <button
-                    type="button"
-                    className={`subtoggle-pill ${paySubMode === 'direct' ? 'active' : ''}`}
-                    onClick={() => setPaySubMode('direct')}
-                  >
-                    <Send size={12} />
-                    <span>Send to ₦Tag</span>
-                  </button>
-                </div>
-                <div className="card-header-actions">
-                  <button
-                    type="button"
-                    className="quick-chip-btn"
-                    onClick={() => setMainTab('claim')}
-                  >
-                    + Claim ₦Tag
-                  </button>
-                </div>
+          <div className="terminal-layout-centered" style={{ maxWidth: '440px' }}>
+            {/* Top Navigation Pill (Image 2 Accurate Segmented Control) */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '8px' }}>
+              <div className="unified-card-subtoggle" style={{ background: 'var(--input-bg, #f1f3f5)', padding: '4px', borderRadius: '9999px', border: '1px solid var(--border-color, rgba(0,0,0,0.06))' }}>
+                <button
+                  type="button"
+                  className={`subtoggle-pill ${paySubMode === 'corridor' ? 'active' : ''}`}
+                  onClick={() => setPaySubMode('corridor')}
+                  style={{ padding: '7px 22px', fontSize: '13px', fontWeight: 700 }}
+                >
+                  <ArrowDownUp size={13} />
+                  <span>Swap</span>
+                </button>
+                <button
+                  type="button"
+                  className={`subtoggle-pill ${paySubMode === 'direct' ? 'active' : ''}`}
+                  onClick={() => setPaySubMode('direct')}
+                  style={{ padding: '7px 22px', fontSize: '13px', fontWeight: 700 }}
+                >
+                  <Send size={13} />
+                  <span>Send to ₦Tag</span>
+                </button>
               </div>
+            </div>
 
-              {paySubMode === 'corridor' ? (
-                <CorridorSwapCard
-                  embedded={true}
-                  walletAddress={walletAddress}
-                  onConnectWallet={() => setIsConnectModalOpen(true)}
-                />
-              ) : (
-                <>
-
-                  {/* 1. Recipient ₦Tag Input Box */}
-                  <div className="tag-recipient-box">
+            {paySubMode === 'corridor' ? (
+              <CorridorSwapCard
+                walletAddress={walletAddress}
+                onConnectWallet={() => setIsConnectModalOpen(true)}
+              />
+            ) : (
+              <div className="crypto-card-terminal">
+                {/* 1. Recipient ₦Tag Input Box */}
+                <div className="tag-recipient-box">
                     <div className="token-input-header">
                       <span>To</span>
                     </div>
@@ -3623,9 +3613,8 @@ function ArcAppShell() {
                     <Send size={15} />
                     <span>Review & Send</span>
                   </button>
-                </>
+                </div>
               )}
-            </div>
           </div>
         )}
 

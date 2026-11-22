@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
+  ArrowDown,
   ArrowDownUp,
   RefreshCw,
   ExternalLink,
@@ -13,6 +14,12 @@ import {
   Clock,
   Send,
   UserCheck,
+  ChevronDown,
+  Info,
+  Sliders,
+  X,
+  Search,
+  Check,
 } from 'lucide-react';
 import {
   getLiveCorridorRate,
@@ -28,16 +35,125 @@ import {
   CELO_ATTRIBUTION_TAG,
   CELO_USDT_ADDRESS,
   CELO_CNGN_ADDRESS,
+  CELO_CUSD_ADDRESS,
 } from '../config/celo.js';
 import { getEthereumProvider } from '../services/celoPayment.js';
+import './swap/SwapWidget.css';
+
+// ── High-Fidelity Official Token Icons ──
+export function TokenIcon({ symbol, size = 26 }) {
+  if (symbol === 'USD₮') {
+    return (
+      <svg width={size} height={size} viewBox="0 0 32 32" fill="none">
+        <circle cx="16" cy="16" r="16" fill="#26A17B" />
+        <path
+          d="M17.9 12.2V9.5H23V6.5H9V9.5H14.1V12.2C10.5 12.4 7.8 13.3 7.8 14.3C7.8 15.3 10.5 16.2 14.1 16.4V22H17.9V16.4C21.5 16.2 24.2 15.3 24.2 14.3C24.2 13.3 21.5 12.4 17.9 12.2ZM16 15.3C12.8 15.3 10.3 14.7 10.3 14C10.3 13.3 12.8 12.7 16 12.7C19.2 12.7 21.7 13.3 21.7 14C21.7 14.7 19.2 15.3 16 15.3Z"
+          fill="white"
+        />
+        <path d="M16 22V25.5H16V22Z" fill="white" />
+      </svg>
+    );
+  }
+  if (symbol === 'cNGN') {
+    return (
+      <svg width={size} height={size} viewBox="0 0 32 32" fill="none">
+        <circle cx="16" cy="16" r="16" fill="#059669" />
+        <circle cx="16" cy="16" r="14.5" stroke="#34D399" strokeWidth="1" strokeOpacity="0.4" />
+        <text
+          x="16"
+          y="20.5"
+          textAnchor="middle"
+          fill="white"
+          fontSize="14"
+          fontWeight="800"
+          fontFamily="system-ui, -apple-system, sans-serif"
+        >
+          ₦
+        </text>
+      </svg>
+    );
+  }
+  if (symbol === 'cUSD') {
+    return (
+      <svg width={size} height={size} viewBox="0 0 32 32" fill="none">
+        <circle cx="16" cy="16" r="16" fill="#35D07F" />
+        <text
+          x="16"
+          y="21"
+          textAnchor="middle"
+          fill="#064E3B"
+          fontSize="14"
+          fontWeight="800"
+          fontFamily="system-ui, -apple-system, sans-serif"
+        >
+          $
+        </text>
+      </svg>
+    );
+  }
+  // CELO native
+  return (
+    <svg width={size} height={size} viewBox="0 0 32 32" fill="none">
+      <circle cx="16" cy="16" r="16" fill="#FCFF52" />
+      <circle cx="12.5" cy="13.5" r="5.5" stroke="#1E1E1E" strokeWidth="2.5" fill="none" />
+      <circle cx="19.5" cy="18.5" r="5.5" stroke="#1E1E1E" strokeWidth="2.5" fill="none" />
+    </svg>
+  );
+}
+
+const SUPPORTED_TOKENS = [
+  {
+    symbol: 'USD₮',
+    name: 'Tether USD',
+    network: 'Celo',
+    address: CELO_USDT_ADDRESS,
+    decimals: 6,
+    fiatSymbol: '$',
+    fiatMultiplier: 1.0,
+  },
+  {
+    symbol: 'cNGN',
+    name: 'Celo Naira',
+    network: 'Celo',
+    address: CELO_CNGN_ADDRESS,
+    decimals: 6,
+    fiatSymbol: '₦',
+    fiatMultiplier: 1.0,
+  },
+  {
+    symbol: 'cUSD',
+    name: 'Celo Dollar',
+    network: 'Celo',
+    address: CELO_CUSD_ADDRESS,
+    decimals: 18,
+    fiatSymbol: '$',
+    fiatMultiplier: 1.0,
+  },
+  {
+    symbol: 'CELO',
+    name: 'Native CELO',
+    network: 'Celo',
+    address: '0x0000000000000000000000000000000000000000',
+    decimals: 18,
+    fiatSymbol: '$',
+    fiatMultiplier: 0.55,
+  },
+];
 
 export default function CorridorSwapCard({ walletAddress, onConnectWallet, embedded = false }) {
-  const [direction, setDirection] = useState('USDT_TO_CNGN'); // 'USDT_TO_CNGN' | 'CNGN_TO_USDT'
+  // Primary direction: 'USDT_TO_CNGN' | 'CNGN_TO_USDT'
+  const [direction, setDirection] = useState('USDT_TO_CNGN');
   const [amountIn, setAmountIn] = useState('');
-  const [rates, setRates] = useState({ rateUsdtToCngn: 1445.50, rateCngnToUsdt: 0.000692 });
+  const [rates, setRates] = useState({ rateUsdtToCngn: 1445.5, rateCngnToUsdt: 0.000692 });
   const [balances, setBalances] = useState({ usdt: '0.00', cngn: '0.00', celo: '0.00' });
   const [isLoadingRates, setIsLoadingRates] = useState(false);
-  
+
+  // Micro-interaction states
+  const [isFlipping, setIsFlipping] = useState(false);
+  const [showDetails, setShowDetails] = useState(true);
+  const [showSettings, setShowSettings] = useState(false);
+  const [slippageTolerance, setSlippageTolerance] = useState('0.5'); // 0.1, 0.5, 1.0
+
   // Indicative & Firm Quote State
   const [indicativeData, setIndicativeData] = useState(null);
   const [firmQuote, setFirmQuote] = useState(null);
@@ -47,7 +163,10 @@ export default function CorridorSwapCard({ walletAddress, onConnectWallet, embed
   // Recipient Payout Option (Real Job to External Recipient)
   const [payDirectlyToTag, setPayDirectlyToTag] = useState(false);
   const [recipientInput, setRecipientInput] = useState('');
-  const [resolvedRecipient, setResolvedRecipient] = useState(null);
+
+  // Token Selector Modal
+  const [tokenModalMode, setTokenModalMode] = useState(null); // 'sell' | 'buy' | null
+  const [tokenSearchQuery, setTokenSearchQuery] = useState('');
 
   // Execution State
   const [isExecuting, setIsExecuting] = useState(false);
@@ -55,6 +174,18 @@ export default function CorridorSwapCard({ walletAddress, onConnectWallet, embed
   const [error, setError] = useState('');
   const [completedReceipt, setCompletedReceipt] = useState(null);
   const [copiedKey, setCopiedKey] = useState(null);
+
+  const isUsdtIn = direction === 'USDT_TO_CNGN';
+  const inTokenSymbol = isUsdtIn ? 'USD₮' : 'cNGN';
+  const outTokenSymbol = isUsdtIn ? 'cNGN' : 'USD₮';
+
+  const inBalance = isUsdtIn ? balances.usdt : balances.cngn;
+  const outBalance = isUsdtIn ? balances.cngn : balances.usdt;
+
+  const inBalanceNum = useMemo(() => {
+    const clean = String(inBalance).replace(/,/g, '');
+    return parseFloat(clean) || 0;
+  }, [inBalance]);
 
   // Fetch balances and rate
   const fetchRatesAndBalances = useCallback(async () => {
@@ -108,7 +239,7 @@ export default function CorridorSwapCard({ walletAddress, onConnectWallet, embed
       } catch (err) {
         console.warn('[Indicative preview error]', err.message);
       }
-    }, 450);
+    }, 350);
 
     return () => clearTimeout(timer);
   }, [amountIn, direction]);
@@ -131,17 +262,22 @@ export default function CorridorSwapCard({ walletAddress, onConnectWallet, embed
     return () => clearInterval(interval);
   }, [firmQuote]);
 
-  const isUsdtIn = direction === 'USDT_TO_CNGN';
-  const inTokenSymbol = isUsdtIn ? 'USD₮' : 'cNGN';
-  const outTokenSymbol = isUsdtIn ? 'cNGN' : 'USD₮';
-  const inBalance = isUsdtIn ? balances.usdt : balances.cngn;
-
+  // Flip direction with spring rotation micro-interaction
   const toggleDirection = () => {
+    setIsFlipping(true);
     setDirection((prev) => (prev === 'USDT_TO_CNGN' ? 'CNGN_TO_USDT' : 'USDT_TO_CNGN'));
     setAmountIn('');
     setIndicativeData(null);
     setFirmQuote(null);
     setError('');
+    setTimeout(() => setIsFlipping(false), 300);
+  };
+
+  // Click MAX button micro-interaction
+  const handleMaxClick = () => {
+    if (inBalanceNum > 0) {
+      setAmountIn(String(inBalanceNum));
+    }
   };
 
   // Request Firm Quote from Textile FX with EIP-712 TakerControl
@@ -214,11 +350,10 @@ export default function CorridorSwapCard({ walletAddress, onConnectWallet, embed
 
     setIsExecuting(true);
     setError('');
-    setStatusMessage('Authorizing transaction...');
+    setStatusMessage('Authorizing transaction on Celo...');
 
     try {
       if (payDirectlyToTag && recipientInput.trim()) {
-        // Mode 2: Cross-currency payment to external recipient
         const prepared = await prepareCorridorPayment({
           recipientTagOrAddress: recipientInput.trim(),
           amountInUsdt: firmQuote.formattedSellAmount,
@@ -234,7 +369,6 @@ export default function CorridorSwapCard({ walletAddress, onConnectWallet, embed
         setCompletedReceipt(receipt);
         setStatusMessage('Payment settled to external recipient!');
       } else {
-        // Mode 1: Self swap
         const result = await executeCorridorSwap({
           fromAddress: walletAddress,
           firmQuoteRecord: firmQuote,
@@ -271,384 +405,621 @@ export default function CorridorSwapCard({ walletAddress, onConnectWallet, embed
     setTimeout(() => setCopiedKey(null), 2000);
   };
 
-  const estimatedDisplay = firmQuote
-    ? firmQuote.formattedBuyAmount
-    : indicativeData
-    ? indicativeData.formattedBuyAmount
-    : amountIn && Number(amountIn) > 0
-    ? (Number(amountIn) * (isUsdtIn ? rates.rateUsdtToCngn : rates.rateCngnToUsdt)).toFixed(isUsdtIn ? 2 : 4)
-    : '0.00';
+  // Estimated output amount
+  const estimatedDisplay = useMemo(() => {
+    if (firmQuote) return firmQuote.formattedBuyAmount;
+    if (indicativeData) return indicativeData.formattedBuyAmount;
+    if (amountIn && Number(amountIn) > 0) {
+      const num = Number(amountIn) * (isUsdtIn ? rates.rateUsdtToCngn : rates.rateCngnToUsdt);
+      return num.toLocaleString('en-US', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: isUsdtIn ? 2 : 4,
+      });
+    }
+    return '0.00';
+  }, [firmQuote, indicativeData, amountIn, isUsdtIn, rates]);
+
+  // Fiat estimate for Sell side
+  const sellFiatEstimate = useMemo(() => {
+    const amt = parseFloat(amountIn) || 0;
+    if (amt <= 0) return '$0.00';
+    if (isUsdtIn) return `$${amt.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    const usdEquiv = amt / (rates.rateUsdtToCngn || 1445.5);
+    return `≈ $${usdEquiv.toFixed(2)}`;
+  }, [amountIn, isUsdtIn, rates]);
+
+  // Fiat estimate for Buy side
+  const buyFiatEstimate = useMemo(() => {
+    const outNum = parseFloat(String(estimatedDisplay).replace(/,/g, '')) || 0;
+    if (outNum <= 0) return '$0.00';
+    if (!isUsdtIn) return `$${outNum.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    const usdEquiv = outNum / (rates.rateUsdtToCngn || 1445.5);
+    return `≈ $${usdEquiv.toFixed(2)}`;
+  }, [estimatedDisplay, isUsdtIn, rates]);
+
+  // Slippage minimum calculation
+  const minimumReceived = useMemo(() => {
+    const rawOut = parseFloat(String(estimatedDisplay).replace(/,/g, '')) || 0;
+    if (rawOut <= 0) return '0.00';
+    const slip = parseFloat(slippageTolerance) || 0.5;
+    const min = rawOut * (1 - slip / 100);
+    return min.toLocaleString('en-US', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: isUsdtIn ? 2 : 4,
+    });
+  }, [estimatedDisplay, slippageTolerance, isUsdtIn]);
+
+  const isInsufficientBalance = useMemo(() => {
+    const entered = parseFloat(amountIn) || 0;
+    return entered > 0 && walletAddress && entered > inBalanceNum;
+  }, [amountIn, walletAddress, inBalanceNum]);
 
   return (
-    <div
-      style={embedded ? {} : {
-        borderRadius: '16px',
-        padding: '20px',
-        background: 'var(--card-bg, #ffffff)',
-        border: '1px solid var(--border-color, #e5e7eb)',
-        boxShadow: '0 4px 20px rgba(0, 0, 0, 0.04)',
-      }}
-    >
-      {/* Input Box 1: You Pay */}
-      <div
-        style={{
-          padding: '14px',
-          borderRadius: '12px',
-          background: 'var(--input-bg, #f9fafb)',
-          border: '1px solid var(--border-color, #e5e7eb)',
-          marginBottom: '8px',
-        }}
-      >
-        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: 'var(--text-secondary, #666)', marginBottom: '6px' }}>
-          <span>You Pay</span>
-          <span>Balance: {inBalance} {inTokenSymbol}</span>
+    <div className="swap-widget-card">
+      {/* ── Top Header Bar ── */}
+      <div className="swap-widget-header">
+        <div className="swap-widget-title-wrap">
+          <span className="swap-widget-title">Swap</span>
+          <span className="swap-live-status-pill" title="Textile RFQ v2 Market Maker Network">
+            <span className="swap-pulse-dot" />
+            <span>Textile RFQ v2</span>
+          </span>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+        <div className="swap-header-controls">
+          <button
+            type="button"
+            className="swap-icon-btn"
+            onClick={() => setShowSettings(!showSettings)}
+            title="Slippage settings"
+          >
+            <Sliders size={15} />
+          </button>
+          <button
+            type="button"
+            className="swap-icon-btn"
+            onClick={fetchRatesAndBalances}
+            title="Refresh rates"
+          >
+            <RefreshCw size={15} className={isLoadingRates ? 'animate-spin' : ''} />
+          </button>
+        </div>
+      </div>
+
+      {/* ── Slippage Settings Dropdown Popover ── */}
+      {showSettings && (
+        <div
+          style={{
+            padding: '10px 14px',
+            borderRadius: '14px',
+            background: 'var(--input-bg, #f8fafc)',
+            border: '1px solid var(--border-color, #e5e7eb)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            fontSize: '12px',
+            marginBottom: '4px',
+          }}
+        >
+          <span style={{ fontWeight: 600, color: 'var(--privy-color-foreground-2, #6b7280)' }}>
+            Slippage Tolerance:
+          </span>
+          <div style={{ display: 'flex', gap: '4px' }}>
+            {['0.1', '0.5', '1.0'].map((val) => (
+              <button
+                key={val}
+                type="button"
+                onClick={() => setSlippageTolerance(val)}
+                style={{
+                  padding: '3px 8px',
+                  borderRadius: '6px',
+                  fontSize: '11px',
+                  fontWeight: 700,
+                  border: '1px solid',
+                  cursor: 'pointer',
+                  borderColor: slippageTolerance === val ? '#10b981' : 'var(--border-color, #e2e8f0)',
+                  background: slippageTolerance === val ? '#10b981' : 'var(--card-bg, #ffffff)',
+                  color: slippageTolerance === val ? '#ffffff' : 'var(--privy-color-foreground, #111111)',
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                {val}% {val === '0.5' ? '(Auto)' : ''}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── CARD 1: SELL (You Pay) ── */}
+      <div className="swap-card-box">
+        <div className="swap-card-top-row">
+          <span className="swap-card-label">Sell</span>
+          <div className="swap-balance-row">
+            <span>
+              Balance: {inBalance} {inTokenSymbol}
+            </span>
+            {walletAddress && inBalanceNum > 0 && (
+              <button
+                type="button"
+                className="swap-max-btn"
+                onClick={handleMaxClick}
+                title="Use full balance"
+              >
+                MAX
+              </button>
+            )}
+          </div>
+        </div>
+
+        <div className="swap-card-main-row">
           <input
             type="number"
             step="any"
-            placeholder="0.00"
+            placeholder="0"
             value={amountIn}
             onChange={(e) => setAmountIn(e.target.value)}
             disabled={isExecuting || isRequestingFirmQuote}
-            style={{
-              border: 'none',
-              background: 'none',
-              fontSize: '22px',
-              fontWeight: 700,
-              width: '100%',
-              outline: 'none',
-              color: 'var(--text-primary, #111)',
-            }}
+            className="swap-number-input"
+            autoComplete="off"
+            autoCorrect="off"
           />
 
-          <div
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '6px',
-              padding: '6px 12px',
-              borderRadius: '20px',
-              background: 'var(--card-bg, #fff)',
-              border: '1px solid var(--border-color, #e5e7eb)',
-              fontWeight: 700,
-              fontSize: '13px',
-            }}
+          <button
+            type="button"
+            className="swap-token-pill"
+            onClick={() => setTokenModalMode('sell')}
+            title="Change token"
           >
-            <span style={{ color: isUsdtIn ? '#26a17b' : '#059669' }}>
-              {isUsdtIn ? '₮' : '₦'}
-            </span>
-            <span>{inTokenSymbol}</span>
-          </div>
+            <div className="swap-token-badge-icon">
+              <TokenIcon symbol={inTokenSymbol} size={24} />
+            </div>
+            <div className="swap-token-info-stack">
+              <span className="swap-token-network">Celo</span>
+              <span className="swap-token-symbol">{inTokenSymbol}</span>
+            </div>
+            <ChevronDown size={14} className="swap-token-chevron" />
+          </button>
+        </div>
+
+        <div className="swap-card-bottom-row">
+          <span>{sellFiatEstimate}</span>
+          {isInsufficientBalance && (
+            <span className="swap-card-warning">Exceeds available balance</span>
+          )}
         </div>
       </div>
 
-      {/* Flip Button */}
-      <div style={{ display: 'flex', justifyContent: 'center', margin: '-4px 0', zIndex: 2, position: 'relative' }}>
+      {/* ── CENTRAL SWITCHER BUTTON (Hero Micro-Interaction) ── */}
+      <div className="swap-flip-divider-wrap">
         <button
           type="button"
           onClick={toggleDirection}
-          style={{
-            width: '32px',
-            height: '32px',
-            borderRadius: '50%',
-            background: 'var(--card-bg, #fff)',
-            border: '1px solid var(--border-color, #d1d5db)',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            boxShadow: '0 2px 6px rgba(0,0,0,0.06)',
-            color: 'var(--text-primary, #111)',
-          }}
+          className={`swap-flip-circle-btn ${isFlipping ? 'flipped' : ''}`}
           title="Switch corridor direction"
+          aria-label="Switch corridor direction"
         >
-          <ArrowDownUp size={14} />
+          <ArrowDown size={16} />
         </button>
       </div>
 
-      {/* Input Box 2: You Receive */}
-      <div
-        style={{
-          padding: '14px',
-          borderRadius: '12px',
-          background: 'var(--input-bg, #f9fafb)',
-          border: '1px solid var(--border-color, #e5e7eb)',
-          marginTop: '8px',
-          marginBottom: '12px',
-        }}
-      >
-        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: 'var(--text-secondary, #666)', marginBottom: '6px' }}>
-          <span>You Receive</span>
-          <span>Balance: {isUsdtIn ? balances.cngn : balances.usdt} {outTokenSymbol}</span>
+      {/* ── CARD 2: BUY (You Receive) ── */}
+      <div className="swap-card-box">
+        <div className="swap-card-top-row">
+          <span className="swap-card-label">Buy</span>
+          <div className="swap-balance-row">
+            <span>
+              Balance: {outBalance} {outTokenSymbol}
+            </span>
+          </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+        <div className="swap-card-main-row">
           <div
-            style={{
-              fontSize: '22px',
-              fontWeight: 700,
-              color: Number(estimatedDisplay) > 0 ? 'var(--text-primary, #111)' : 'var(--text-secondary, #999)',
-            }}
+            className={`swap-number-output ${
+              !amountIn || Number(amountIn) <= 0 ? 'empty' : ''
+            }`}
           >
             {estimatedDisplay}
           </div>
 
-          <div
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '6px',
-              padding: '6px 12px',
-              borderRadius: '20px',
-              background: 'var(--card-bg, #fff)',
-              border: '1px solid var(--border-color, #e5e7eb)',
-              fontWeight: 700,
-              fontSize: '13px',
-            }}
+          <button
+            type="button"
+            className="swap-token-pill"
+            onClick={() => setTokenModalMode('buy')}
+            title="Change token"
           >
-            <span style={{ color: !isUsdtIn ? '#26a17b' : '#059669' }}>
-              {!isUsdtIn ? '₮' : '₦'}
-            </span>
-            <span>{outTokenSymbol}</span>
-          </div>
+            <div className="swap-token-badge-icon">
+              <TokenIcon symbol={outTokenSymbol} size={24} />
+            </div>
+            <div className="swap-token-info-stack">
+              <span className="swap-token-network">Celo</span>
+              <span className="swap-token-symbol">{outTokenSymbol}</span>
+            </div>
+            <ChevronDown size={14} className="swap-token-chevron" />
+          </button>
+        </div>
+
+        <div className="swap-card-bottom-row">
+          <span>{buyFiatEstimate}</span>
+          {firmQuote && quoteSecondsLeft !== null && (
+            <div
+              className={`swap-countdown-pill ${
+                quoteSecondsLeft <= 10 ? 'urgent' : ''
+              }`}
+            >
+              <Clock size={11} />
+              <span>{quoteSecondsLeft}s left</span>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Option: Pay directly to external recipient */}
-      {isUsdtIn && (
-        <div style={{ marginBottom: '14px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>
-              <input
-                type="checkbox"
-                checked={payDirectlyToTag}
-                onChange={(e) => setPayDirectlyToTag(e.target.checked)}
-              />
-              <span>Pay directly to external recipient (₦Tag / Phone)</span>
-            </label>
+      {/* ── Rate & Breakdown Intelligence Strip ── */}
+      <div className="swap-rate-intelligence-strip">
+        <div
+          className="swap-rate-summary-bar"
+          onClick={() => setShowDetails(!showDetails)}
+          title="Click to toggle details breakdown"
+        >
+          <div className="swap-rate-text">
+            <span>
+              1 {inTokenSymbol} ≈{' '}
+              {(firmQuote?.effectiveRate || (isUsdtIn ? rates.rateUsdtToCngn : rates.rateCngnToUsdt)).toLocaleString(
+                'en-US',
+                { maximumFractionDigits: isUsdtIn ? 2 : 6 }
+              )}{' '}
+              {outTokenSymbol}
+            </span>
           </div>
-
-          {payDirectlyToTag && (
-            <input
-              type="text"
-              placeholder="Recipient ₦Tag or address (e.g. ₦editor, +23480...)"
-              value={recipientInput}
-              onChange={(e) => setRecipientInput(e.target.value)}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span className="swap-route-badge">Best Rate ~ &lt;1s</span>
+            <ChevronDown
+              size={13}
               style={{
-                width: '100%',
-                padding: '9px 12px',
-                borderRadius: '8px',
-                border: '1px solid var(--border-color, #d1d5db)',
-                fontSize: '13px',
-                background: 'var(--input-bg, #f9fafb)',
-                outline: 'none',
+                transform: showDetails ? 'rotate(180deg)' : 'rotate(0deg)',
+                transition: 'transform 0.2s ease',
+                color: 'var(--privy-color-foreground-3, #9ca3af)',
               }}
             />
+          </div>
+        </div>
+
+        {/* Expandable Details Table */}
+        {showDetails && (
+          <div className="swap-breakdown-table">
+            <div className="swap-breakdown-row">
+              <span title="Execution protocol and settlement network">Route</span>
+              <span style={{ color: '#059669', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                <Zap size={11} /> Textile RFQ v2 (Celo)
+              </span>
+            </div>
+
+            <div className="swap-breakdown-row">
+              <span title="Minimum guaranteed amount delivered based on slippage">
+                Minimum Received
+              </span>
+              <span>
+                {minimumReceived} {outTokenSymbol}
+              </span>
+            </div>
+
+            <div className="swap-breakdown-row">
+              <span title="Difference between market price and estimated price">
+                Price Impact
+              </span>
+              <span style={{ color: '#059669' }}>&lt; 0.01%</span>
+            </div>
+
+            <div className="swap-breakdown-row">
+              <span title="Celo sub-second gas settlement fee">Network Fee</span>
+              <span>&lt; 0.0001 CELO (~ $0.0001)</span>
+            </div>
+
+            <div className="swap-breakdown-row">
+              <span title="Protocol commission fee">Exchange Fee</span>
+              <span style={{ color: '#059669' }}>Free (0%)</span>
+            </div>
+
+            {firmQuote && (
+              <div className="swap-breakdown-row">
+                <span>Spender Contract</span>
+                <span style={{ fontFamily: 'monospace', fontSize: '11px' }}>
+                  {firmQuote.spender
+                    ? `${firmQuote.spender.slice(0, 6)}...${firmQuote.spender.slice(-4)}`
+                    : 'Textile Reactor'}
+                </span>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* ── Direct Recipient Delivery Option (Expandable) ── */}
+      {isUsdtIn && (
+        <div className="swap-recipient-toggle-wrap">
+          <label className="swap-recipient-checkbox-label">
+            <input
+              type="checkbox"
+              checked={payDirectlyToTag}
+              onChange={(e) => setPayDirectlyToTag(e.target.checked)}
+              style={{ accentColor: '#10b981', cursor: 'pointer' }}
+            />
+            <span>Deliver output directly to external ₦Tag or Phone</span>
+          </label>
+
+          {payDirectlyToTag && (
+            <div className="swap-recipient-input-wrap">
+              <span className="swap-recipient-tag-prefix">₦</span>
+              <input
+                type="text"
+                placeholder="segun, food, or +234..."
+                value={recipientInput.replace(/^[$₦]/, '')}
+                onChange={(e) => setRecipientInput(e.target.value)}
+                className="swap-recipient-input"
+              />
+            </div>
           )}
         </div>
       )}
 
-      {/* Pricing & Firm Quote Details */}
-      <div
-        style={{
-          padding: '10px 14px',
-          borderRadius: '10px',
-          background: 'rgba(53, 208, 127, 0.05)',
-          border: '1px solid rgba(53, 208, 127, 0.2)',
-          fontSize: '12px',
-          marginBottom: '14px',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '4px',
-        }}
-      >
-        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-          <span style={{ color: 'var(--text-secondary, #666)' }}>Textile RFQ v2 Rate</span>
-          <span style={{ fontWeight: 600, color: 'var(--text-primary, #111)' }}>
-            1 USD₮ ≈ {(firmQuote?.effectiveRate || rates.rateUsdtToCngn).toLocaleString()} cNGN
-          </span>
-        </div>
-
-        {indicativeData?.availableSellAmount && (
-          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <span style={{ color: 'var(--text-secondary, #666)' }}>Market Maker Depth</span>
-            <span style={{ fontWeight: 600, color: '#059669' }}>
-              {Number(indicativeData.availableSellAmount).toLocaleString()} {inTokenSymbol}
-            </span>
-          </div>
-        )}
-
-        {firmQuote && (
-          <>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ color: 'var(--text-secondary, #666)' }}>Quote Expiry</span>
-              <span style={{ fontWeight: 700, color: quoteSecondsLeft && quoteSecondsLeft <= 10 ? '#dc2626' : '#059669' }}>
-                <Clock size={11} style={{ display: 'inline', marginRight: '3px' }} />
-                {quoteSecondsLeft}s remaining
-              </span>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ color: 'var(--text-secondary, #666)' }}>Spender Contract</span>
-              <span style={{ fontFamily: 'monospace', fontSize: '11px' }}>
-                {firmQuote.spender ? `${firmQuote.spender.slice(0, 6)}...${firmQuote.spender.slice(-4)}` : 'Textile Reactor'}
-              </span>
-            </div>
-          </>
-        )}
-
-
-      </div>
-
-      {/* Action Buttons */}
-      {!firmQuote ? (
+      {/* ── Primary Action Button ── */}
+      {!walletAddress ? (
         <button
           type="button"
-          disabled={isRequestingFirmQuote || !amountIn || Number(amountIn) <= 0}
+          className="swap-primary-action-btn"
+          onClick={onConnectWallet}
+        >
+          <span>Connect Wallet</span>
+        </button>
+      ) : !amountIn || Number(amountIn) <= 0 ? (
+        <button type="button" className="swap-primary-action-btn" disabled>
+          <span>Enter an amount</span>
+        </button>
+      ) : isInsufficientBalance ? (
+        <button type="button" className="swap-primary-action-btn" disabled>
+          <span>Insufficient {inTokenSymbol} Balance</span>
+        </button>
+      ) : !firmQuote ? (
+        <button
+          type="button"
+          className="swap-primary-action-btn"
+          disabled={isRequestingFirmQuote}
           onClick={handleRequestFirmQuote}
-          style={{
-            width: '100%',
-            padding: '13px 18px',
-            borderRadius: '12px',
-            background: 'linear-gradient(135deg, #35D07F 0%, #10b981 100%)',
-            color: '#042f2e',
-            border: 'none',
-            fontWeight: 700,
-            fontSize: '14px',
-            cursor: isRequestingFirmQuote ? 'wait' : 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '8px',
-            boxShadow: '0 2px 10px rgba(53, 208, 127, 0.25)',
-          }}
         >
           {isRequestingFirmQuote ? (
             <>
-              <RefreshCw size={16} className="spin" />
-              <span>Soliciting Market Maker Quotes (75s)...</span>
+              <RefreshCw size={17} className="animate-spin" />
+              <span>Soliciting Market Maker Quotes…</span>
             </>
           ) : (
             <>
-              <ShieldCheck size={16} />
-              <span>Request Firm Quote (Textile RFQ)</span>
+              <ShieldCheck size={17} />
+              <span>Review Swap Quote (Textile RFQ)</span>
             </>
           )}
         </button>
       ) : (
         <button
           type="button"
+          className="swap-primary-action-btn"
           disabled={isExecuting || (quoteSecondsLeft !== null && quoteSecondsLeft <= 0)}
           onClick={handleAuthorizeAndExecute}
           style={{
-            width: '100%',
-            padding: '13px 18px',
-            borderRadius: '12px',
-            background: quoteSecondsLeft && quoteSecondsLeft <= 0 ? '#9ca3af' : 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-            color: '#ffffff',
-            border: 'none',
-            fontWeight: 700,
-            fontSize: '14px',
-            cursor: isExecuting ? 'wait' : 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '8px',
-            boxShadow: '0 2px 10px rgba(5, 150, 105, 0.25)',
+            background:
+              quoteSecondsLeft && quoteSecondsLeft <= 0
+                ? '#9ca3af'
+                : 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
           }}
         >
           {isExecuting ? (
             <>
-              <RefreshCw size={16} className="spin" />
-              <span>{statusMessage || 'Authorizing Swap...'}</span>
+              <RefreshCw size={17} className="animate-spin" />
+              <span>{statusMessage || 'Authorizing Swap on Celo…'}</span>
             </>
           ) : (
             <>
-              <Zap size={16} />
+              <Zap size={17} />
               <span>
                 {payDirectlyToTag
                   ? `Authorize Swap & Pay ${firmQuote.formattedBuyAmount} cNGN`
-                  : `Authorize Swap (${firmQuote.formattedBuyAmount} ${outTokenSymbol})`}
+                  : `Confirm Swap (${firmQuote.formattedBuyAmount} ${outTokenSymbol})`}
               </span>
             </>
           )}
         </button>
       )}
 
-      {/* Error Alert */}
+      {/* ── Error Banner ── */}
       {error && (
         <div
           style={{
-            marginTop: '10px',
-            padding: '8px 12px',
-            borderRadius: '8px',
-            background: 'rgba(239, 68, 68, 0.1)',
-            border: '1px solid rgba(239, 68, 68, 0.2)',
+            padding: '9px 12px',
+            borderRadius: '10px',
+            background: 'rgba(239, 68, 68, 0.08)',
+            border: '1px solid rgba(239, 68, 68, 0.25)',
             color: '#dc2626',
             fontSize: '12px',
             display: 'flex',
             alignItems: 'center',
             gap: '6px',
+            animation: 'modalSlideUp 0.2s ease',
           }}
         >
-          <AlertCircle size={14} />
+          <AlertCircle size={15} style={{ flexShrink: 0 }} />
           <span>{error}</span>
         </div>
       )}
 
-      {/* Verifiable Cryptographic Receipt Card */}
+      {/* ── Verifiable Receipt Card ── */}
       {completedReceipt && (
         <div
           style={{
-            marginTop: '14px',
-            padding: '12px 14px',
-            borderRadius: '12px',
+            padding: '14px',
+            borderRadius: '16px',
             background: 'rgba(5, 150, 105, 0.08)',
             border: '1px solid rgba(5, 150, 105, 0.3)',
             fontSize: '12px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '8px',
+            animation: 'modalSlideUp 0.25s ease',
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <CheckCircle2 size={16} color="#059669" />
-              <span style={{ fontWeight: 700, color: '#059669' }}>Payment Receipt</span>
+              <CheckCircle2 size={17} color="#059669" />
+              <span style={{ fontWeight: 800, color: '#059669', fontSize: '13px' }}>
+                Corridor Swap Finalized
+              </span>
             </div>
-            <span style={{ fontSize: '10.5px', fontFamily: 'monospace', color: '#059669' }}>
-              {completedReceipt.receiptId}
+            <button
+              type="button"
+              onClick={() => setCompletedReceipt(null)}
+              style={{
+                border: 'none',
+                background: 'transparent',
+                cursor: 'pointer',
+                color: '#6b7280',
+              }}
+            >
+              <X size={15} />
+            </button>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <span style={{ color: '#4b5563' }}>Converted</span>
+            <span style={{ fontWeight: 700, color: '#111827' }}>
+              {completedReceipt.amountSentUsdt} USD₮ → {completedReceipt.amountDeliveredCngn} cNGN
             </span>
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '11.5px', color: 'var(--text-secondary, #444)' }}>
-            <div>
-              <strong>Converted:</strong> {completedReceipt.amountSentUsdt} USD₮ → {completedReceipt.amountDeliveredCngn} cNGN
-            </div>
-            {completedReceipt.recipientTag && (
-              <div>
-                <strong>Delivered to:</strong> {completedReceipt.recipientTag} ({completedReceipt.recipientAddress})
-              </div>
-            )}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
-              <a
-                href={completedReceipt.swapExplorerUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{ color: '#059669', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '2px', fontWeight: 600 }}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '2px' }}>
+            <a
+              href={completedReceipt.swapExplorerUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                color: '#059669',
+                textDecoration: 'none',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px',
+                fontWeight: 700,
+                fontSize: '11.5px',
+              }}
+            >
+              <span>View on CeloScan</span>
+              <ExternalLink size={11} />
+            </a>
+            <span style={{ fontSize: '10px', color: '#9ca3af' }}>ERC-8021 Tagged</span>
+          </div>
+        </div>
+      )}
+
+      {/* ── Token Selector Modal ── */}
+      {tokenModalMode && (
+        <div className="swap-modal-backdrop" onClick={() => setTokenModalMode(null)}>
+          <div
+            className="swap-token-modal-card"
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+          >
+            <div className="swap-token-modal-header">
+              <span className="swap-token-modal-title">Select a token</span>
+              <button
+                type="button"
+                className="swap-icon-btn"
+                onClick={() => setTokenModalMode(null)}
               >
-                <span>Swap Tx</span>
-                <ExternalLink size={10} />
-              </a>
-              {completedReceipt.payoutExplorerUrl && (
-                <a
-                  href={completedReceipt.payoutExplorerUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{ color: '#059669', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '2px', fontWeight: 600 }}
-                >
-                  <span>Payout Tx</span>
-                  <ExternalLink size={10} />
-                </a>
-              )}
+                <X size={16} />
+              </button>
+            </div>
+
+            <div style={{ position: 'relative' }}>
+              <Search
+                size={14}
+                style={{
+                  position: 'absolute',
+                  left: '12px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  color: '#9ca3af',
+                }}
+              />
+              <input
+                type="text"
+                placeholder="Search token name or symbol"
+                value={tokenSearchQuery}
+                onChange={(e) => setTokenSearchQuery(e.target.value)}
+                className="swap-token-search-input"
+                style={{ paddingLeft: '34px' }}
+                autoFocus
+              />
+            </div>
+
+            <div className="swap-token-list">
+              {SUPPORTED_TOKENS.filter(
+                (t) =>
+                  t.symbol.toLowerCase().includes(tokenSearchQuery.toLowerCase()) ||
+                  t.name.toLowerCase().includes(tokenSearchQuery.toLowerCase())
+              ).map((token) => {
+                const currentActive =
+                  tokenModalMode === 'sell'
+                    ? inTokenSymbol === token.symbol
+                    : outTokenSymbol === token.symbol;
+
+                return (
+                  <div
+                    key={token.symbol}
+                    className={`swap-token-item ${currentActive ? 'selected' : ''}`}
+                    onClick={() => {
+                      if (token.symbol === 'USD₮' || token.symbol === 'cNGN') {
+                        if (tokenModalMode === 'sell') {
+                          if (token.symbol === 'cNGN' && direction === 'USDT_TO_CNGN') {
+                            toggleDirection();
+                          } else if (token.symbol === 'USD₮' && direction === 'CNGN_TO_USDT') {
+                            toggleDirection();
+                          }
+                        } else {
+                          if (token.symbol === 'USD₮' && direction === 'USDT_TO_CNGN') {
+                            toggleDirection();
+                          } else if (token.symbol === 'cNGN' && direction === 'CNGN_TO_USDT') {
+                            toggleDirection();
+                          }
+                        }
+                      }
+                      setTokenModalMode(null);
+                      setTokenSearchQuery('');
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <TokenIcon symbol={token.symbol} size={30} />
+                      <div>
+                        <div style={{ fontWeight: 800, fontSize: '14px', color: 'var(--privy-color-foreground, #111111)' }}>
+                          {token.symbol}
+                        </div>
+                        <div style={{ fontSize: '11px', color: 'var(--privy-color-foreground-3, #9ca3af)' }}>
+                          {token.name} • {token.network}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--privy-color-foreground-2, #6b7280)' }}>
+                        {token.symbol === 'USD₮'
+                          ? balances.usdt
+                          : token.symbol === 'cNGN'
+                          ? balances.cngn
+                          : token.symbol === 'CELO'
+                          ? balances.celo
+                          : '0.00'}
+                      </span>
+                      {currentActive && <Check size={16} color="#10b981" />}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>

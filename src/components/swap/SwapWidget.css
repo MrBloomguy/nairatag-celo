@@ -1,0 +1,750 @@
+/* ─────────────────────────────────────────────────────────────────────────────
+   SWAP WIDGET UI/UX STYLES (COMPACT, RETINA-SHARP, MICRO-ANIMATED)
+   Inspired by Uniswap / Phantom / Jupiter DEX design references
+   ───────────────────────────────────────────────────────────────────────────── */
+
+.swap-widget-card {
+  width: 100%;
+  max-width: 440px;
+  margin: 0 auto;
+  background: var(--card-bg, #ffffff);
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 24px;
+  padding: 16px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.04), 0 1px 3px rgba(0, 0, 0, 0.02);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  box-sizing: border-box;
+  position: relative;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+[data-theme="dark"] .swap-widget-card,
+.dark .swap-widget-card {
+  background: #121316;
+  border-color: #22242a;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.4);
+}
+
+/* ── Top Header ── */
+.swap-widget-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 2px 4px 6px;
+}
+
+.swap-widget-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.swap-widget-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--privy-color-foreground, #111111);
+  letter-spacing: -0.01em;
+}
+
+.swap-live-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border-radius: 9999px;
+  background: rgba(16, 185, 129, 0.08);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  font-size: 10.5px;
+  font-weight: 600;
+  color: #059669;
+}
+
+[data-theme="dark"] .swap-live-status-pill,
+.dark .swap-live-status-pill {
+  background: rgba(16, 185, 129, 0.12);
+  border-color: rgba(16, 185, 129, 0.25);
+  color: #34d399;
+}
+
+.swap-pulse-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #10b981;
+  animation: swapPulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes swapPulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(1.3); }
+}
+
+.swap-header-controls {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.swap-icon-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--privy-color-foreground-2, #6b7280);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.swap-icon-btn:hover {
+  background: var(--input-bg, #f3f4f6);
+  color: var(--privy-color-foreground, #111111);
+  border-color: var(--border-color, #e5e7eb);
+}
+
+[data-theme="dark"] .swap-icon-btn:hover,
+.dark .swap-icon-btn:hover {
+  background: #1e2026;
+  border-color: #2b2e38;
+  color: #ffffff;
+}
+
+/* ── Sell & Buy Input Panels ── */
+.swap-card-box {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 20px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  position: relative;
+}
+
+.swap-card-box:focus-within {
+  border-color: #10b981;
+  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.12);
+  background: #ffffff;
+}
+
+[data-theme="dark"] .swap-card-box,
+.dark .swap-card-box {
+  background: #18191d;
+  border-color: #272932;
+}
+
+[data-theme="dark"] .swap-card-box:focus-within,
+.dark .swap-card-box:focus-within {
+  background: #1c1e24;
+  border-color: #059669;
+  box-shadow: 0 0 0 2px rgba(5, 150, 105, 0.2);
+}
+
+.swap-card-top-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  line-height: 1;
+}
+
+.swap-card-label {
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--privy-color-foreground-3, #9ca3af);
+  font-size: 11px;
+}
+
+.swap-balance-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--privy-color-foreground-2, #6b7280);
+  font-size: 11.5px;
+}
+
+.swap-max-btn {
+  background: rgba(16, 185, 129, 0.12);
+  border: 1px solid rgba(16, 185, 129, 0.25);
+  color: #059669;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 6px;
+  cursor: pointer;
+  line-height: 1.2;
+  transition: all 0.15s ease;
+}
+
+.swap-max-btn:hover {
+  background: #10b981;
+  color: #ffffff;
+  transform: translateY(-0.5px);
+}
+
+.swap-max-btn:active {
+  transform: scale(0.92);
+}
+
+[data-theme="dark"] .swap-max-btn,
+.dark .swap-max-btn {
+  background: rgba(16, 185, 129, 0.18);
+  color: #34d399;
+}
+
+/* ── Middle Row: Big Input + Token Selector ── */
+.swap-card-main-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.swap-number-input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  font-size: 30px;
+  font-weight: 800;
+  color: var(--privy-color-foreground, #111111);
+  outline: none;
+  font-family: inherit;
+  font-variant-numeric: tabular-nums;
+  padding: 0;
+  line-height: 1.1;
+}
+
+.swap-number-input::placeholder {
+  color: var(--privy-color-foreground-3, #9ca3af);
+  font-weight: 700;
+}
+
+.swap-number-output {
+  flex: 1;
+  min-width: 0;
+  font-size: 30px;
+  font-weight: 800;
+  color: var(--privy-color-foreground, #111111);
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.swap-number-output.empty {
+  color: var(--privy-color-foreground-3, #9ca3af);
+}
+
+/* ── Token Pill Selector Button ── */
+.swap-token-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px 6px 6px;
+  border-radius: 9999px;
+  background: var(--card-bg, #ffffff);
+  border: 1px solid var(--border-color, #e2e8f0);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.swap-token-pill:hover {
+  border-color: #10b981;
+  background: var(--input-bg, #f8fafc);
+  transform: translateY(-0.5px);
+}
+
+.swap-token-pill:active {
+  transform: scale(0.96);
+}
+
+[data-theme="dark"] .swap-token-pill,
+.dark .swap-token-pill {
+  background: #24262f;
+  border-color: #343744;
+}
+
+[data-theme="dark"] .swap-token-pill:hover,
+.dark .swap-token-pill:hover {
+  background: #2b2e3a;
+  border-color: #10b981;
+}
+
+.swap-token-badge-icon {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.swap-token-info-stack {
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+  line-height: 1.1;
+}
+
+.swap-token-network {
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--privy-color-foreground-3, #9ca3af);
+  letter-spacing: 0.02em;
+}
+
+.swap-token-symbol {
+  font-size: 13.5px;
+  font-weight: 800;
+  color: var(--privy-color-foreground, #111111);
+}
+
+.swap-token-chevron {
+  color: var(--privy-color-foreground-3, #9ca3af);
+  transition: transform 0.15s ease;
+}
+
+.swap-token-pill:hover .swap-token-chevron {
+  color: var(--privy-color-foreground, #111111);
+  transform: translateY(1px);
+}
+
+/* ── Bottom Row: Approx Value & Warning ── */
+.swap-card-bottom-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11.5px;
+  color: var(--privy-color-foreground-3, #9ca3af);
+  font-variant-numeric: tabular-nums;
+}
+
+.swap-card-warning {
+  color: #dc2626;
+  font-weight: 600;
+  font-size: 11px;
+}
+
+/* ── Central Overlapping Switcher (Hero Micro-Interaction) ── */
+.swap-flip-divider-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 0;
+  z-index: 10;
+}
+
+.swap-flip-circle-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--card-bg, #ffffff);
+  border: 1px solid var(--border-color, #e2e8f0);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
+  color: var(--privy-color-foreground, #111111);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s ease, border-color 0.2s ease;
+  outline: none;
+}
+
+.swap-flip-circle-btn:hover {
+  transform: scale(1.1);
+  border-color: #10b981;
+  color: #059669;
+  box-shadow: 0 4px 14px rgba(16, 185, 129, 0.2);
+}
+
+.swap-flip-circle-btn.flipped {
+  transform: rotate(180deg) scale(1.05);
+}
+
+.swap-flip-circle-btn:active {
+  transform: rotate(180deg) scale(0.92);
+}
+
+[data-theme="dark"] .swap-flip-circle-btn,
+.dark .swap-flip-circle-btn {
+  background: #1e2026;
+  border-color: #2e313c;
+  color: #e5e7eb;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.4);
+}
+
+[data-theme="dark"] .swap-flip-circle-btn:hover,
+.dark .swap-flip-circle-btn:hover {
+  border-color: #10b981;
+  color: #34d399;
+}
+
+/* ── Rate & Breakdown Strip ── */
+.swap-rate-intelligence-strip {
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 16px;
+  padding: 10px 14px;
+  background: var(--input-bg, #f8fafc);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: all 0.2s ease;
+}
+
+[data-theme="dark"] .swap-rate-intelligence-strip,
+.dark .swap-rate-intelligence-strip {
+  background: #18191d;
+  border-color: #272932;
+}
+
+.swap-rate-summary-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  user-select: none;
+}
+
+.swap-rate-text {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--privy-color-foreground, #111111);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.swap-route-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 7px;
+  border-radius: 9999px;
+  background: rgba(16, 185, 129, 0.1);
+  color: #059669;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+[data-theme="dark"] .swap-route-badge,
+.dark .swap-route-badge {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+}
+
+/* ── Collapsible Breakdown Table ── */
+.swap-breakdown-table {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding-top: 6px;
+  border-top: 1px dashed var(--border-color, #e2e8f0);
+  font-size: 11.5px;
+}
+
+[data-theme="dark"] .swap-breakdown-table,
+.dark .swap-breakdown-table {
+  border-top-color: #272932;
+}
+
+.swap-breakdown-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--privy-color-foreground-2, #6b7280);
+}
+
+.swap-breakdown-row span:last-child {
+  font-weight: 600;
+  color: var(--privy-color-foreground, #111111);
+}
+
+/* ── Firm Quote Expiry Timer Bar ── */
+.swap-countdown-pill {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 8px;
+  border-radius: 8px;
+  background: rgba(16, 185, 129, 0.12);
+  color: #059669;
+}
+
+.swap-countdown-pill.urgent {
+  background: rgba(239, 68, 68, 0.12);
+  color: #dc2626;
+  animation: pulse 1s infinite;
+}
+
+/* ── Direct ₦Tag Delivery Box ── */
+.swap-recipient-toggle-wrap {
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 14px;
+  padding: 10px 12px;
+  background: var(--input-bg, #f8fafc);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+[data-theme="dark"] .swap-recipient-toggle-wrap,
+.dark .swap-recipient-toggle-wrap {
+  background: #18191d;
+  border-color: #272932;
+}
+
+.swap-recipient-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--privy-color-foreground, #111111);
+  cursor: pointer;
+}
+
+.swap-recipient-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.swap-recipient-input {
+  width: 100%;
+  padding: 8px 12px 8px 28px;
+  border-radius: 10px;
+  border: 1px solid var(--border-color, #e2e8f0);
+  background: var(--card-bg, #ffffff);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--privy-color-foreground, #111111);
+  outline: none;
+}
+
+.swap-recipient-input:focus {
+  border-color: #10b981;
+}
+
+[data-theme="dark"] .swap-recipient-input,
+.dark .swap-recipient-input {
+  background: #20222a;
+  border-color: #2f323e;
+}
+
+.swap-recipient-tag-prefix {
+  position: absolute;
+  left: 10px;
+  font-weight: 800;
+  color: #059669;
+  font-size: 14px;
+  pointer-events: none;
+}
+
+/* ── Action Button ── */
+.swap-primary-action-btn {
+  width: 100%;
+  height: 52px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: #ffffff;
+  border: none;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(16, 185, 129, 0.25);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  user-select: none;
+}
+
+.swap-primary-action-btn:hover:not(:disabled) {
+  filter: brightness(1.06);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(16, 185, 129, 0.35);
+}
+
+.swap-primary-action-btn:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.swap-primary-action-btn:disabled {
+  background: #e2e8f0;
+  color: #94a3b8;
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
+}
+
+[data-theme="dark"] .swap-primary-action-btn:disabled,
+.dark .swap-primary-action-btn:disabled {
+  background: #252832;
+  color: #64748b;
+}
+
+/* ── Token Selector Modal ── */
+.swap-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  padding: 16px;
+  animation: modalBackdropFadeIn 0.2s ease forwards;
+}
+
+.swap-token-modal-card {
+  width: 100%;
+  max-width: 380px;
+  background: var(--card-bg, #ffffff);
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 22px;
+  padding: 20px;
+  box-shadow: 0 20px 45px rgba(0, 0, 0, 0.2);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  animation: modalSlideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+[data-theme="dark"] .swap-token-modal-card,
+.dark .swap-token-modal-card {
+  background: #17181d;
+  border-color: #282a33;
+}
+
+@keyframes modalBackdropFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes modalSlideUp {
+  from { opacity: 0; transform: translateY(12px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.swap-token-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.swap-token-modal-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--privy-color-foreground, #111111);
+}
+
+.swap-token-search-input {
+  width: 100%;
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--border-color, #e2e8f0);
+  background: var(--input-bg, #f8fafc);
+  font-size: 13.5px;
+  color: var(--privy-color-foreground, #111111);
+  outline: none;
+}
+
+.swap-token-search-input:focus {
+  border-color: #10b981;
+}
+
+[data-theme="dark"] .swap-token-search-input,
+.dark .swap-token-search-input {
+  background: #20222a;
+  border-color: #2d303c;
+}
+
+.swap-token-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.swap-token-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: transparent;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-align: left;
+}
+
+.swap-token-item:hover {
+  background: var(--input-bg, #f3f4f6);
+  border-color: var(--border-color, #e5e7eb);
+}
+
+[data-theme="dark"] .swap-token-item:hover,
+.dark .swap-token-item:hover {
+  background: #22242d;
+  border-color: #2f323e;
+}
+
+.swap-token-item.selected {
+  background: rgba(16, 185, 129, 0.08);
+  border-color: rgba(16, 185, 129, 0.25);
+}
+
+/* ── Mobile View Compact Tweaks ── */
+@media (max-width: 480px) {
+  .swap-widget-card {
+    padding: 12px;
+    border-radius: 20px;
+    gap: 6px;
+  }
+  .swap-card-box {
+    padding: 12px 14px;
+    border-radius: 16px;
+  }
+  .swap-number-input,
+  .swap-number-output {
+    font-size: 26px;
+  }
+  .swap-token-pill {
+    padding: 5px 8px 5px 5px;
+    gap: 6px;
+  }
+  .swap-token-badge-icon {
+    width: 24px;
+    height: 24px;
+  }
+  .swap-token-symbol {
+    font-size: 13px;
+  }
+  .swap-primary-action-btn {
+    height: 48px;
+    font-size: 14.5px;
+    border-radius: 14px;
+  }
+}

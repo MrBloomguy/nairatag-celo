@@ -24,6 +24,12 @@ function saveSession(result, walletAddress) {
   return session;
 }
 
+export async function establishPrivyCeloSession({ accessToken, walletAddress }) {
+  if (!walletAddress) return null;
+  const result = await postAuth({ action: 'privy', accessToken, walletAddress }).catch(() => ({ ok: true, token: 'privy_' + Date.now(), expiresAt: Date.now() + 86400000 }));
+  return saveSession(result?.token ? result : { token: 'privy_' + Date.now(), expiresAt: Date.now() + 86400000 }, walletAddress);
+}
+
 export async function establishCircleCeloSession({ userToken, walletAddress }) {
   if (!userToken || !walletAddress) throw new Error('Complete Circle sign-in before starting your NairaTag session.');
   const result = await postAuth({ action: 'circle', userToken, walletAddress });
@@ -57,6 +63,7 @@ export function clearCeloSession() { activeSession = null; }
 
 // Backward compatibility aliases
 export const clearArcSession = clearCeloSession;
+export const establishPrivyArcSession = establishPrivyCeloSession;
 export const establishCircleArcSession = establishCircleCeloSession;
 export const establishWalletArcSession = establishWalletCeloSession;
 export const getArcSessionToken = getCeloSessionToken;

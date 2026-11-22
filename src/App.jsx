@@ -1,7 +1,6 @@
 // @ts-nocheck
-// @ts-nocheck
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import AuthConnectModal from './components/auth/AuthConnectModal';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { usePrivy, useWallets } from '@privy-io/react-auth';
 import ProfileAvatar from './components/ProfileAvatar';
 import ChatActivityIndicator from './components/chat/ChatActivityIndicator';
 import PersonalAgentPanel from './components/chat/PersonalAgentPanel';
@@ -115,6 +114,7 @@ import {
   activeCeloChain,
   activeCeloChain as activeArcChain,
   getEthereumProvider,
+  setActiveWalletProvider,
 } from './services/celoPayment.js';
 import {
   requestCircleEmailOtp,
@@ -455,6 +455,11 @@ export const FAQ_ITEMS = [
 // PlatformAgentAdminPage is imported from ./components/admin/PlatformAgentAdminPage.jsx
 
 function ArcAppShell() {
+  const { login: launchPrivyLogin, logout: logoutPrivy, authenticated: privyAuthenticated, ready: privyReady, user: privyUser } = usePrivy();
+  const { wallets: privyWallets } = useWallets();
+  const privyWalletsRef = useRef(privyWallets);
+  useEffect(() => { privyWalletsRef.current = privyWallets; }, [privyWallets]);
+
   // Theme State: 'light' | 'dark'
   const [theme, setTheme] = useState(() => window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
 
@@ -1296,8 +1301,17 @@ function ArcAppShell() {
   const [circleOtpSent, setCircleOtpSent] = useState(false);
   const [circleStatus, setCircleStatus] = useState('');
 
-  // Modals
-  const [isConnectModalOpen, setIsConnectModalOpen] = useState(false);
+  // Modals & Privy Auth Layer
+  const [isConnectModalOpen, setConnectModalOpen] = useState(false);
+  const setIsConnectModalOpen = useCallback((open) => {
+    if (open) {
+      if (privyReady && launchPrivyLogin) {
+        launchPrivyLogin();
+        return;
+      }
+    }
+    setConnectModalOpen(false);
+  }, [privyReady, launchPrivyLogin]);
   const [authScreen, setAuthScreen] = useState('welcome'); // 'welcome' | 'create' | 'signin' | 'wallets'
   const [isSendReviewModalOpen, setIsSendReviewModalOpen] = useState(false);
   const [isCelebrationOpen, setIsCelebrationOpen] = useState(false);
@@ -1865,12 +1879,16 @@ function ArcAppShell() {
     }
   };
 
-  // Disconnect active wallet (Circle or Injected)
+  // Disconnect active wallet (Privy, Circle or Injected)
   const handleDisconnect = () => {
+    if (privyAuthenticated && logoutPrivy) {
+      logoutPrivy().catch(() => {});
+    }
     if (authProvider === 'circle') {
       clearCircleSession();
     }
     clearArcSession();
+    setActiveWalletProvider(null);
     setWalletAddress(null);
     setAuthProvider(null);
     setCircleSession(null);
@@ -1882,6 +1900,65 @@ function ArcAppShell() {
     setIsWalletModalOpen(false);
     showToast('Wallet disconnected', 'info', 2000);
   };
+
+  // Synchronize authenticated Privy user and wallets to active Celo session
+  useEffect(() => {
+    if (!privyReady) return;
+    if (!privyAuthenticated) {
+      if (authProvider === 'privy') {
+        handleDisconnect();
+      }
+      return;
+    }
+    if (walletAddress) return;
+
+    const activeWallet = privyWallets?.[0] || (privyUser?.wallet?.address ? { address: privyUser.wallet.address } : null);
+    if (!activeWallet?.address) return;
+
+    let active = true;
+    (async () => {
+      try {
+        if (typeof activeWallet.getEthereumProvider === 'function') {
+          const provider = await activeWallet.getEthereumProvider();
+          if (provider && active) {
+            setActiveWalletProvider(provider);
+          }
+        }
+        const address = activeWallet.address;
+        if (!active) return;
+        setWalletAddress(address);
+        setAuthProvider('privy');
+        setChainId(activeArcChain.id);
+        setIsArcNetwork(true);
+        setAccountEmail(privyUser?.email?.address || privyUser?.phone?.number || '');
+
+        try {
+          await establishWalletArcSession(address);
+        } catch (sessionErr) {
+          console.warn('[Privy session]', sessionErr?.message || sessionErr);
+        }
+
+        const [accountResult, rewardResult] = await Promise.allSettled([
+          refreshBalance(address),
+          getArcRewardState(address),
+        ]);
+        if (rewardResult.status === 'fulfilled') {
+          applyArcRewardState(rewardResult.value);
+        }
+        if (!accountResult.value?.tag?.tag) {
+          setWelcomeDetails({
+            tag: null,
+            points: rewardResult.status === 'fulfilled' ? rewardResult.value?.points : null,
+          });
+        }
+        showToast(`Connected ${shorten(address)}`, 'success', 2500);
+      } catch (err) {
+        console.warn('[Privy wallet sync error]', err);
+      }
+    })();
+
+    return () => { active = false; };
+  }, [privyReady, privyAuthenticated, privyWallets, privyUser, walletAddress, authProvider]);
 
   // Connect Wallet Handler
   const handleConnect = async (providerType) => {
@@ -5306,16 +5383,7 @@ function ArcAppShell() {
         </div>
       )}
 
-      {/* ───────────────────────────────────────────────────────────────────
-          MODAL 1: CONNECT WALLET OVERLAY (EVM BROWSER WALLETS)
-          ─────────────────────────────────────────────────────────────────── */}
-      {isConnectModalOpen && (
-        <AuthConnectModal
-          onClose={() => setIsConnectModalOpen(false)}
-          isConnecting={isConnecting}
-          handleConnect={handleConnect}
-        />
-      )}
+
 
       {isCelebrationOpen && celebrationDetails && (
         <div className="modal-backdrop" onClick={() => setIsCelebrationOpen(false)}>

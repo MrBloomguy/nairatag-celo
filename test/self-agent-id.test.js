@@ -812,8 +812,8 @@ test('25. Agent execution failure after confirmed payment (Traceable receipt & I
 });
 
 test('26. getVerificationStatusLabel maps canonical user-facing verification labels', () => {
-  assert.equal(getVerificationStatusLabel(VERIFICATION_STATUS.VERIFIED), 'Self Verified');
-  assert.equal(getVerificationStatusLabel('verified'), 'Self Verified');
+  assert.equal(getVerificationStatusLabel(VERIFICATION_STATUS.VERIFIED), 'Self Agent ID');
+  assert.equal(getVerificationStatusLabel('verified'), 'Self Agent ID');
   assert.equal(getVerificationStatusLabel(VERIFICATION_STATUS.PENDING), 'Verification Pending');
   assert.equal(getVerificationStatusLabel(VERIFICATION_STATUS.EXPIRED), 'Verification Expired');
   assert.equal(getVerificationStatusLabel(VERIFICATION_STATUS.FAILED), 'Verification Failed');

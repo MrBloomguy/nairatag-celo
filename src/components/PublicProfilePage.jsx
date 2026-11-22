@@ -20,6 +20,7 @@ import {
 import { resolveTagProfile, generateAvatarSvg } from '../services/tagAvatar.js';
 import { resolveTag } from '../services/nairatagResolver.js';
 import { CELO_NAIRATAG_RESOLVER_ADDRESS as ARC_NAIRATAG_RESOLVER_ADDRESS, CELO_MAINNET_CONFIG as ARC_TESTNET_CONFIG } from '../config/celo.js';
+import SelfAgentIdBadge from './SelfAgentIdBadge.jsx';
 import confetti from 'canvas-confetti';
 
 export default function PublicProfilePage({ rawHandle, type = 'agent' }) {
@@ -633,17 +634,7 @@ export default function PublicProfilePage({ rawHandle, type = 'agent' }) {
                 <ShieldCheck size={18} color="#059669" />
                 <span>Human Verification · Self Agent ID</span>
               </h2>
-              <span style={{
-                fontSize: '11px',
-                fontWeight: 700,
-                color: '#059669',
-                backgroundColor: theme === 'dark' ? 'rgba(5, 150, 105, 0.15)' : '#ecfdf5',
-                border: '1px solid rgba(5, 150, 105, 0.3)',
-                padding: '3px 10px',
-                borderRadius: '12px'
-              }}>
-                ✓ Self Verified
-              </span>
+              <SelfAgentIdBadge isVerified={true} size="sm" />
             </div>
 
             <p style={{ margin: 0, fontSize: '13px', color: theme === 'dark' ? '#94a3b8' : '#4b5563', lineHeight: '1.5' }}>

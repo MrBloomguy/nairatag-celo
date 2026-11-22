@@ -92,7 +92,7 @@ export function getVerificationStatusLabel(status) {
   const norm = String(status || '').toLowerCase().trim();
   switch (norm) {
     case 'verified':
-      return 'Self Verified';
+      return 'Self Agent ID';
     case 'verification_pending':
     case 'pending':
       return 'Verification Pending';

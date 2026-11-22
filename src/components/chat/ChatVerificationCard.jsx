@@ -12,6 +12,7 @@
 import React, { useState } from 'react';
 import { ShieldCheck, ShieldAlert, Award, QrCode, ExternalLink, CheckCircle2, Sparkles, Loader2, RefreshCw } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import SelfAgentIdBadge from '../SelfAgentIdBadge.jsx';
 import { awardVerificationPoints, getAgentPoints } from '../../services/agentPointsService.js';
 import { getAgentVerificationStatus, VERIFICATION_STATUS } from '../../services/selfAgentIdService.js';
 
@@ -126,17 +127,7 @@ export default function ChatVerificationCard({
         </div>
 
         {/* Verification Status Badge */}
-        {isVerified ? (
-          <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
-            <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-            <span>Self Verified</span>
-          </span>
-        ) : (
-          <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/30">
-            <ShieldAlert className="w-3.5 h-3.5 text-amber-400" />
-            <span>Unverified</span>
-          </span>
-        )}
+        <SelfAgentIdBadge isVerified={isVerified} size="sm" />
       </div>
 
       {/* Body: Proof Details & Points Incentive */}

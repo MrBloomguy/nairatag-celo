@@ -8,6 +8,7 @@ import PersonalAgentPanel from './components/chat/PersonalAgentPanel';
 import CorridorSwapCard from './components/CorridorSwapCard';
 import AltanaSessionCard from './components/AltanaSessionCard';
 import SelfAgentVerificationCard from './components/SelfAgentVerificationCard';
+import SelfAgentIdBadge, { SelfIcon } from './components/SelfAgentIdBadge.jsx';
 import ChatVerificationCard from './components/chat/ChatVerificationCard.jsx';
 import AgentVaultCard from './components/AgentVaultCard';
 import BookingMarketplace from './components/bookings/BookingMarketplace.jsx';
@@ -3921,30 +3922,15 @@ function ArcAppShell() {
                     <div className="agent-directory-tag">₦{String(agent.tag || '').replace(/^[₦$@#]/, '')}</div>
                     {agent.role && <div style={{ fontSize: '11px', color: 'var(--privy-color-foreground-3)', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' }}>{agent.role}</div>}
                     
-                    {/* Self Verified Badge with click-to-view proof details */}
-                    <div
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setActiveVerificationDetailAgent(agent);
-                      }}
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '4px',
-                        padding: '3px 8px',
-                        borderRadius: '12px',
-                        fontSize: '11px',
-                        fontWeight: 700,
-                        marginTop: '6px',
-                        cursor: 'pointer',
-                        background: agent.self?.verified !== false && agent.status !== 'unverified' ? 'rgba(5, 150, 105, 0.12)' : 'rgba(148, 163, 184, 0.12)',
-                        color: agent.self?.verified !== false && agent.status !== 'unverified' ? '#059669' : '#64748b',
-                        border: `1px solid ${agent.self?.verified !== false && agent.status !== 'unverified' ? 'rgba(5, 150, 105, 0.3)' : 'rgba(148, 163, 184, 0.25)'}`,
-                      }}
-                      title="Click to view Self Agent ID onchain verification details"
-                    >
-                      <ShieldCheck size={12} color={agent.self?.verified !== false && agent.status !== 'unverified' ? '#059669' : '#94a3b8'} />
-                      <span>{agent.self?.verified !== false && agent.status !== 'unverified' ? 'Self Verified' : 'Unverified'}</span>
+                    {/* Official Self Agent ID Badge with click-to-view proof details */}
+                    <div style={{ marginTop: '6px' }}>
+                      <SelfAgentIdBadge
+                        isVerified={agent.self?.verified !== false && agent.status !== 'unverified'}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setActiveVerificationDetailAgent(agent);
+                        }}
+                      />
                     </div>
                     {agent.self?.verified !== false && agent.status !== 'unverified' && (
                       <div style={{ fontSize: '10px', color: '#059669', opacity: 0.85, marginTop: '2px' }}>
@@ -3993,29 +3979,14 @@ function ArcAppShell() {
                       <div className="agent-circle-meta">
                         <div className="agent-circle-name" style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                           <span className="agent-circle-tag-pill">₦{String(agent.tag || '').replace(/^[₦$@#]/, '')}</span>
-                          <span
+                          <SelfAgentIdBadge
+                            size="xs"
+                            isVerified={agent.self?.verified !== false && agent.status !== 'unverified'}
                             onClick={(e) => {
                               e.stopPropagation();
                               setActiveVerificationDetailAgent(agent);
                             }}
-                            style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '3px',
-                              padding: '2px 7px',
-                              borderRadius: '10px',
-                              fontSize: '10px',
-                              fontWeight: 700,
-                              background: agent.self?.verified !== false && agent.status !== 'unverified' ? 'rgba(5, 150, 105, 0.12)' : 'rgba(148, 163, 184, 0.12)',
-                              color: agent.self?.verified !== false && agent.status !== 'unverified' ? '#059669' : '#64748b',
-                              border: `1px solid ${agent.self?.verified !== false && agent.status !== 'unverified' ? 'rgba(5, 150, 105, 0.3)' : 'rgba(148, 163, 184, 0.25)'}`,
-                              cursor: 'pointer',
-                            }}
-                            title="Click to view Self Agent ID onchain verification details"
-                          >
-                            <ShieldCheck size={11} color={agent.self?.verified !== false && agent.status !== 'unverified' ? '#059669' : '#94a3b8'} />
-                            <span>{agent.self?.verified !== false && agent.status !== 'unverified' ? 'Self Verified' : 'Unverified'}</span>
-                          </span>
+                          />
                         </div>
                         {agent.role && <div style={{ fontSize: '11px', color: 'var(--privy-color-foreground-3)', marginTop: '2px' }}>{agent.role}</div>}
                       </div>
@@ -5715,23 +5686,10 @@ function ArcAppShell() {
                       </div>
                     </div>
                   </div>
-                  <span
-                    style={{
-                      fontSize: '11px',
-                      background: selectedAgentProfile.self?.verified !== false ? '#ecfdf5' : '#fef3c7',
-                      color: selectedAgentProfile.self?.verified !== false ? '#059669' : '#d97706',
-                      padding: '3px 9px',
-                      borderRadius: '12px',
-                      fontWeight: 700,
-                      border: `1px solid ${selectedAgentProfile.self?.verified !== false ? '#a7f3d0' : '#fde68a'}`,
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '4px',
-                    }}
-                  >
-                    {selectedAgentProfile.self?.verified !== false ? <CheckCircle2 size={12} color="#059669" /> : <AlertCircle size={12} color="#d97706" />}
-                    <span>{selectedAgentProfile.self?.verified !== false ? 'Self Verified' : 'Unverified'}</span>
-                  </span>
+                  <SelfAgentIdBadge
+                    size="sm"
+                    isVerified={selectedAgentProfile.self?.verified !== false}
+                  />
                 </div>
 
                 <p style={{ margin: 0, fontSize: '12px', color: 'var(--privy-color-foreground-2, #475569)', lineHeight: 1.45 }}>
@@ -5875,10 +5833,10 @@ function ArcAppShell() {
               <div style={{ background: 'var(--surface-2, #f8fafc)', borderRadius: '12px', padding: '14px', border: '1px solid rgba(0,0,0,0.08)', marginBottom: '14px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
                   <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary, #64748b)' }}>Verification Status</span>
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '12px', fontWeight: 700, color: activeVerificationDetailAgent.self?.verified !== false && activeVerificationDetailAgent.status !== 'unverified' ? '#059669' : '#d97706', background: activeVerificationDetailAgent.self?.verified !== false && activeVerificationDetailAgent.status !== 'unverified' ? 'rgba(5, 150, 105, 0.1)' : 'rgba(217, 119, 6, 0.1)', padding: '2px 8px', borderRadius: '8px' }}>
-                    <CheckCircle2 size={13} color={activeVerificationDetailAgent.self?.verified !== false && activeVerificationDetailAgent.status !== 'unverified' ? '#059669' : '#d97706'} />
-                    <span>{activeVerificationDetailAgent.self?.verified !== false && activeVerificationDetailAgent.status !== 'unverified' ? 'Self Verified (Proof Active)' : 'Unverified'}</span>
-                  </span>
+                  <SelfAgentIdBadge
+                    size="sm"
+                    isVerified={activeVerificationDetailAgent.self?.verified !== false && activeVerificationDetailAgent.status !== 'unverified'}
+                  />
                 </div>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '12px' }}>

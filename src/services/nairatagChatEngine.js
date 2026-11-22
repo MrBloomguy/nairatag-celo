@@ -165,7 +165,7 @@ export async function processNairaTagChatMessage({
     const widget = {
       type: 'self_verification',
       title: `Self Agent ID · ₦${targetTag.toUpperCase()}`,
-      badge: isTargetVerified ? 'Self Verified' : 'Unverified · Needs Proof',
+      badge: isTargetVerified ? 'Self Agent ID' : 'Unverified · Needs Proof',
       agentTag: targetTag,
       agentName: targetAgent.name || `₦${targetTag.toUpperCase()}`,
       avatar: targetAgent.avatar || `https://api.dicebear.com/7.x/identicon/svg?seed=${targetTag}`,

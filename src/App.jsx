@@ -3441,37 +3441,43 @@ function ArcAppShell() {
             ─────────────────────────────────────────────────────────────────── */}
         {mainTab === 'pay' && (
           <div className="terminal-layout-centered" style={{ maxWidth: '440px' }}>
-            {/* Top Navigation Pill (Image 2 Accurate Segmented Control) */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '8px' }}>
-              <div className="unified-card-subtoggle" style={{ background: 'var(--input-bg, #f1f3f5)', padding: '4px', borderRadius: '9999px', border: '1px solid var(--border-color, rgba(0,0,0,0.06))' }}>
-                <button
-                  type="button"
-                  className={`subtoggle-pill ${paySubMode === 'corridor' ? 'active' : ''}`}
-                  onClick={() => setPaySubMode('corridor')}
-                  style={{ padding: '7px 22px', fontSize: '13px', fontWeight: 700 }}
-                >
-                  <ArrowDownUp size={13} />
-                  <span>Swap</span>
-                </button>
-                <button
-                  type="button"
-                  className={`subtoggle-pill ${paySubMode === 'direct' ? 'active' : ''}`}
-                  onClick={() => setPaySubMode('direct')}
-                  style={{ padding: '7px 22px', fontSize: '13px', fontWeight: 700 }}
-                >
-                  <Send size={13} />
-                  <span>Send to ₦Tag</span>
-                </button>
-              </div>
-            </div>
-
             {paySubMode === 'corridor' ? (
               <CorridorSwapCard
                 walletAddress={walletAddress}
                 onConnectWallet={() => setIsConnectModalOpen(true)}
+                paySubMode={paySubMode}
+                onSelectSubMode={setPaySubMode}
               />
             ) : (
               <div className="crypto-card-terminal">
+                {/* In-Box Sub-Mode Toggle */}
+                <div className="swap-widget-header" style={{ padding: '0 0 10px 0', borderBottom: '1px solid var(--border-color, rgba(0,0,0,0.06))' }}>
+                  <div className="swap-widget-toggle">
+                    <button
+                      type="button"
+                      className={`swap-widget-toggle-btn ${paySubMode === 'corridor' ? 'active' : ''}`}
+                      onClick={() => setPaySubMode('corridor')}
+                    >
+                      <ArrowDownUp size={13} />
+                      <span>Swap</span>
+                    </button>
+                    <button
+                      type="button"
+                      className={`swap-widget-toggle-btn ${paySubMode === 'direct' ? 'active' : ''}`}
+                      onClick={() => setPaySubMode('direct')}
+                    >
+                      <Send size={13} />
+                      <span>Send to ₦Tag</span>
+                    </button>
+                  </div>
+
+                  <div className="swap-header-controls">
+                    <span className="swap-live-status-pill" style={{ fontSize: '11px', color: 'var(--privy-color-foreground-2)' }}>
+                      <span className="swap-pulse-dot" style={{ background: '#3b82f6' }} />
+                      <span>Direct Pay</span>
+                    </span>
+                  </div>
+                </div>
                 {/* 1. Recipient ₦Tag Input Box */}
                 <div className="tag-recipient-box">
                     <div className="token-input-header">

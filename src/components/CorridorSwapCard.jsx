@@ -140,7 +140,13 @@ const SUPPORTED_TOKENS = [
   },
 ];
 
-export default function CorridorSwapCard({ walletAddress, onConnectWallet, embedded = false }) {
+export default function CorridorSwapCard({
+  walletAddress,
+  onConnectWallet,
+  embedded = false,
+  paySubMode = 'corridor',
+  onSelectSubMode,
+}) {
   // Primary direction: 'USDT_TO_CNGN' | 'CNGN_TO_USDT'
   const [direction, setDirection] = useState('USDT_TO_CNGN');
   const [amountIn, setAmountIn] = useState('');
@@ -458,13 +464,30 @@ export default function CorridorSwapCard({ walletAddress, onConnectWallet, embed
     <div className="swap-widget-card">
       {/* ── Top Header Bar ── */}
       <div className="swap-widget-header">
-        <div className="swap-widget-title-wrap">
-          <span className="swap-widget-title">Swap</span>
-          <span className="swap-live-status-pill" title="Textile RFQ v2 Market Maker Network">
-            <span className="swap-pulse-dot" />
-            <span>Textile RFQ v2</span>
-          </span>
-        </div>
+        {onSelectSubMode ? (
+          <div className="swap-widget-toggle">
+            <button
+              type="button"
+              className={`swap-widget-toggle-btn ${paySubMode === 'corridor' ? 'active' : ''}`}
+              onClick={() => onSelectSubMode('corridor')}
+            >
+              <ArrowDownUp size={13} />
+              <span>Swap</span>
+            </button>
+            <button
+              type="button"
+              className={`swap-widget-toggle-btn ${paySubMode === 'direct' ? 'active' : ''}`}
+              onClick={() => onSelectSubMode('direct')}
+            >
+              <Send size={13} />
+              <span>Send to ₦Tag</span>
+            </button>
+          </div>
+        ) : (
+          <div className="swap-widget-title-wrap">
+            <span className="swap-widget-title">Swap</span>
+          </div>
+        )}
 
         <div className="swap-header-controls">
           <button

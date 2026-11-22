@@ -540,7 +540,7 @@ export async function executeTextileSwap({
     throw new Error('Quote has expired. Please request a fresh firm quote.');
   }
 
-  const provider = getEthereumProvider();
+  const provider = getEthereumProvider(null, userAddr);
   if (!provider) throw new Error('EVM wallet provider unavailable.');
 
   const walletClient = createWalletClient({

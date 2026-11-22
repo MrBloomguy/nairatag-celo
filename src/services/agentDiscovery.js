@@ -134,7 +134,7 @@ export function discoverAgentsByCapability(request, agents = [], limit = 3, opti
 
 /**
  * Filters agents by their authoritative Self Agent ID verification status.
- * Supports: 'all', 'verified' (Self Verified), 'pending' (Verification Pending), 'unverified' (Not Verified).
+ * Supports: 'all', 'verified' (Self Agent ID Verified), 'pending' (Verification Pending), 'unverified' (Not Verified).
  * 
  * @param {Array} agents - Candidate agents
  * @param {string} [filter='all'] - Target filter key

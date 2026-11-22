@@ -1910,7 +1910,6 @@ function ArcAppShell() {
       }
       return;
     }
-    if (walletAddress) return;
 
     const activeWallet = privyWallets?.[0] || (privyUser?.wallet?.address ? { address: privyUser.wallet.address } : null);
     if (!activeWallet?.address) return;
@@ -1924,34 +1923,36 @@ function ArcAppShell() {
             setActiveWalletProvider(provider);
           }
         }
-        const address = activeWallet.address;
         if (!active) return;
-        setWalletAddress(address);
-        setAuthProvider('privy');
-        setChainId(activeArcChain.id);
-        setIsArcNetwork(true);
-        setAccountEmail(privyUser?.email?.address || privyUser?.phone?.number || '');
+        if (!walletAddress || walletAddress.toLowerCase() !== activeWallet.address.toLowerCase()) {
+          const address = activeWallet.address;
+          setWalletAddress(address);
+          setAuthProvider('privy');
+          setChainId(activeArcChain.id);
+          setIsArcNetwork(true);
+          setAccountEmail(privyUser?.email?.address || privyUser?.phone?.number || '');
 
-        try {
-          await establishWalletArcSession(address);
-        } catch (sessionErr) {
-          console.warn('[Privy session]', sessionErr?.message || sessionErr);
-        }
+          try {
+            await establishWalletArcSession(address);
+          } catch (sessionErr) {
+            console.warn('[Privy session]', sessionErr?.message || sessionErr);
+          }
 
-        const [accountResult, rewardResult] = await Promise.allSettled([
-          refreshBalance(address),
-          getArcRewardState(address),
-        ]);
-        if (rewardResult.status === 'fulfilled') {
-          applyArcRewardState(rewardResult.value);
+          const [accountResult, rewardResult] = await Promise.allSettled([
+            refreshBalance(address),
+            getArcRewardState(address),
+          ]);
+          if (rewardResult.status === 'fulfilled') {
+            applyArcRewardState(rewardResult.value);
+          }
+          if (!accountResult.value?.tag?.tag) {
+            setWelcomeDetails({
+              tag: null,
+              points: rewardResult.status === 'fulfilled' ? rewardResult.value?.points : null,
+            });
+          }
+          showToast(`Connected ${shorten(address)}`, 'success', 2500);
         }
-        if (!accountResult.value?.tag?.tag) {
-          setWelcomeDetails({
-            tag: null,
-            points: rewardResult.status === 'fulfilled' ? rewardResult.value?.points : null,
-          });
-        }
-        showToast(`Connected ${shorten(address)}`, 'success', 2500);
       } catch (err) {
         console.warn('[Privy wallet sync error]', err);
       }

@@ -151,7 +151,7 @@ export async function transferCngnToRecipient({
   const userAddr = getAddress(fromAddress);
   const targetAddr = getAddress(recipientAddress);
 
-  const provider = getEthereumProvider();
+  const provider = getEthereumProvider(null, userAddr);
   if (!provider) throw new Error('EVM wallet provider unavailable.');
 
   const { createWalletClient, custom } = await import('viem');

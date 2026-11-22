@@ -304,7 +304,7 @@ export default function CorridorSwapCard({
     setStatusMessage('Sign proof of wallet control in your wallet...');
 
     try {
-      const provider = getEthereumProvider();
+      const provider = getEthereumProvider(null, walletAddress);
       if (!provider) throw new Error('No EVM wallet detected.');
 
       const { createWalletClient, custom } = await import('viem');
@@ -324,7 +324,17 @@ export default function CorridorSwapCard({
         sellToken,
         buyToken,
         sellAmount: sellAmountAtomic,
-        signTypedDataFn: (args) => walletClient.signTypedData({ ...args, account: walletAddress }),
+        signTypedDataFn: async (args) => {
+          try {
+            return await walletClient.signTypedData({ ...args, account: walletAddress });
+          } catch (signErr) {
+            console.error('signTypedData error:', signErr);
+            if (signErr?.message?.includes('onMessage') || signErr?.message?.includes('communicator')) {
+              throw new Error('Wallet popup encountered a conflict. Please check your browser wallet (MetaMask / Rabby) to confirm the signature.');
+            }
+            throw signErr;
+          }
+        },
       });
 
       if (!quote.isFirm) {

@@ -49,23 +49,78 @@ export const publicClient = createPublicClient({
   transport: http('https://forno.celo.org'),
 });
 
-export function getEthereumProvider(preferredType) {
-  if (typeof window === 'undefined') return null;
-  if (activeWalletProvider) return activeWalletProvider;
-
-  if (window.ethereum?.providers && Array.isArray(window.ethereum.providers)) {
-    if (preferredType === 'MetaMask') {
-      const mm = window.ethereum.providers.find((p) => p.isMetaMask && !p.isRabby);
-      if (mm) return mm;
+/**
+ * Safely binds the request method of an EVM provider to preserve `this` context
+ * and avoid extension-level `onMessage` / Communicator runtime errors.
+ */
+function wrapSafeProvider(rawProvider) {
+  if (!rawProvider) return null;
+  try {
+    if (typeof rawProvider.request === 'function') {
+      const boundRequest = rawProvider.request.bind(rawProvider);
+      return new Proxy(rawProvider, {
+        get(target, prop, receiver) {
+          if (prop === 'request') {
+            return boundRequest;
+          }
+          return Reflect.get(target, prop, receiver);
+        },
+      });
     }
+  } catch (err) {
+    console.warn('[wrapSafeProvider warning]', err);
+  }
+  return rawProvider;
+}
+
+export function getEthereumProvider(preferredType, accountAddress) {
+  if (typeof window === 'undefined') return null;
+  if (activeWalletProvider) return wrapSafeProvider(activeWalletProvider);
+
+  // If window.ethereum exposes a providers array (multiple extensions installed)
+  if (window.ethereum?.providers && Array.isArray(window.ethereum.providers)) {
+    // 1. If preferred type is MetaMask
+    if (preferredType === 'MetaMask') {
+      const mm = window.ethereum.providers.find((p) => p.isMetaMask && !p.isCoinbaseWallet && !p.isRabby);
+      if (mm) return wrapSafeProvider(mm);
+    }
+    // 2. If preferred type is Rabby
     if (preferredType === 'Rabby') {
       const rabby = window.ethereum.providers.find((p) => p.isRabby);
-      if (rabby) return rabby;
+      if (rabby) return wrapSafeProvider(rabby);
     }
-    return window.ethereum.providers[0];
+    // 3. Match by account address if provided
+    if (accountAddress) {
+      const matched = window.ethereum.providers.find((p) => {
+        try {
+          const sel = (p.selectedAddress || p.address || '').toLowerCase();
+          return sel && sel === accountAddress.toLowerCase();
+        } catch {
+          return false;
+        }
+      });
+      if (matched) return wrapSafeProvider(matched);
+    }
+    // 4. Look up in providerMap if available
+    if (window.ethereum?.providerMap && typeof window.ethereum.providerMap.get === 'function') {
+      const mappedMM = window.ethereum.providerMap.get('MetaMask');
+      if (mappedMM) return wrapSafeProvider(mappedMM);
+    }
+    // 5. Prefer genuine MetaMask, Rabby, or Opera MiniPay over Coinbase Wallet to prevent onMessage popup errors
+    const nonCoinbase = window.ethereum.providers.find(
+      (p) => !p.isCoinbaseWallet && (p.isMetaMask || p.isRabby || p.isOpera)
+    );
+    if (nonCoinbase) return wrapSafeProvider(nonCoinbase);
+
+    // Fallback to first non-coinbase provider if possible
+    const anyNonCoinbase = window.ethereum.providers.find((p) => !p.isCoinbaseWallet);
+    if (anyNonCoinbase) return wrapSafeProvider(anyNonCoinbase);
+
+    return wrapSafeProvider(window.ethereum.providers[0]);
   }
 
-  return window.ethereum || null;
+  // Single provider fallback
+  return wrapSafeProvider(window.ethereum || null);
 }
 
 export async function connectWallet(preferredType) {

@@ -96,12 +96,36 @@ export function classifyInput(input) {
  *   error?: string
  * }>}
  */
+const CANONICAL_PLATFORM_TAGS = {
+  nairatag: '0xc519729BF6D15e5984702BBa2C553f1c74A73C95',
+  bloom: '0x7c264210D5C992b8ea3224eb6B39F477a493AF26',
+  segun: '0x653f773C9062e71A6554b42a9525fcD47fCC1693',
+  defillama: '0xbfA115E28aE09eBf5a11484C2161A4E45B956Ce6',
+  meteo: '0x235d64821815b3c37eeB7A755D96B9b671a5ae36',
+  coingecko: '0x1abfD1865F9a7Eb23C02aBEf113a07Fa8A690Ef8',
+  music: '0x653f773C9062e71A6554b42a9525fcD47fCC1693',
+};
+
 export async function resolveTag(rawTag, network = 'celo') {
   const norm = normalizeTag(rawTag);
   if (!norm.valid) {
     return {
       success: false,
       error: norm.error
+    };
+  }
+
+  // Authoritative fast-path resolution for canonical Celo Mainnet platform agents
+  if (CANONICAL_PLATFORM_TAGS[norm.cleanTag]) {
+    return {
+      success: true,
+      canonicalTag: `₦${norm.cleanTag.toUpperCase()}`,
+      cleanTag: norm.cleanTag,
+      resolvedAddress: getAddress(CANONICAL_PLATFORM_TAGS[norm.cleanTag]),
+      network: 'Celo Mainnet',
+      isVerified: true,
+      source: 'canonical-celo-registry',
+      reputation: 100,
     };
   }
 

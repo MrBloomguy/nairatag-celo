@@ -328,7 +328,28 @@ export default function CorridorSwapCard({
           try {
             return await walletClient.signTypedData({ ...args, account: walletAddress });
           } catch (signErr) {
-            console.error('signTypedData error:', signErr);
+            console.warn('[signTypedData] walletClient error, attempting direct RPC fallback:', signErr);
+            if (provider && typeof provider.request === 'function') {
+              try {
+                const payload = JSON.stringify({
+                  types: args.types,
+                  domain: args.domain,
+                  primaryType: args.primaryType,
+                  message: args.message,
+                });
+                const directSig = await provider.request({
+                  method: 'eth_signTypedData_v4',
+                  params: [walletAddress, payload],
+                });
+                if (directSig) return directSig;
+              } catch (directErr) {
+                console.error('[signTypedData] Direct eth_signTypedData_v4 fallback failed:', directErr);
+                if (signErr?.message?.includes('onMessage') || directErr?.message?.includes('onMessage')) {
+                  throw new Error('Wallet popup encountered an extension conflict. Please check your browser wallet (MetaMask / Rabby) to confirm the signature.');
+                }
+                throw directErr;
+              }
+            }
             if (signErr?.message?.includes('onMessage') || signErr?.message?.includes('communicator')) {
               throw new Error('Wallet popup encountered a conflict. Please check your browser wallet (MetaMask / Rabby) to confirm the signature.');
             }
@@ -502,59 +523,38 @@ export default function CorridorSwapCard({
         <div className="swap-header-controls">
           <button
             type="button"
-            className="swap-icon-btn"
+            className={`swap-icon-btn ${showSettings ? 'active' : ''}`}
             onClick={() => setShowSettings(!showSettings)}
             title="Slippage settings"
+            aria-label="Slippage settings"
           >
-            <Sliders size={15} />
+            <Sliders size={14} />
           </button>
           <button
             type="button"
             className="swap-icon-btn"
             onClick={fetchRatesAndBalances}
             title="Refresh rates"
+            aria-label="Refresh rates"
           >
-            <RefreshCw size={15} className={isLoadingRates ? 'animate-spin' : ''} />
+            <RefreshCw size={14} className={isLoadingRates ? 'animate-spin' : ''} />
           </button>
         </div>
       </div>
 
       {/* ── Slippage Settings Dropdown Popover ── */}
       {showSettings && (
-        <div
-          style={{
-            padding: '10px 14px',
-            borderRadius: '14px',
-            background: 'var(--input-bg, #f8fafc)',
-            border: '1px solid var(--border-color, #e5e7eb)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            fontSize: '12px',
-            marginBottom: '4px',
-          }}
-        >
+        <div className="swap-slippage-popover">
           <span style={{ fontWeight: 600, color: 'var(--privy-color-foreground-2, #6b7280)' }}>
-            Slippage Tolerance:
+            Slippage:
           </span>
-          <div style={{ display: 'flex', gap: '4px' }}>
+          <div className="swap-slippage-pill-group">
             {['0.1', '0.5', '1.0'].map((val) => (
               <button
                 key={val}
                 type="button"
                 onClick={() => setSlippageTolerance(val)}
-                style={{
-                  padding: '3px 8px',
-                  borderRadius: '6px',
-                  fontSize: '11px',
-                  fontWeight: 700,
-                  border: '1px solid',
-                  cursor: 'pointer',
-                  borderColor: slippageTolerance === val ? '#10b981' : 'var(--border-color, #e2e8f0)',
-                  background: slippageTolerance === val ? '#10b981' : 'var(--card-bg, #ffffff)',
-                  color: slippageTolerance === val ? '#ffffff' : 'var(--privy-color-foreground, #111111)',
-                  transition: 'all 0.15s ease',
-                }}
+                className={`swap-slippage-chip ${slippageTolerance === val ? 'active' : ''}`}
               >
                 {val}% {val === '0.5' ? '(Auto)' : ''}
               </button>
@@ -604,13 +604,13 @@ export default function CorridorSwapCard({
             title="Change token"
           >
             <div className="swap-token-badge-icon">
-              <TokenIcon symbol={inTokenSymbol} size={24} />
+              <TokenIcon symbol={inTokenSymbol} size={22} />
             </div>
             <div className="swap-token-info-stack">
               <span className="swap-token-network">Celo</span>
               <span className="swap-token-symbol">{inTokenSymbol}</span>
             </div>
-            <ChevronDown size={14} className="swap-token-chevron" />
+            <ChevronDown size={13} className="swap-token-chevron" />
           </button>
         </div>
 
@@ -631,7 +631,7 @@ export default function CorridorSwapCard({
           title="Switch corridor direction"
           aria-label="Switch corridor direction"
         >
-          <ArrowDown size={16} />
+          <ArrowDown size={15} />
         </button>
       </div>
 
@@ -662,13 +662,13 @@ export default function CorridorSwapCard({
             title="Change token"
           >
             <div className="swap-token-badge-icon">
-              <TokenIcon symbol={outTokenSymbol} size={24} />
+              <TokenIcon symbol={outTokenSymbol} size={22} />
             </div>
             <div className="swap-token-info-stack">
               <span className="swap-token-network">Celo</span>
               <span className="swap-token-symbol">{outTokenSymbol}</span>
             </div>
-            <ChevronDown size={14} className="swap-token-chevron" />
+            <ChevronDown size={13} className="swap-token-chevron" />
           </button>
         </div>
 
@@ -680,14 +680,34 @@ export default function CorridorSwapCard({
                 quoteSecondsLeft <= 10 ? 'urgent' : ''
               }`}
             >
-              <Clock size={11} />
+              <Clock size={10} />
               <span>{quoteSecondsLeft}s left</span>
             </div>
           )}
         </div>
       </div>
 
-      {/* ── Rate & Breakdown Intelligence Strip ── */}
+      {/* ── Centered Floating Exchange Rate Pill (Reference 1 style) ── */}
+      <div className="swap-center-rate-pill-wrap">
+        <button
+          type="button"
+          className="swap-center-rate-pill"
+          onClick={toggleDirection}
+          title="Click to flip conversion perspective"
+        >
+          <span className="swap-pulse-dot" />
+          <span>
+            1 {inTokenSymbol} ≈{' '}
+            {(firmQuote?.effectiveRate || (isUsdtIn ? rates.rateUsdtToCngn : rates.rateCngnToUsdt)).toLocaleString(
+              'en-US',
+              { maximumFractionDigits: isUsdtIn ? 2 : 4 }
+            )}{' '}
+            {outTokenSymbol}
+          </span>
+        </button>
+      </div>
+
+      {/* ── Route & Breakdown Intelligence Section (Reference 1 & 2) ── */}
       <div className="swap-rate-intelligence-strip">
         <div
           className="swap-rate-summary-bar"
@@ -695,17 +715,11 @@ export default function CorridorSwapCard({
           title="Click to toggle details breakdown"
         >
           <div className="swap-rate-text">
-            <span>
-              1 {inTokenSymbol} ≈{' '}
-              {(firmQuote?.effectiveRate || (isUsdtIn ? rates.rateUsdtToCngn : rates.rateCngnToUsdt)).toLocaleString(
-                'en-US',
-                { maximumFractionDigits: isUsdtIn ? 2 : 6 }
-              )}{' '}
-              {outTokenSymbol}
-            </span>
+            <span>Route</span>
+            <span className="swap-route-badge">Textile RFQ v2 · Best Rate</span>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <span className="swap-route-badge">Best Rate ~ &lt;1s</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+            <span style={{ fontSize: '11px', color: '#059669', fontWeight: 700 }}>&lt; 1s</span>
             <ChevronDown
               size={13}
               style={{
@@ -721,19 +735,15 @@ export default function CorridorSwapCard({
         {showDetails && (
           <div className="swap-breakdown-table">
             <div className="swap-breakdown-row">
-              <span title="Execution protocol and settlement network">Route</span>
-              <span style={{ color: '#059669', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                <Zap size={11} /> Textile RFQ v2 (Celo)
+              <span title="Guaranteed minimum received amount after slippage">Minimum received</span>
+              <span>
+                {minimumReceived} {outTokenSymbol}
               </span>
             </div>
 
             <div className="swap-breakdown-row">
-              <span title="Minimum guaranteed amount delivered based on slippage">
-                Minimum Received
-              </span>
-              <span>
-                {minimumReceived} {outTokenSymbol}
-              </span>
+              <span title="Configured slippage tolerance">Slippage Tolerance</span>
+              <span>{slippageTolerance}%</span>
             </div>
 
             <div className="swap-breakdown-row">
@@ -744,19 +754,19 @@ export default function CorridorSwapCard({
             </div>
 
             <div className="swap-breakdown-row">
-              <span title="Celo sub-second gas settlement fee">Network Fee</span>
+              <span title="Celo sub-second gas settlement fee">Network fee</span>
               <span>&lt; 0.0001 CELO (~ $0.0001)</span>
             </div>
 
             <div className="swap-breakdown-row">
-              <span title="Protocol commission fee">Exchange Fee</span>
+              <span title="Protocol commission fee">Exchange fee</span>
               <span style={{ color: '#059669' }}>Free (0%)</span>
             </div>
 
             {firmQuote && (
               <div className="swap-breakdown-row">
                 <span>Spender Contract</span>
-                <span style={{ fontFamily: 'monospace', fontSize: '11px' }}>
+                <span style={{ fontFamily: 'monospace', fontSize: '10.5px' }}>
                   {firmQuote.spender
                     ? `${firmQuote.spender.slice(0, 6)}...${firmQuote.spender.slice(-4)}`
                     : 'Textile Reactor'}

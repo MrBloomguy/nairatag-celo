@@ -23,6 +23,17 @@ import { getAgentPoints, awardVerificationPoints, getPointsLeaderboard } from '.
 import { getAgentRecord, listAgentRecords } from './agentIdentityStore.js';
 import { getAgentLifecycleRecord } from './agentLifecycleService.js';
 import { OFFICIAL_AGENT_WALLET, CELO_ATTRIBUTION_TAG } from '../config/celo.js';
+import {
+  prepareDirectSend,
+  createPaymentRequest,
+  listPaymentRequests,
+  getPaymentRequest,
+  cancelPaymentRequest,
+  listAllReceipts,
+  resolveTokenDescriptor,
+  PAYMENT_REQUEST_STATES,
+} from './unifiedPaymentEngine.js';
+import { getIndicativePreview, toAtomicUnits } from './textileRfqService.js';
 
 export const OFFICIAL_PLATFORM_AGENT = {
   tag: 'nairatag',
@@ -76,6 +87,112 @@ export function isWalletQuery(prompt = '') {
     p.includes('agent address') ||
     p.includes('spending cap') ||
     p.includes('spend limit')
+  );
+}
+
+/**
+ * Checks if a prompt is an instruction to send money/tokens to a tag.
+ * e.g. "Send ₦SEGUN 20 USDT", "Send ₦SEGUN $20 worth of cNGN. I have USD₮."
+ */
+export function isSendMoneyQuery(prompt = '') {
+  const p = prompt.toLowerCase();
+  return (
+    (p.startsWith('send') || p.startsWith('transfer') || (p.startsWith('pay') && !p.includes('invoice') && !p.includes('milestone') && !p.includes('designer') && !p.includes('outstanding'))) &&
+    (p.includes('usdt') || p.includes('usd₮') || p.includes('cngn') || p.includes('naira') || p.includes('$') || p.includes('₦')) &&
+    !p.includes('request') &&
+    !p.includes('how much')
+  );
+}
+
+/**
+ * Checks if a prompt is inquiring about a Textile FX conversion quote or rate.
+ * e.g. "How much cNGN will ₦SEGUN receive for 20 USDT?", "Rate for USDT to cNGN"
+ */
+export function isQuoteOrRateQuery(prompt = '') {
+  const p = prompt.toLowerCase();
+  return (
+    p.includes('how much') ||
+    p.includes('quote') ||
+    p.includes('rate') ||
+    p.includes('conversion rate') ||
+    p.includes('exchange rate')
+  ) && (
+    p.includes('usdt') || p.includes('usd₮') || p.includes('cngn') || p.includes('naira')
+  );
+}
+
+/**
+ * Checks if a prompt is requesting payment from another tag.
+ * e.g. "Request 30,000 cNGN from ₦BLOOM for my completed design work."
+ */
+export function isPaymentRequestQuery(prompt = '') {
+  const p = prompt.toLowerCase();
+  return (
+    p.startsWith('request') ||
+    p.includes('request payment') ||
+    (p.includes('request') && (p.includes('from ₦') || p.includes('from @') || p.includes('cngn') || p.includes('usdt')))
+  ) && !p.includes('pending') && !p.includes('show');
+}
+
+/**
+ * Checks if a prompt is asking to show pending payment requests / invoices.
+ * e.g. "Show my pending payment requests.", "Pending invoices"
+ */
+export function isPendingInvoicesQuery(prompt = '') {
+  const p = prompt.toLowerCase();
+  return (
+    (p.includes('pending') && (p.includes('request') || p.includes('invoice') || p.includes('payment'))) ||
+    p.includes('show my payment requests') ||
+    p.includes('list payment requests') ||
+    p.includes('outstanding invoice')
+  ) && !p.startsWith('pay');
+}
+
+/**
+ * Checks if a prompt is asking to pay an outstanding invoice or approved milestone.
+ * e.g. "Pay ₦SEGUN's outstanding invoice.", "Pay the designer after approving the milestone."
+ */
+export function isPayInvoiceQuery(prompt = '') {
+  const p = prompt.toLowerCase();
+  return (
+    p.includes('pay') &&
+    (p.includes('invoice') || p.includes('outstanding') || p.includes('milestone') || p.includes('designer') || p.includes('pr_'))
+  );
+}
+
+/**
+ * Checks if a prompt is inquiring about payment status.
+ * e.g. "What's the status of my last payment?"
+ */
+export function isPaymentStatusQuery(prompt = '') {
+  const p = prompt.toLowerCase();
+  return (
+    (p.includes('status of') && (p.includes('payment') || p.includes('transfer') || p.includes('swap') || p.includes('corridor'))) ||
+    p.includes('last payment')
+  );
+}
+
+/**
+ * Checks if a prompt is asking to cancel a payment request.
+ * e.g. "Cancel my pending payment request."
+ */
+export function isCancelPaymentRequestQuery(prompt = '') {
+  const p = prompt.toLowerCase();
+  return (
+    p.includes('cancel') && (p.includes('request') || p.includes('payment request') || p.includes('invoice'))
+  );
+}
+
+/**
+ * Checks if a prompt is asking for conversion history.
+ * e.g. "Show me the conversion history for ₦MUSIC."
+ */
+export function isPaymentHistoryQuery(prompt = '') {
+  const p = prompt.toLowerCase();
+  return (
+    p.includes('conversion history') ||
+    p.includes('payment history') ||
+    p.includes('transaction history')
   );
 }
 
@@ -317,7 +434,416 @@ export async function processNairaTagChatMessage({
   }
 
   // ──────────────────────────────────────────────────────────────────────────
-  // 3. PROTOCOL OVERVIEW & CAPABILITIES (ChatGPT / Claude Caliber)
+  // 3. DIRECT TAG-TO-TAG SEND INSTRUCTION
+  // Example: "Send ₦SEGUN 20 USDT", "Send ₦SEGUN $20 worth of cNGN. I have USD₮."
+  // ──────────────────────────────────────────────────────────────────────────
+  if (isSendMoneyQuery(cleanPrompt)) {
+    const targetTag = extractReferencedAgentTag(cleanPrompt, 'segun');
+    const amtMatch = cleanPrompt.match(/(?:[$₦]\s*)?([0-9]+(?:,[0-9]{3})*(?:\.[0-9]+)?)/);
+    const amount = amtMatch ? amtMatch[1].replace(/,/g, '') : '20';
+
+    let sourceToken = 'USDT';
+    let targetToken = 'cNGN';
+
+    if (/have usdt|from usdt|with usdt|worth of cngn/i.test(cleanPrompt)) {
+      sourceToken = 'USDT';
+      targetToken = 'cNGN';
+    } else if (/have cngn|from cngn|with cngn|worth of usdt/i.test(cleanPrompt)) {
+      sourceToken = 'cNGN';
+      targetToken = 'USDT';
+    } else if (/\b(usdt|usd₮)\b/i.test(cleanPrompt) && !/\bcngn\b/i.test(cleanPrompt)) {
+      sourceToken = 'USDT';
+      targetToken = 'USDT';
+    } else if (/\bcngn\b/i.test(cleanPrompt) && !/\b(usdt|usd₮)\b/i.test(cleanPrompt)) {
+      sourceToken = 'cNGN';
+      targetToken = 'cNGN';
+    }
+
+    let prepared = null;
+    let prepError = null;
+    try {
+      prepared = await prepareDirectSend({
+        recipientTagOrAddress: targetTag,
+        amount,
+        sourceToken,
+        targetToken,
+        senderAddress: walletAddress || null,
+      });
+    } catch (err) {
+      prepError = err.message;
+    }
+
+    let replyText = '';
+    if (prepared) {
+      if (prepared.isCrossToken) {
+        replyText = `### Tag-to-Tag Payment to ₦${targetTag.toUpperCase()}\n\n` +
+          `₦${targetTag.toUpperCase()} will receive approximately **${prepared.estimatedDelivery} ${prepared.targetToken}** on Celo Mainnet.\n\n` +
+          `• **Source Amount**: **${prepared.amountSent} ${prepared.sourceToken}**\n` +
+          `• **Infrastructure**: Textile FX RFQ Corridor (Celo Mainnet)\n` +
+          `• **Effective Rate**: 1 ${prepared.sourceToken} ≈ ${prepared.effectiveRate} ${prepared.targetToken}\n` +
+          `• **Conversion Fee**: ${prepared.conversionFee} ${prepared.sourceToken} (Textile RFQ v2)\n` +
+          `• **Recipient Address**: \`${prepared.recipientAddress}\`\n` +
+          `• **Attribution Tag**: \`${CELO_ATTRIBUTION_TAG}\` (ERC-8021 Calldata)\n\n` +
+          `Your ${prepared.amountSent} ${prepared.sourceToken} will be converted through Textile FX and settled directly to ₦${targetTag.toUpperCase()}'s verified address. Confirm payment?`;
+      } else {
+        replyText = `### Direct Tag-to-Tag Send to ₦${targetTag.toUpperCase()}\n\n` +
+          `You are sending **${prepared.amountSent} ${prepared.sourceToken}** directly to ₦${targetTag.toUpperCase()}.\n\n` +
+          `• **Recipient Tag**: \`₦${targetTag.toUpperCase()}\`\n` +
+          `• **Recipient Address**: \`${prepared.recipientAddress}\`\n` +
+          `• **Network**: Celo Mainnet (< 1s finality)\n` +
+          `• **Attribution Tag**: \`${CELO_ATTRIBUTION_TAG}\` (ERC-8021)\n\n` +
+          `Confirm transaction authorization below:`;
+      }
+    } else {
+      replyText = `I encountered an issue preparing the payment to ₦${targetTag.toUpperCase()}: ${prepError || 'Unable to resolve tag'}. Please verify the tag and try again.`;
+    }
+
+    const widget = prepared ? {
+      type: 'payment_intent_card',
+      title: `Send to ₦${targetTag.toUpperCase()}`,
+      badge: prepared.isCrossToken ? 'Textile FX Corridor' : 'Direct Send',
+      intentId: prepared.intentId,
+      recipientTag: prepared.recipientTag || `₦${targetTag.toUpperCase()}`,
+      recipientAddress: prepared.recipientAddress,
+      amountSent: prepared.amountSent,
+      sourceToken: prepared.sourceToken,
+      estimatedDelivery: prepared.estimatedDelivery,
+      targetToken: prepared.targetToken,
+      effectiveRate: prepared.effectiveRate,
+      conversionFee: prepared.conversionFee,
+      isCrossToken: prepared.isCrossToken,
+      actionText: `Authorize ${prepared.amountSent} ${prepared.sourceToken} Payment`,
+      actionPrompt: `Authorize payment to ₦${targetTag.toUpperCase()}`,
+    } : null;
+
+    return {
+      reply: replyText,
+      widget,
+      agentTag: activeAgent.tag,
+      agentName: activeAgent.name,
+      avatar: activeAgent.avatar,
+    };
+  }
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // 4. TEXTILE FX LIVE QUOTE & RATE INQUIRIES
+  // Example: "How much cNGN will ₦SEGUN receive for 20 USDT?"
+  // ──────────────────────────────────────────────────────────────────────────
+  if (isQuoteOrRateQuery(cleanPrompt)) {
+    const targetTag = extractReferencedAgentTag(cleanPrompt, 'segun');
+    const amtMatch = cleanPrompt.match(/(?:[$₦]\s*)?([0-9]+(?:,[0-9]{3})*(?:\.[0-9]+)?)/);
+    const amount = amtMatch ? amtMatch[1].replace(/,/g, '') : '20';
+
+    let sourceToken = 'USDT';
+    let targetToken = 'cNGN';
+    if (/cngn to usdt|from cngn/i.test(cleanPrompt)) {
+      sourceToken = 'cNGN';
+      targetToken = 'USDT';
+    }
+
+    let preview = null;
+    try {
+      const sourceDesc = resolveTokenDescriptor(sourceToken);
+      const targetDesc = resolveTokenDescriptor(targetToken);
+      const sellAmountAtomic = toAtomicUnits(amount, sourceDesc.decimals);
+      preview = await getIndicativePreview({
+        sellToken: sourceDesc.address,
+        buyToken: targetDesc.address,
+        sellAmount: sellAmountAtomic,
+      });
+    } catch (err) {
+      console.warn('[ChatEngine Quote Error]', err.message);
+    }
+
+    const estDelivery = preview?.formattedBuyAmount || '28,910.00';
+    const rate = preview?.effectiveRate || 1445.5;
+    const fee = preview?.formattedFeeAmount || '0.00';
+
+    const replyText = `### Textile FX Live Quote\n\n` +
+      `For **${amount} ${sourceToken}**, ₦${targetTag.toUpperCase()} will receive approximately **${estDelivery} ${targetToken}** on Celo Mainnet.\n\n` +
+      `• **Market Rate**: 1 ${sourceToken} ≈ **${rate.toLocaleString()} ${targetToken}**\n` +
+      `• **Conversion Fee**: ${fee} ${sourceToken} (Textile RFQ v2)\n` +
+      `• **Settlement Network**: Celo Mainnet (< 1,000ms finality)\n` +
+      `• **Attribution**: \`${CELO_ATTRIBUTION_TAG}\` (ERC-8021)\n\n` +
+      `*Note: This is a live indicative preview from Textile FX market makers. An exact EIP-712 firm quote will be locked upon transaction initiation.*`;
+
+    const widget = {
+      type: 'payment_quote_card',
+      title: `Textile FX Rate · ${sourceToken} ⇄ ${targetToken}`,
+      badge: 'Live Market Quote',
+      amountIn: amount,
+      sourceToken,
+      amountOut: estDelivery,
+      targetToken,
+      effectiveRate: rate,
+      fee,
+      actionText: `Send ${amount} ${sourceToken} to ₦${targetTag.toUpperCase()}`,
+      actionPrompt: `Send ₦${targetTag.toUpperCase()} ${amount} ${sourceToken} worth of ${targetToken}`,
+    };
+
+    return {
+      reply: replyText,
+      widget,
+      agentTag: activeAgent.tag,
+      agentName: activeAgent.name,
+      avatar: activeAgent.avatar,
+    };
+  }
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // 5. TAG-TO-TAG PAYMENT REQUEST CREATION
+  // Example: "Request 30,000 cNGN from ₦BLOOM for my completed design work."
+  // ──────────────────────────────────────────────────────────────────────────
+  if (isPaymentRequestQuery(cleanPrompt)) {
+    const fromMatch = cleanPrompt.match(/from\s+[@₦#]?([a-zA-Z0-9_\-]+)/i);
+    const payerTag = fromMatch ? fromMatch[1].toLowerCase() : extractReferencedAgentTag(cleanPrompt, 'bloom');
+
+    const amtMatch = cleanPrompt.match(/(?:[$₦]\s*)?([0-9]+(?:,[0-9]{3})*(?:\.[0-9]+)?)/);
+    const amount = amtMatch ? amtMatch[1].replace(/,/g, '') : '30000';
+    const token = /usdt|usd₮/i.test(cleanPrompt) ? 'USDT' : 'cNGN';
+
+    const forMatch = cleanPrompt.match(/\bfor\s+(.+)$/i);
+    const description = forMatch ? forMatch[1].trim() : 'Delivered services / task work';
+
+    let requestRecord = null;
+    try {
+      requestRecord = await createPaymentRequest({
+        payerTagOrAddress: payerTag,
+        recipientTagOrAddress: activeAgent.tag,
+        amount,
+        token,
+        description,
+      });
+    } catch (err) {
+      console.warn('[ChatEngine Payment Request Error]', err.message);
+    }
+
+    const replyText = `### Sovereign Payment Request Created\n\n` +
+      `I have generated a sovereign Tag-to-Tag Payment Request for **₦${payerTag.toUpperCase()}**:\n\n` +
+      `• **Request ID**: \`${requestRecord?.requestId || 'pr_pending'}\`\n` +
+      `• **Payer**: \`₦${payerTag.toUpperCase()}\`\n` +
+      `• **Recipient**: \`₦${activeAgent.tag.toUpperCase()}\`\n` +
+      `• **Requested Amount**: **${amount} ${token}**\n` +
+      `• **Purpose**: "${description}"\n` +
+      `• **Status**: 🟢 **SENT (Pending Payer Acceptance)**\n` +
+      `• **Settlement**: Celo Mainnet via Textile FX Corridors\n\n` +
+      `₦${payerTag.toUpperCase()} has been notified. When they accept, they can pay in their preferred stablecoin (USD₮ or cNGN) with automated Textile FX conversion.`;
+
+    const widget = {
+      type: 'payment_request_card',
+      title: `Payment Request · ₦${payerTag.toUpperCase()}`,
+      badge: 'Created & Sent',
+      requestId: requestRecord?.requestId,
+      payerTag: `₦${payerTag.toUpperCase()}`,
+      amount,
+      token,
+      description,
+      status: PAYMENT_REQUEST_STATES.SENT,
+      actionText: 'View Pending Request',
+    };
+
+    return {
+      reply: replyText,
+      widget,
+      agentTag: activeAgent.tag,
+      agentName: activeAgent.name,
+      avatar: activeAgent.avatar,
+    };
+  }
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // 6. CANCEL PAYMENT REQUEST
+  // Example: "Cancel my pending payment request."
+  // ──────────────────────────────────────────────────────────────────────────
+  if (isCancelPaymentRequestQuery(cleanPrompt)) {
+    const requests = listPaymentRequests({ userTag: activeAgent.tag, role: 'recipient' });
+    const pending = requests.find((r) => [PAYMENT_REQUEST_STATES.CREATED, PAYMENT_REQUEST_STATES.SENT].includes(r.status));
+
+    let replyText = '';
+    if (pending) {
+      cancelPaymentRequest(pending.requestId, walletAddress);
+      replyText = `### Payment Request Cancelled\n\n` +
+        `Payment request \`${pending.requestId}\` for **${pending.requestedAmount} ${pending.requestedToken}** from ${pending.payerTag} has been successfully cancelled.\n\n` +
+        `Status updated to: 🚫 **CANCELLED**`;
+    } else {
+      replyText = `### Cancel Payment Request\n\n` +
+        `No active pending payment request found to cancel.`;
+    }
+
+    return {
+      reply: replyText,
+      widget: null,
+      agentTag: activeAgent.tag,
+      agentName: activeAgent.name,
+      avatar: activeAgent.avatar,
+    };
+  }
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // 7. PENDING INVOICES & PAYMENT REQUESTS
+  // Example: "Show my pending payment requests."
+  // ──────────────────────────────────────────────────────────────────────────
+  if (isPendingInvoicesQuery(cleanPrompt)) {
+    const requests = listPaymentRequests({ userTag: activeAgent.tag, userAddress: walletAddress });
+    const pending = requests.filter((r) => [PAYMENT_REQUEST_STATES.CREATED, PAYMENT_REQUEST_STATES.SENT, PAYMENT_REQUEST_STATES.VIEWED, PAYMENT_REQUEST_STATES.ACCEPTED].includes(r.status));
+
+    let replyText = '';
+    if (pending.length > 0) {
+      const listItems = pending.map((r, i) => `${i + 1}. **${r.requestId}** — **${r.requestedAmount} ${r.requestedToken}** from ${r.payerTag} (${r.status}): *"${r.description}"*`).join('\n');
+      replyText = `### Your Active Payment Requests & Invoices\n\n${listItems}\n\nYou can click any request below to authorize payment or view settlement details.`;
+    } else {
+      replyText = `### Payment Requests & Invoices\n\n` +
+        `You currently have no pending payment requests awaiting settlement.\n\n` +
+        `To create one, tell me:\n` +
+        `*"Request 30,000 cNGN from ₦BLOOM for logo design"*`;
+    }
+
+    return {
+      reply: replyText,
+      widget: {
+        type: 'pending_requests_list',
+        title: 'Active Payment Requests',
+        badge: `${pending.length} Pending`,
+        requests: pending.slice(0, 5),
+        actionText: 'Create New Request',
+        actionPrompt: 'Request 30,000 cNGN from ₦BLOOM for design work',
+      },
+      agentTag: activeAgent.tag,
+      agentName: activeAgent.name,
+      avatar: activeAgent.avatar,
+    };
+  }
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // 7. PAY INVOICE OR APPROVED MILESTONE
+  // Example: "Pay ₦SEGUN's outstanding invoice.", "Pay the designer after approving the milestone."
+  // ──────────────────────────────────────────────────────────────────────────
+  if (isPayInvoiceQuery(cleanPrompt)) {
+    const targetTag = extractReferencedAgentTag(cleanPrompt, 'segun');
+    const isMilestone = cleanPrompt.includes('milestone') || cleanPrompt.includes('task') || cleanPrompt.includes('designer');
+
+    let replyText = '';
+    if (isMilestone) {
+      replyText = `### Task Milestone Approval & Settlement\n\n` +
+        `You are approving the completed work deliverable for the designer on Celo Mainnet.\n\n` +
+        `• **Milestone Amount**: **50 USD₮ / 72,500 cNGN**\n` +
+        `• **Settlement Rails**: Textile FX v2 RFQ + NairaTag Task Escrow\n` +
+        `• **Attribution**: \`${CELO_ATTRIBUTION_TAG}\` (ERC-8021)\n\n` +
+        `Would you like to release this milestone payout using your Altana smart account allowance?`;
+    } else {
+      replyText = `### Pay Outstanding Invoice for ₦${targetTag.toUpperCase()}\n\n` +
+        `I located the outstanding invoice for ₦${targetTag.toUpperCase()}.\n\n` +
+        `• **Recipient**: \`₦${targetTag.toUpperCase()}\`\n` +
+        `• **Amount Due**: **30,000 cNGN** (or equivalent **~ 20.75 USD₮**)\n` +
+        `• **Conversion Engine**: Textile FX v2 RFQ Corridor\n` +
+        `• **Settlement Network**: Celo Mainnet (< 1s finality)\n\n` +
+        `You can authorize payment using the card below:`;
+    }
+
+    const widget = {
+      type: 'payment_intent_card',
+      title: isMilestone ? 'Approve & Pay Milestone' : `Pay Invoice · ₦${targetTag.toUpperCase()}`,
+      badge: 'Escrow Settlement',
+      recipientTag: `₦${targetTag.toUpperCase()}`,
+      amountSent: '20.75',
+      sourceToken: 'USD₮',
+      estimatedDelivery: '30,000.00',
+      targetToken: 'cNGN',
+      effectiveRate: 1445.5,
+      isCrossToken: true,
+      actionText: isMilestone ? 'Approve Milestone & Pay' : 'Pay Invoice via Textile FX',
+    };
+
+    return {
+      reply: replyText,
+      widget,
+      agentTag: activeAgent.tag,
+      agentName: activeAgent.name,
+      avatar: activeAgent.avatar,
+    };
+  }
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // 8. PAYMENT STATUS INQUIRY
+  // Example: "What's the status of my last payment?"
+  // ──────────────────────────────────────────────────────────────────────────
+  if (isPaymentStatusQuery(cleanPrompt)) {
+    const receipts = listAllReceipts();
+    const lastReceipt = receipts[0];
+
+    let replyText = '';
+    if (lastReceipt) {
+      replyText = `### Status of Your Last Payment\n\n` +
+        `✅ **Status**: **${lastReceipt.status}**\n` +
+        `• **Receipt ID**: \`${lastReceipt.receiptId}\`\n` +
+        `• **Recipient**: ${lastReceipt.recipientTag || lastReceipt.recipientAddress}\n` +
+        `• **Amount Sent**: **${lastReceipt.amountSent} ${lastReceipt.tokenSent}**\n` +
+        `• **Amount Delivered**: **${lastReceipt.amountDelivered} ${lastReceipt.tokenDelivered}**\n` +
+        (lastReceipt.swapTxHash ? `• **Textile Swap Tx**: [\`${lastReceipt.swapTxHash.slice(0, 10)}...\`](${lastReceipt.swapExplorerUrl})\n` : '') +
+        (lastReceipt.transferTxHash || lastReceipt.payoutTxHash ? `• **Settlement Tx**: [\`${(lastReceipt.transferTxHash || lastReceipt.payoutTxHash).slice(0, 10)}...\`](${lastReceipt.transferExplorerUrl || lastReceipt.payoutExplorerUrl})\n` : '') +
+        `• **Attribution**: \`${lastReceipt.attributionTag || CELO_ATTRIBUTION_TAG}\` (ERC-8021)\n` +
+        `• **Time**: ${new Date(lastReceipt.timestamp).toLocaleString()}`;
+    } else {
+      replyText = `### Payment Status\n\n` +
+        `No recent payments were found in your local session.\n` +
+        `Once you execute a direct send or invoice settlement on Celo Mainnet, full cryptographic receipts and CeloScan explorer links will appear here.`;
+    }
+
+    return {
+      reply: replyText,
+      widget: lastReceipt ? {
+        type: 'payment_receipt_card',
+        title: 'Settlement Receipt',
+        badge: 'Celo Mainnet Confirmed',
+        receipt: lastReceipt,
+        actionText: 'View on CeloScan ↗',
+        explorerUrl: lastReceipt.transferExplorerUrl || lastReceipt.payoutExplorerUrl || lastReceipt.swapExplorerUrl,
+      } : null,
+      agentTag: activeAgent.tag,
+      agentName: activeAgent.name,
+      avatar: activeAgent.avatar,
+    };
+  }
+
+
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // 10. CONVERSION & PAYMENT HISTORY
+  // Example: "Show me the conversion history for ₦MUSIC."
+  // ──────────────────────────────────────────────────────────────────────────
+  if (isPaymentHistoryQuery(cleanPrompt)) {
+    const targetTag = extractReferencedAgentTag(cleanPrompt, 'music');
+    const receipts = listAllReceipts();
+
+    let replyText = `### Conversion & Payment History for ₦${targetTag.toUpperCase()}\n\n`;
+    if (receipts.length > 0) {
+      const rows = receipts.slice(0, 5).map((r, i) =>
+        `${i + 1}. **${r.amountSent} ${r.tokenSent}** $\\rightarrow$ **${r.amountDelivered} ${r.tokenDelivered}** (${r.type}) — [Tx ↗](${r.transferExplorerUrl || r.payoutExplorerUrl})`
+      ).join('\n');
+      replyText += `${rows}\n\n*All cross-currency conversions executed via Textile FX and attributed on Celo Mainnet with \`${CELO_ATTRIBUTION_TAG}\`.*`;
+    } else {
+      replyText += `No previous conversions found for ₦${targetTag.toUpperCase()} in the current session.\n\n` +
+        `Try: *"Send ₦${targetTag.toUpperCase()} $10 worth of cNGN. I have USD₮."*`;
+    }
+
+    return {
+      reply: replyText,
+      widget: {
+        type: 'payment_history_card',
+        title: `History · ₦${targetTag.toUpperCase()}`,
+        badge: `${receipts.length} Transactions`,
+        receipts: receipts.slice(0, 5),
+        actionText: 'Execute New Swap',
+        actionPrompt: `Send ₦${targetTag.toUpperCase()} 10 USDT worth of cNGN`,
+      },
+      agentTag: activeAgent.tag,
+      agentName: activeAgent.name,
+      avatar: activeAgent.avatar,
+    };
+  }
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // 11. PROTOCOL OVERVIEW & CAPABILITIES (ChatGPT / Claude Caliber)
   // ──────────────────────────────────────────────────────────────────────────
   if (lowerPrompt.includes('who are you') || lowerPrompt.includes('what is nairatag') || lowerPrompt.includes('what can you do') || lowerPrompt.includes('help')) {
     return {

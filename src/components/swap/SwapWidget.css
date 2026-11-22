@@ -1,20 +1,21 @@
 /* ─────────────────────────────────────────────────────────────────────────────
-   SWAP WIDGET UI/UX STYLES (COMPACT, RETINA-SHARP, MICRO-ANIMATED)
-   Inspired by Uniswap / Phantom / Jupiter DEX design references
+   SWAP WIDGET UI/UX REDESIGN (COMPACT, RETINA-SHARP, MICRO-ANIMATED)
+   Tailored precisely to the reference mobile & web DEX specifications
    ───────────────────────────────────────────────────────────────────────────── */
 
+/* ── Main Container Card ── */
 .swap-widget-card {
   width: 100%;
-  max-width: 416px;
+  max-width: 412px;
   margin: 0 auto;
   background: var(--card-bg, #ffffff);
-  border: 1px solid var(--border-color, #e5e7eb);
-  border-radius: 20px;
+  border: 1px solid var(--border-color, rgba(0, 0, 0, 0.08));
+  border-radius: 22px;
   padding: 12px 14px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.04), 0 1px 3px rgba(0, 0, 0, 0.02);
+  box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.05), 0 1px 3px rgba(0, 0, 0, 0.02);
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 5px;
   box-sizing: border-box;
   position: relative;
   transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
@@ -23,48 +24,51 @@
 [data-theme="dark"] .swap-widget-card,
 .dark .swap-widget-card {
   background: #121316;
-  border-color: #22242a;
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.4);
+  border-color: rgba(255, 255, 255, 0.07);
+  box-shadow: 0 16px 40px -10px rgba(0, 0, 0, 0.45);
 }
 
-/* ── Top Header ── */
+/* ── Top Header Navigation & Controls ── */
 .swap-widget-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 2px 4px;
+  padding: 2px 2px 6px;
+  gap: 8px;
 }
 
+/* Floating Segmented Pill Switcher (Reference 2 layout) */
 .swap-widget-toggle {
   display: inline-flex;
   align-items: center;
-  background: var(--input-bg, #f1f3f5);
+  background: rgba(0, 0, 0, 0.04);
   padding: 3px;
   border-radius: 9999px;
-  border: 1px solid var(--border-color, rgba(0, 0, 0, 0.06));
-  gap: 2px;
+  border: 1px solid rgba(0, 0, 0, 0.04);
+  gap: 3px;
 }
 
 [data-theme="dark"] .swap-widget-toggle,
 .dark .swap-widget-toggle {
-  background: #1a1c23;
-  border-color: #2b2e38;
+  background: #1a1c22;
+  border-color: rgba(255, 255, 255, 0.06);
 }
 
 .swap-widget-toggle-btn {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 5px 14px;
+  padding: 5px 13px;
   border-radius: 9999px;
   border: none;
   background: transparent;
-  color: var(--privy-color-foreground-3, #888888);
-  font-size: 13px;
+  color: var(--privy-color-foreground-3, #8e95a5);
+  font-size: 12.5px;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   white-space: nowrap;
+  user-select: none;
 }
 
 .swap-widget-toggle-btn:hover {
@@ -72,9 +76,9 @@
 }
 
 .swap-widget-toggle-btn.active {
-  background: var(--card-bg, #ffffff);
-  color: var(--privy-color-foreground, #111111);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  background: #ffffff;
+  color: #111111;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.07);
   font-weight: 700;
 }
 
@@ -92,43 +96,10 @@
 }
 
 .swap-widget-title {
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 700;
   color: var(--privy-color-foreground, #111111);
   letter-spacing: -0.01em;
-}
-
-.swap-live-status-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 3px 8px;
-  border-radius: 9999px;
-  background: rgba(16, 185, 129, 0.08);
-  border: 1px solid rgba(16, 185, 129, 0.2);
-  font-size: 10.5px;
-  font-weight: 600;
-  color: #059669;
-}
-
-[data-theme="dark"] .swap-live-status-pill,
-.dark .swap-live-status-pill {
-  background: rgba(16, 185, 129, 0.12);
-  border-color: rgba(16, 185, 129, 0.25);
-  color: #34d399;
-}
-
-.swap-pulse-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: #10b981;
-  animation: swapPulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-}
-
-@keyframes swapPulse {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.4; transform: scale(1.3); }
 }
 
 .swap-header-controls {
@@ -138,9 +109,9 @@
 }
 
 .swap-icon-btn {
-  width: 32px;
-  height: 32px;
-  border-radius: 10px;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -152,27 +123,92 @@
 }
 
 .swap-icon-btn:hover {
-  background: var(--input-bg, #f3f4f6);
+  background: rgba(0, 0, 0, 0.04);
   color: var(--privy-color-foreground, #111111);
-  border-color: var(--border-color, #e5e7eb);
+  border-color: rgba(0, 0, 0, 0.06);
+}
+
+.swap-icon-btn.active {
+  background: rgba(16, 185, 129, 0.1);
+  color: #059669;
+  border-color: rgba(16, 185, 129, 0.25);
 }
 
 [data-theme="dark"] .swap-icon-btn:hover,
 .dark .swap-icon-btn:hover {
   background: #1e2026;
-  border-color: #2b2e38;
+  border-color: rgba(255, 255, 255, 0.08);
   color: #ffffff;
 }
 
-/* ── Sell & Buy Input Panels ── */
+[data-theme="dark"] .swap-icon-btn.active,
+.dark .swap-icon-btn.active {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+  border-color: rgba(16, 185, 129, 0.3);
+}
+
+/* ── Inline Slippage Drawer Popover ── */
+.swap-slippage-popover {
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: var(--input-bg, #f8fafc);
+  border: 1px solid var(--border-color, #e5e7eb);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11.5px;
+  margin-bottom: 2px;
+  animation: swapSlideDown 0.18s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+[data-theme="dark"] .swap-slippage-popover,
+.dark .swap-slippage-popover {
+  background: #18191e;
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+@keyframes swapSlideDown {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.swap-slippage-pill-group {
+  display: flex;
+  gap: 4px;
+}
+
+.swap-slippage-chip {
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  border: 1px solid var(--border-color, #e2e8f0);
+  background: var(--card-bg, #ffffff);
+  color: var(--privy-color-foreground, #111111);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.swap-slippage-chip:hover {
+  border-color: #10b981;
+}
+
+.swap-slippage-chip.active {
+  background: #10b981;
+  color: #ffffff;
+  border-color: #10b981;
+}
+
+/* ── Input Panels (Sell & Buy) ── */
 .swap-card-box {
   background: #f8fafc;
   border: 1px solid #e2e8f0;
   border-radius: 16px;
-  padding: 10px 14px;
+  padding: 10px 12px;
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 4px;
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   position: relative;
 }
@@ -185,22 +221,23 @@
 
 [data-theme="dark"] .swap-card-box,
 .dark .swap-card-box {
-  background: #18191d;
-  border-color: #272932;
+  background: #17181d;
+  border-color: rgba(255, 255, 255, 0.06);
 }
 
 [data-theme="dark"] .swap-card-box:focus-within,
 .dark .swap-card-box:focus-within {
-  background: #1c1e24;
+  background: #1b1c22;
   border-color: #059669;
   box-shadow: 0 0 0 2px rgba(5, 150, 105, 0.2);
 }
 
+/* Top Row of Input Card */
 .swap-card-top-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  font-size: 11.5px;
+  font-size: 11px;
   line-height: 1;
 }
 
@@ -215,28 +252,28 @@
 .swap-balance-row {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
   color: var(--privy-color-foreground-2, #6b7280);
   font-size: 11px;
 }
 
 .swap-max-btn {
-  background: rgba(16, 185, 129, 0.12);
+  background: rgba(16, 185, 129, 0.1);
   border: 1px solid rgba(16, 185, 129, 0.25);
   color: #059669;
   font-size: 9.5px;
-  font-weight: 700;
-  padding: 2px 6px;
-  border-radius: 5px;
+  font-weight: 800;
+  padding: 2px 5px;
+  border-radius: 4px;
   cursor: pointer;
-  line-height: 1.2;
-  transition: all 0.15s ease;
+  line-height: 1.1;
+  transition: all 0.15s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .swap-max-btn:hover {
   background: #10b981;
   color: #ffffff;
-  transform: translateY(-0.5px);
+  transform: translateY(-0.5px) scale(1.05);
 }
 
 .swap-max-btn:active {
@@ -245,16 +282,16 @@
 
 [data-theme="dark"] .swap-max-btn,
 .dark .swap-max-btn {
-  background: rgba(16, 185, 129, 0.18);
+  background: rgba(16, 185, 129, 0.16);
   color: #34d399;
 }
 
-/* ── Middle Row: Big Input + Token Selector ── */
+/* Middle Main Row: Big Number & Token Pill */
 .swap-card-main-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  gap: 8px;
 }
 
 .swap-number-input {
@@ -262,7 +299,7 @@
   min-width: 0;
   border: none;
   background: transparent;
-  font-size: 26px;
+  font-size: 28px;
   font-weight: 700;
   color: var(--privy-color-foreground, #111111);
   outline: none;
@@ -280,7 +317,7 @@
 .swap-number-output {
   flex: 1;
   min-width: 0;
-  font-size: 26px;
+  font-size: 28px;
   font-weight: 700;
   color: var(--privy-color-foreground, #111111);
   line-height: 1.1;
@@ -294,19 +331,19 @@
   color: var(--privy-color-foreground-3, #9ca3af);
 }
 
-/* ── Token Pill Selector Button ── */
+/* Token Selector Pill (Reference 1 & 2 inspired) */
 .swap-token-pill {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 6px 10px 6px 6px;
+  gap: 7px;
+  padding: 5px 9px 5px 5px;
   border-radius: 9999px;
   background: var(--card-bg, #ffffff);
   border: 1px solid var(--border-color, #e2e8f0);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
   cursor: pointer;
   user-select: none;
-  transition: all 0.15s ease;
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
   flex-shrink: 0;
 }
 
@@ -322,19 +359,19 @@
 
 [data-theme="dark"] .swap-token-pill,
 .dark .swap-token-pill {
-  background: #24262f;
-  border-color: #343744;
+  background: #23252d;
+  border-color: rgba(255, 255, 255, 0.1);
 }
 
 [data-theme="dark"] .swap-token-pill:hover,
 .dark .swap-token-pill:hover {
-  background: #2b2e3a;
+  background: #2b2e38;
   border-color: #10b981;
 }
 
 .swap-token-badge-icon {
-  width: 26px;
-  height: 26px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -346,11 +383,11 @@
   display: flex;
   flex-direction: column;
   text-align: left;
-  line-height: 1.1;
+  line-height: 1.05;
 }
 
 .swap-token-network {
-  font-size: 9px;
+  font-size: 8.5px;
   font-weight: 600;
   text-transform: uppercase;
   color: var(--privy-color-foreground-3, #9ca3af);
@@ -358,7 +395,7 @@
 }
 
 .swap-token-symbol {
-  font-size: 13.5px;
+  font-size: 13px;
   font-weight: 800;
   color: var(--privy-color-foreground, #111111);
 }
@@ -373,23 +410,24 @@
   transform: translateY(1px);
 }
 
-/* ── Bottom Row: Approx Value & Warning ── */
+/* Bottom Row of Input Card */
 .swap-card-bottom-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  font-size: 11.5px;
+  font-size: 11px;
   color: var(--privy-color-foreground-3, #9ca3af);
   font-variant-numeric: tabular-nums;
+  line-height: 1.2;
 }
 
 .swap-card-warning {
   color: #dc2626;
   font-weight: 600;
-  font-size: 11px;
+  font-size: 10.5px;
 }
 
-/* ── Central Overlapping Switcher (Hero Micro-Interaction) ── */
+/* ── Central Overlapping Switcher Button (Hero Micro-Interaction) ── */
 .swap-flip-divider-wrap {
   position: relative;
   display: flex;
@@ -397,6 +435,7 @@
   justify-content: center;
   height: 0;
   z-index: 10;
+  margin: -4px 0;
 }
 
 .swap-flip-circle-btn {
@@ -411,15 +450,15 @@
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s ease, border-color 0.2s ease;
+  transition: transform 0.32s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s ease, border-color 0.2s ease;
   outline: none;
 }
 
 .swap-flip-circle-btn:hover {
-  transform: scale(1.1);
+  transform: scale(1.12);
   border-color: #10b981;
   color: #059669;
-  box-shadow: 0 4px 14px rgba(16, 185, 129, 0.2);
+  box-shadow: 0 4px 14px rgba(16, 185, 129, 0.25);
 }
 
 .swap-flip-circle-btn.flipped {
@@ -435,7 +474,7 @@
   background: #1e2026;
   border-color: #121316;
   color: #e5e7eb;
-  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.5);
 }
 
 [data-theme="dark"] .swap-flip-circle-btn:hover,
@@ -444,22 +483,78 @@
   color: #34d399;
 }
 
-/* ── Rate & Breakdown Strip ── */
+/* ── Centered Floating Exchange Rate Pill (Reference 1 style) ── */
+.swap-center-rate-pill-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 3px 0;
+}
+
+.swap-center-rate-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border-radius: 9999px;
+  background: rgba(0, 0, 0, 0.03);
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--privy-color-foreground, #374151);
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.15s ease;
+}
+
+.swap-center-rate-pill:hover {
+  background: rgba(0, 0, 0, 0.05);
+  border-color: rgba(16, 185, 129, 0.3);
+  transform: translateY(-0.5px);
+}
+
+[data-theme="dark"] .swap-center-rate-pill,
+.dark .swap-center-rate-pill {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.07);
+  color: #d1d5db;
+}
+
+[data-theme="dark"] .swap-center-rate-pill:hover,
+.dark .swap-center-rate-pill:hover {
+  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(16, 185, 129, 0.4);
+}
+
+.swap-pulse-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #10b981;
+  animation: swapPulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes swapPulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.35; transform: scale(1.3); }
+}
+
+/* ── Rate & Breakdown Intelligence Section (Reference 1 & 2) ── */
 .swap-rate-intelligence-strip {
   border: 1px solid var(--border-color, #e5e7eb);
-  border-radius: 16px;
-  padding: 10px 14px;
+  border-radius: 14px;
+  padding: 8px 12px;
   background: var(--input-bg, #f8fafc);
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
   transition: all 0.2s ease;
 }
 
 [data-theme="dark"] .swap-rate-intelligence-strip,
 .dark .swap-rate-intelligence-strip {
-  background: #18191d;
-  border-color: #272932;
+  background: #17181d;
+  border-color: rgba(255, 255, 255, 0.06);
 }
 
 .swap-rate-summary-bar {
@@ -471,7 +566,7 @@
 }
 
 .swap-rate-text {
-  font-size: 12px;
+  font-size: 11.5px;
   font-weight: 600;
   color: var(--privy-color-foreground, #111111);
   display: flex;
@@ -482,12 +577,12 @@
 .swap-route-badge {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 3px;
   padding: 2px 7px;
   border-radius: 9999px;
   background: rgba(16, 185, 129, 0.1);
   color: #059669;
-  font-size: 11px;
+  font-size: 10.5px;
   font-weight: 700;
 }
 
@@ -497,19 +592,19 @@
   color: #34d399;
 }
 
-/* ── Collapsible Breakdown Table ── */
+/* Collapsible Breakdown Table */
 .swap-breakdown-table {
   display: flex;
   flex-direction: column;
-  gap: 7px;
-  padding-top: 6px;
+  gap: 5px;
+  padding-top: 5px;
   border-top: 1px dashed var(--border-color, #e2e8f0);
-  font-size: 11.5px;
+  font-size: 11px;
 }
 
 [data-theme="dark"] .swap-breakdown-table,
 .dark .swap-breakdown-table {
-  border-top-color: #272932;
+  border-top-color: rgba(255, 255, 255, 0.08);
 }
 
 .swap-breakdown-row {
@@ -524,15 +619,14 @@
   color: var(--privy-color-foreground, #111111);
 }
 
-/* ── Firm Quote Expiry Timer Bar ── */
 .swap-countdown-pill {
   display: flex;
   align-items: center;
-  gap: 5px;
-  font-size: 11px;
+  gap: 4px;
+  font-size: 10.5px;
   font-weight: 700;
-  padding: 4px 8px;
-  border-radius: 8px;
+  padding: 2px 6px;
+  border-radius: 6px;
   background: rgba(16, 185, 129, 0.12);
   color: #059669;
 }
@@ -540,31 +634,31 @@
 .swap-countdown-pill.urgent {
   background: rgba(239, 68, 68, 0.12);
   color: #dc2626;
-  animation: pulse 1s infinite;
+  animation: swapPulse 1s infinite;
 }
 
-/* ── Direct ₦Tag Delivery Box ── */
+/* ── Direct ₦Tag Delivery Option ── */
 .swap-recipient-toggle-wrap {
   border: 1px solid var(--border-color, #e5e7eb);
-  border-radius: 14px;
-  padding: 10px 12px;
+  border-radius: 12px;
+  padding: 8px 10px;
   background: var(--input-bg, #f8fafc);
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
 }
 
 [data-theme="dark"] .swap-recipient-toggle-wrap,
 .dark .swap-recipient-toggle-wrap {
-  background: #18191d;
-  border-color: #272932;
+  background: #17181d;
+  border-color: rgba(255, 255, 255, 0.06);
 }
 
 .swap-recipient-checkbox-label {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 12px;
+  gap: 7px;
+  font-size: 11.5px;
   font-weight: 600;
   color: var(--privy-color-foreground, #111111);
   cursor: pointer;
@@ -578,11 +672,11 @@
 
 .swap-recipient-input {
   width: 100%;
-  padding: 8px 12px 8px 28px;
-  border-radius: 10px;
+  padding: 6px 10px 6px 24px;
+  border-radius: 8px;
   border: 1px solid var(--border-color, #e2e8f0);
   background: var(--card-bg, #ffffff);
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--privy-color-foreground, #111111);
   outline: none;
@@ -594,28 +688,28 @@
 
 [data-theme="dark"] .swap-recipient-input,
 .dark .swap-recipient-input {
-  background: #20222a;
-  border-color: #2f323e;
+  background: #1f2129;
+  border-color: rgba(255, 255, 255, 0.1);
 }
 
 .swap-recipient-tag-prefix {
   position: absolute;
-  left: 10px;
+  left: 8px;
   font-weight: 800;
   color: #059669;
-  font-size: 14px;
+  font-size: 13px;
   pointer-events: none;
 }
 
-/* ── Action Button ── */
+/* ── Primary Action Button (Reference 1 Glow & Modern Feel) ── */
 .swap-primary-action-btn {
   width: 100%;
-  height: 48px;
+  height: 46px;
   border-radius: 14px;
   background: linear-gradient(135deg, #10b981 0%, #059669 100%);
   color: #ffffff;
   border: none;
-  font-size: 14.5px;
+  font-size: 14px;
   font-weight: 700;
   letter-spacing: -0.01em;
   display: flex;
@@ -623,15 +717,32 @@
   justify-content: center;
   gap: 8px;
   cursor: pointer;
-  box-shadow: 0 4px 14px rgba(16, 185, 129, 0.25);
+  box-shadow: 0 4px 16px rgba(16, 185, 129, 0.28);
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   user-select: none;
+  position: relative;
+  overflow: hidden;
+}
+
+.swap-primary-action-btn::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 50%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transition: 0.5s;
+}
+
+.swap-primary-action-btn:hover:not(:disabled)::after {
+  left: 150%;
 }
 
 .swap-primary-action-btn:hover:not(:disabled) {
-  filter: brightness(1.06);
+  filter: brightness(1.05);
   transform: translateY(-1px);
-  box-shadow: 0 6px 20px rgba(16, 185, 129, 0.35);
+  box-shadow: 0 6px 20px rgba(16, 185, 129, 0.38);
 }
 
 .swap-primary-action-btn:active:not(:disabled) {
@@ -648,8 +759,8 @@
 
 [data-theme="dark"] .swap-primary-action-btn:disabled,
 .dark .swap-primary-action-btn:disabled {
-  background: #252832;
-  color: #64748b;
+  background: #22242d;
+  color: #555d6e;
 }
 
 /* ── Token Selector Modal ── */
@@ -668,22 +779,22 @@
 
 .swap-token-modal-card {
   width: 100%;
-  max-width: 380px;
+  max-width: 360px;
   background: var(--card-bg, #ffffff);
   border: 1px solid var(--border-color, #e5e7eb);
-  border-radius: 22px;
-  padding: 20px;
+  border-radius: 20px;
+  padding: 16px;
   box-shadow: 0 20px 45px rgba(0, 0, 0, 0.2);
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  animation: modalSlideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  gap: 12px;
+  animation: modalSlideUp 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 [data-theme="dark"] .swap-token-modal-card,
 .dark .swap-token-modal-card {
   background: #17181d;
-  border-color: #282a33;
+  border-color: rgba(255, 255, 255, 0.1);
 }
 
 @keyframes modalBackdropFadeIn {
@@ -703,18 +814,18 @@
 }
 
 .swap-token-modal-title {
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 700;
   color: var(--privy-color-foreground, #111111);
 }
 
 .swap-token-search-input {
   width: 100%;
-  padding: 10px 14px;
-  border-radius: 12px;
+  padding: 8px 12px;
+  border-radius: 10px;
   border: 1px solid var(--border-color, #e2e8f0);
   background: var(--input-bg, #f8fafc);
-  font-size: 13.5px;
+  font-size: 13px;
   color: var(--privy-color-foreground, #111111);
   outline: none;
 }
@@ -725,15 +836,15 @@
 
 [data-theme="dark"] .swap-token-search-input,
 .dark .swap-token-search-input {
-  background: #20222a;
-  border-color: #2d303c;
+  background: #1f2129;
+  border-color: rgba(255, 255, 255, 0.1);
 }
 
 .swap-token-list {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  max-height: 280px;
+  gap: 3px;
+  max-height: 260px;
   overflow-y: auto;
 }
 
@@ -741,8 +852,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 12px;
-  border-radius: 12px;
+  padding: 8px 10px;
+  border-radius: 10px;
   background: transparent;
   border: 1px solid transparent;
   cursor: pointer;
@@ -757,8 +868,8 @@
 
 [data-theme="dark"] .swap-token-item:hover,
 .dark .swap-token-item:hover {
-  background: #22242d;
-  border-color: #2f323e;
+  background: #20222a;
+  border-color: rgba(255, 255, 255, 0.08);
 }
 
 .swap-token-item.selected {
@@ -769,32 +880,37 @@
 /* ── Mobile View Compact Tweaks ── */
 @media (max-width: 480px) {
   .swap-widget-card {
-    padding: 12px;
-    border-radius: 20px;
-    gap: 6px;
+    padding: 10px 12px;
+    border-radius: 18px;
+    gap: 4px;
+    max-width: 100%;
   }
   .swap-card-box {
-    padding: 12px 14px;
-    border-radius: 16px;
+    padding: 8px 10px;
+    border-radius: 14px;
   }
   .swap-number-input,
   .swap-number-output {
-    font-size: 26px;
+    font-size: 24px;
   }
   .swap-token-pill {
-    padding: 5px 8px 5px 5px;
-    gap: 6px;
+    padding: 4px 7px 4px 4px;
+    gap: 5px;
   }
   .swap-token-badge-icon {
-    width: 24px;
-    height: 24px;
+    width: 22px;
+    height: 22px;
   }
   .swap-token-symbol {
-    font-size: 13px;
+    font-size: 12.5px;
   }
   .swap-primary-action-btn {
-    height: 48px;
-    font-size: 14.5px;
-    border-radius: 14px;
+    height: 44px;
+    font-size: 13.5px;
+    border-radius: 12px;
+  }
+  .swap-widget-toggle-btn {
+    padding: 4px 10px;
+    font-size: 12px;
   }
 }

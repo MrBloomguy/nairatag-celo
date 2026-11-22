@@ -83,16 +83,18 @@ Built as a native, shared platform primitive — not hardcoded into individual a
 - `src/services/bookingRegistryService.js` — Common service schema validation and category directory.
 - `src/services/bookingPaymentService.js` — Agent Vault authorization evaluation and x402 digital dollar settlement.
 - `src/services/textileRfqService.js` — Textile FX API v2 client (`preview`, `request` with EIP-712 proof of control, cancel, swap execution, ERC-8021 attribution).
+- `src/services/unifiedPaymentEngine.js` — Master Textile FX-powered Tag-to-Tag Payment Layer (Direct Send, 11-State Payment Requests, Task & Booking settlement bridges, Altana session spend bounds, dual-tx recovery).
 - `src/services/corridorPaymentFlow.js` — Cross-currency payment orchestrator (resolve `₦tag` -> Textile swap -> cNGN recipient settlement -> cryptographic receipt).
+- `src/components/chat/ChatPaymentWidget.jsx` — Generative in-chat payment widgets (Intent cards, Live Quote cards, Payment Request cards, Receipts).
 - `src/components/bookings/BookingMarketplace.jsx` — Comprehensive booking UI with step-by-step and 7-view panoramic walkthrough views.
 - `src/components/bookings/PanoramicWalkthroughView.jsx` — Pixel-perfect 7-view grid display matching the master design.
 
 ---
 
-## 5. Automated Test Suite (116 / 116 Tests Passing)
+## 5. Automated Test Suite (139 / 139 Tests Passing)
 
 ```bash
-# Run all 116 automated tests across all 8 test suites
+# Run all 139 automated tests across all 9 test suites
 node --max-old-space-size=4096 --test test/*.test.js
 
 # Build production bundle
@@ -101,15 +103,16 @@ npm run build
 
 | Suite | Tests | Result | Focus |
 |---|---|---|---|
+| `test/unified-payment-engine.test.js` | **21** | `PASSED` | Textile FX Direct Send, 11-State Payment Requests, Task Milestone & Booking bridges, Altana session bounds, Chat intent parsing |
 | `test/agent-lifecycle.test.js` | **20** | `PASSED` | 8-state machine, Self proof gate, Altana wallet provisioning, session limits, revocation, booking E2E |
 | `test/agent-vault.test.js` | **11** | `PASSED` | Autonomous checkout, passkey step-up, replay protection, ERC-8021 attribution |
 | `test/altana-wallet.test.js` | **15** | `PASSED` | Session policy builder, contract allowlists, passkey signing, ERC-20 approve rejection |
 | `test/booking.test.js` | **15** | `PASSED` | Range-aware slot collision, atomic double-booking mutex, 15m hold auto-expiry |
 | `test/self-agent-id.test.js` | **31** | `PASSED` | Official `@selfxyz/agent-sdk`, 10-agent Sybil limit, verifier creation, x402 HTTP 402 flow, replay protection, fail-closed boundaries |
-| `test/agent-points-and-chat.test.js` | **11** | `PASSED` | Real Trust Points engine (+500 verification bonus), idempotency, tiering, ChatGPT/Claude-caliber ₦NAIRATAG chat intelligence, in-chat verification card |
+| `test/agent-points-and-chat.test.js` | **13** | `PASSED` | Real Trust Points engine (+500 verification bonus), idempotency, tiering, Altana in-chat wallet retrieval & widget emission |
 | `test/agent-discovery.test.js` | **8** | `PASSED` | Capability discovery, voice alias matching, disambiguation |
 | `test/textile-corridor.test.js` | **5** | `PASSED` | Live Textile FX v2 RFQ previews (USD₮ ⇄ cNGN), EIP-712 taker signatures |
-| **Total** | **116** | `ALL PASS` | `duration: 9.53s` |
+| **Total** | **139** | `ALL PASS` | `duration: 23.16s` |
 
 ---
 

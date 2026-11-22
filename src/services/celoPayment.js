@@ -50,8 +50,8 @@ export const publicClient = createPublicClient({
 });
 
 /**
- * Safely binds the request method of an EVM provider to preserve `this` context
- * and avoid extension-level `onMessage` / Communicator runtime errors.
+ * Safely binds the request method and event emitters of an EVM provider to preserve `this` context
+ * and avoid extension-level `onMessage` / Communicator runtime errors in viem and multi-wallet setups.
  */
 function wrapSafeProvider(rawProvider) {
   if (!rawProvider) return null;
@@ -63,7 +63,14 @@ function wrapSafeProvider(rawProvider) {
           if (prop === 'request') {
             return boundRequest;
           }
-          return Reflect.get(target, prop, receiver);
+          if (prop === 'onMessage') {
+            return target.onMessage !== undefined ? target.onMessage : () => {};
+          }
+          const val = Reflect.get(target, prop, receiver);
+          if (typeof val === 'function') {
+            return val.bind(target);
+          }
+          return val;
         },
       });
     }

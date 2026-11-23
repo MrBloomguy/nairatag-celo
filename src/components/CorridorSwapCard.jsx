@@ -337,19 +337,46 @@ export default function CorridorSwapCard({
         transport: custom(provider),
       });
 
+      // Proactively ensure accounts are authorized on this provider
+      let authorizedAccounts = [];
+      try {
+        if (typeof provider.request === 'function') {
+          authorizedAccounts = await provider.request({ method: 'eth_accounts' });
+          if (!authorizedAccounts || authorizedAccounts.length === 0) {
+            authorizedAccounts = await provider.request({ method: 'eth_requestAccounts' });
+          }
+        }
+      } catch (authReqErr) {
+        console.warn('[CorridorSwap] eth_requestAccounts check:', authReqErr);
+      }
+
+      // Detect account mismatch if user switched accounts in their wallet extension
+      if (authorizedAccounts && authorizedAccounts.length > 0) {
+        const hasMatch = authorizedAccounts.some(
+          (a) => a.toLowerCase() === walletAddress.toLowerCase()
+        );
+        if (!hasMatch) {
+          throw new Error(
+            `Wallet account mismatch: Your wallet is currently set to ${authorizedAccounts[0].slice(0, 6)}...${authorizedAccounts[0].slice(-4)}, but this app is connected to ${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}. Please switch to your connected account in your wallet extension.`
+          );
+        }
+      }
+
+      const { createWalletClient, custom, getAddress } = await import('viem');
+      const activeAccount = getAddress(walletAddress);
       const isUsdt = direction === 'USDT_TO_CNGN';
       const sellToken = isUsdt ? CELO_USDT_ADDRESS : CELO_CNGN_ADDRESS;
       const buyToken = isUsdt ? CELO_CNGN_ADDRESS : CELO_USDT_ADDRESS;
       const sellAmountAtomic = toAtomicUnits(clean, 6);
 
       const quote = await requestFirmQuote({
-        takerAddress: walletAddress,
+        takerAddress: activeAccount,
         sellToken,
         buyToken,
         sellAmount: sellAmountAtomic,
         signTypedDataFn: async (args) => {
           try {
-            return await walletClient.signTypedData({ ...args, account: walletAddress });
+            return await walletClient.signTypedData({ ...args, account: activeAccount });
           } catch (signErr) {
             console.warn('[signTypedData] walletClient error, attempting direct RPC fallback:', signErr);
             if (provider && typeof provider.request === 'function') {
@@ -365,16 +392,34 @@ export default function CorridorSwapCard({
                 );
                 const directSig = await provider.request({
                   method: 'eth_signTypedData_v4',
-                  params: [walletAddress, payload],
+                  params: [activeAccount, payload],
                 });
                 if (directSig) return directSig;
               } catch (directErr) {
                 console.error('[signTypedData] Direct eth_signTypedData_v4 fallback failed:', directErr);
+                if (
+                  directErr?.message?.includes('not been authorized') ||
+                  directErr?.code === 4100 ||
+                  directErr?.cause?.code === 4100
+                ) {
+                  throw new Error(
+                    `Wallet authorization required: Please open your wallet (MetaMask / Rabby), approve the connection to this site for ${activeAccount.slice(0, 6)}...${activeAccount.slice(-4)}, and confirm the signature prompt.`
+                  );
+                }
                 if (signErr?.message?.includes('onMessage') || directErr?.message?.includes('onMessage')) {
                   throw new Error('Wallet popup encountered an extension conflict. Please check your browser wallet (MetaMask / Rabby) to confirm the signature.');
                 }
                 throw directErr;
               }
+            }
+            if (
+              signErr?.message?.includes('not been authorized') ||
+              signErr?.code === 4100 ||
+              signErr?.cause?.code === 4100
+            ) {
+              throw new Error(
+                `Wallet authorization required: Please open your wallet (MetaMask / Rabby), approve the connection to this site for ${activeAccount.slice(0, 6)}...${activeAccount.slice(-4)}, and confirm the signature prompt.`
+              );
             }
             if (signErr?.message?.includes('onMessage') || signErr?.message?.includes('communicator')) {
               throw new Error('Wallet popup encountered a conflict. Please check your browser wallet (MetaMask / Rabby) to confirm the signature.');

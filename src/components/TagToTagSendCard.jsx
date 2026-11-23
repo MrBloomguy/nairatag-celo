@@ -365,8 +365,34 @@ export default function TagToTagSendCard({
       const provider = getEthereumProvider(null, walletAddress);
       if (!provider) throw new Error('No EVM wallet detected.');
 
-      const { createWalletClient, custom } = await import('viem');
+      // Proactively ensure accounts are authorized on this provider
+      let authorizedAccounts = [];
+      try {
+        if (typeof provider.request === 'function') {
+          authorizedAccounts = await provider.request({ method: 'eth_accounts' });
+          if (!authorizedAccounts || authorizedAccounts.length === 0) {
+            authorizedAccounts = await provider.request({ method: 'eth_requestAccounts' });
+          }
+        }
+      } catch (authReqErr) {
+        console.warn('[handleRequestFirmQuote] eth_requestAccounts check:', authReqErr);
+      }
+
+      // Detect account mismatch if user switched accounts in their wallet extension
+      if (authorizedAccounts && authorizedAccounts.length > 0) {
+        const hasMatch = authorizedAccounts.some(
+          (a) => a.toLowerCase() === walletAddress.toLowerCase()
+        );
+        if (!hasMatch) {
+          throw new Error(
+            `Wallet account mismatch: Your wallet is currently set to ${authorizedAccounts[0].slice(0, 6)}...${authorizedAccounts[0].slice(-4)}, but this app is connected to ${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}. Please switch to your connected account in your wallet extension.`
+          );
+        }
+      }
+
+      const { createWalletClient, custom, getAddress } = await import('viem');
       const { celoMainnet } = await import('../config/celo.js');
+      const activeAccount = getAddress(walletAddress);
       const walletClient = createWalletClient({
         chain: celoMainnet,
         transport: custom(provider),
@@ -377,13 +403,13 @@ export default function TagToTagSendCard({
       const sellAmountAtomic = toAtomicUnits(clean, sellDesc.decimals);
 
       const quote = await requestFirmQuote({
-        takerAddress: walletAddress,
+        takerAddress: activeAccount,
         sellToken: sellDesc.address,
         buyToken: buyDesc.address,
         sellAmount: sellAmountAtomic,
         signTypedDataFn: async (args) => {
           try {
-            return await walletClient.signTypedData({ ...args, account: walletAddress });
+            return await walletClient.signTypedData({ ...args, account: activeAccount });
           } catch (signErr) {
             console.warn('[signTypedData] walletClient error, attempting direct RPC fallback:', signErr);
             if (provider && typeof provider.request === 'function') {
@@ -399,16 +425,34 @@ export default function TagToTagSendCard({
                 );
                 const directSig = await provider.request({
                   method: 'eth_signTypedData_v4',
-                  params: [walletAddress, payload],
+                  params: [activeAccount, payload],
                 });
                 if (directSig) return directSig;
               } catch (directErr) {
                 console.error('[signTypedData] Direct fallback failed:', directErr);
+                if (
+                  directErr?.message?.includes('not been authorized') ||
+                  directErr?.code === 4100 ||
+                  directErr?.cause?.code === 4100
+                ) {
+                  throw new Error(
+                    `Wallet authorization required: Please open your wallet (MetaMask / Rabby), approve the connection to this site for ${activeAccount.slice(0, 6)}...${activeAccount.slice(-4)}, and confirm the signature prompt.`
+                  );
+                }
                 if (signErr?.message?.includes('onMessage') || directErr?.message?.includes('onMessage')) {
                   throw new Error('Wallet extension conflict. Please open your wallet (MetaMask / Rabby) and confirm the signature prompt.');
                 }
                 throw directErr;
               }
+            }
+            if (
+              signErr?.message?.includes('not been authorized') ||
+              signErr?.code === 4100 ||
+              signErr?.cause?.code === 4100
+            ) {
+              throw new Error(
+                `Wallet authorization required: Please open your wallet (MetaMask / Rabby), approve the connection to this site for ${activeAccount.slice(0, 6)}...${activeAccount.slice(-4)}, and confirm the signature prompt.`
+              );
             }
             throw signErr;
           }

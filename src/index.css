@@ -3276,11 +3276,12 @@ select,
   border-color: #3880FF;
 }
 
-/* Rank pill at top right of card */
+/* Rank pill at top left of card */
 .card-rank-tag {
   position: absolute;
   top: 14px;
-  right: 14px;
+  left: 14px;
+  right: auto;
   font-size: 11px;
   font-weight: 800;
   padding: 2.5px 8px;
@@ -3288,12 +3289,124 @@ select,
   background: rgba(0, 82, 255, 0.08);
   color: #0052FF;
   border: 1px solid rgba(0, 82, 255, 0.2);
+  z-index: 2;
 }
 
 [data-theme="dark"] .card-rank-tag {
   background: rgba(56, 128, 255, 0.15);
   color: #60A5FA;
   border-color: rgba(96, 165, 250, 0.3);
+}
+
+/* Status tag at top right of card */
+.card-status-tag {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  left: auto;
+  font-size: 10px;
+  font-weight: 800;
+  padding: 2px 7px;
+  border-radius: var(--radius-pill, 9999px);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  z-index: 2;
+}
+
+.status-badge-open {
+  background: rgba(16, 185, 129, 0.12);
+  color: #10B981;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.status-badge-ongoing, .status-badge-in_progress {
+  background: rgba(245, 158, 11, 0.12);
+  color: #F59E0B;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.status-badge-submitted {
+  background: rgba(59, 130, 246, 0.12);
+  color: #3B82F6;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+.status-badge-releasing {
+  background: rgba(168, 85, 247, 0.15);
+  color: #A855F7;
+  border: 1px solid rgba(168, 85, 247, 0.35);
+}
+
+.status-badge-paid {
+  background: rgba(16, 185, 129, 0.18);
+  color: #10B981;
+  border: 1px solid rgba(16, 185, 129, 0.4);
+}
+
+/* Lifecycle Stepper in Task Detail */
+.task-lifecycle-stepper {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: var(--surface2, rgba(255, 255, 255, 0.03));
+  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.08));
+  border-radius: 12px;
+  margin-bottom: 16px;
+  gap: 6px;
+  overflow-x: auto;
+}
+
+.task-step-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--privy-color-foreground-3);
+  white-space: nowrap;
+}
+
+.task-step-item.active {
+  color: #10B981;
+  font-weight: 700;
+}
+
+.task-step-item.completed {
+  color: var(--privy-color-foreground);
+}
+
+.task-step-dot {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 800;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--privy-color-foreground-2);
+}
+
+.task-step-item.active .task-step-dot {
+  background: #10B981;
+  color: #000;
+  box-shadow: 0 0 10px rgba(16, 185, 129, 0.4);
+}
+
+.task-step-item.completed .task-step-dot {
+  background: rgba(16, 185, 129, 0.2);
+  color: #10B981;
+}
+
+.task-step-arrow {
+  color: var(--privy-color-foreground-3);
+  opacity: 0.4;
+  font-size: 11px;
 }
 
 /* Medallion badge in center */

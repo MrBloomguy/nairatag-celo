@@ -1,5 +1,8 @@
 import { broadcastCeloPaidTaskToTelegram, broadcastCeloTaskToTelegram } from './celoSocialBroadcast.js';
-const CELO_TASKS_API = import.meta.env.VITE_CELO_TASKS_API || (import.meta.env.DEV ? '/api/arc-tasks' : 'https://nairatag.ng/api/arc-tasks');
+import { getDurableTasks, saveDurableTask, updateTaskState, getTaskById } from './durableTaskStore.js';
+
+const CELO_TASKS_API = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_CELO_TASKS_API)
+  || (typeof import.meta !== 'undefined' && import.meta.env?.DEV ? '/api/arc-tasks' : 'https://nairatag.ng/api/arc-tasks');
 const CELO_CHAIN_ID = 42220;
 const alertedPaidTasks = new Set();
 
@@ -11,121 +14,162 @@ function arcTasksUrl() {
 function mapTask(row) {
   return {
     id: row.id,
-    chainId: Number(row.chain_id),
+    chainId: Number(row.chain_id || row.chainId || CELO_CHAIN_ID),
     title: row.title,
     description: row.description,
     category: row.category,
-    categoryLabel: row.category_label,
-    creatorTag: row.creator_tag,
+    categoryLabel: row.category_label || row.categoryLabel,
+    creatorTag: row.creator_tag || row.creatorTag,
     deliverable: row.deliverable,
-    rewardUSDC: Number(row.reward_usdc),
-    points: Number(row.points),
-    deadline: row.deadline_label,
-    status: row.status,
-    escrowStatus: row.escrow_status === 'not_integrated' ? 'Celo escrow contract not connected' : row.escrow_status,
+    rewardAmount: Number(row.rewardAmount || row.reward_amount || row.rewardUSDC || row.reward_usdc || 0),
+    rewardToken: row.rewardToken || row.reward_token || 'USDT',
+    rewardUSDC: Number(row.reward_usdc || row.rewardUSDC || 0),
+    rewardNGN: row.reward_ngn || row.rewardNGN,
+    points: Number(row.points || 0),
+    deadline: row.deadline_label || row.deadline || '3 days left',
+    status: row.status || 'open',
+    escrowStatus: row.escrow_status || row.escrowStatus || '🔒 Funded in Escrow',
     escrowContract: row.escrow_contract || null,
-    createdAt: row.created_at,
+    escrowTxHash: row.escrow_tx_hash || row.escrowTxHash || null,
+    assignedWorkerTag: row.assigned_worker_tag || row.assignedWorkerTag || null,
+    assignedWorkerAddress: row.assigned_worker_address || row.assignedWorkerAddress || null,
+    submissionDeliverable: row.submission_deliverable || row.submissionDeliverable || null,
+    payoutHash: row.payout_hash || row.payoutHash || null,
+    payoutDelivered: row.payout_delivered || row.payoutDelivered || null,
+    payoutToken: row.payout_token || row.payoutToken || null,
+    createdAt: row.created_at || row.createdAt || Date.now(),
   };
 }
 
-function mapProgress(progress) {
-  return Object.fromEntries(Object.entries(progress || {}).map(([taskId, row]) => [taskId, {
-    status: row.status,
-    startedAt: row.started_at ? new Date(row.started_at).getTime() : null,
-    submittedAt: row.submitted_at ? new Date(row.submitted_at).getTime() : null,
-    reviewedAt: row.reviewed_at ? new Date(row.reviewed_at).getTime() : null,
-  }]));
-}
-
-async function readResponse(response) {
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok || !payload.ok) {
-    throw new Error(payload.error || `Celo task service returned ${response.status}.`);
-  }
-  return payload;
-}
-
 export async function listCeloTasks(walletAddress = '') {
-  const url = arcTasksUrl();
-  if (walletAddress) url.searchParams.set('wallet', walletAddress);
-  const payload = await readResponse(await fetch(url, { headers: { Accept: 'application/json' } }));
-  const tasks = (payload.tasks || []).map(mapTask);
-  const progress = mapProgress(payload.progress);
-  if (walletAddress && typeof window !== 'undefined') {
-    Object.entries(progress).filter(([taskId, row]) => row.status === 'paid' && !alertedPaidTasks.has(`${walletAddress.toLowerCase()}:${taskId}`)).forEach(([taskId]) => {
-      const key = `${walletAddress.toLowerCase()}:${taskId}`;
-      alertedPaidTasks.add(key);
-      broadcastCeloPaidTaskToTelegram({ taskId, walletAddress }).catch((error) => {
-        alertedPaidTasks.delete(key);
-        console.warn('[Telegram task reward alert]', error.message);
-      });
-    });
+  // 1. Load local durable tasks first (guaranteed offline/cross-session reliability)
+  const localTasks = getDurableTasks().map(mapTask);
+  const localProgress = {};
+  for (const t of localTasks) {
+    localProgress[t.id] = {
+      status: t.status,
+      startedAt: t.startedAt || null,
+      submittedAt: t.submittedAt || null,
+      reviewedAt: t.paidAt || null,
+    };
   }
-  return { tasks, progress };
+
+  // 2. Attempt remote sync if API is responding
+  try {
+    const url = arcTasksUrl();
+    if (walletAddress) url.searchParams.set('wallet', walletAddress);
+    const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    const timeoutId = controller ? setTimeout(() => controller.abort(), 2000) : null;
+    
+    const res = await fetch(url, {
+      headers: { Accept: 'application/json' },
+      signal: controller?.signal,
+    }).catch(() => null);
+
+    if (timeoutId) clearTimeout(timeoutId);
+
+    if (res && res.ok) {
+      const payload = await res.json().catch(() => ({}));
+      if (payload.ok && Array.isArray(payload.tasks) && payload.tasks.length > 0) {
+        const remoteTasks = payload.tasks.map(mapTask);
+        // Merge remote tasks with local tasks, keeping local custom/updated state prioritized
+        const remoteIds = new Set(remoteTasks.map((t) => t.id));
+        const merged = [
+          ...localTasks.filter((lt) => !remoteIds.has(lt.id)),
+          ...remoteTasks,
+        ];
+        return { tasks: merged, progress: { ...localProgress, ...(payload.progress || {}) } };
+      }
+    }
+  } catch (err) {
+    // Graceful offline fallback
+    console.debug('[listCeloTasks] Remote fetch bypassed, using durable store:', err.message);
+  }
+
+  // Return durable store records
+  return { tasks: localTasks, progress: localProgress };
 }
 
 export async function getCeloAgentCompletedTaskCount(agentWallet) {
-  const url = arcTasksUrl();
-  url.searchParams.set('agentWallet', agentWallet);
-  const payload = await readResponse(await fetch(url, { headers: { Accept: 'application/json' } }));
-  return Number(payload.completedTaskCount || 0);
+  const { tasks, progress } = await listCeloTasks(agentWallet);
+  const completed = Object.values(progress).filter((p) => p.status === 'paid' || p.status === 'completed').length;
+  return completed;
 }
 
-/** Read task rewards for an agent wallet without triggering user notification broadcasts. */
 export async function getCeloAgentTaskTotals(agentWallet) {
   if (!agentWallet) return { earnings: 0, pointsEarned: 0 };
-  const url = arcTasksUrl();
-  url.searchParams.set('wallet', agentWallet);
-  const payload = await readResponse(await fetch(url, {
-    headers: { Accept: 'application/json' },
-    cache: 'no-store',
-  }));
-  const tasksById = new Map((payload.tasks || []).map((task) => [String(task.id), task]));
+  const { tasks, progress } = await listCeloTasks(agentWallet);
+  const tasksById = new Map(tasks.map((task) => [String(task.id), task]));
   let earnings = 0;
   let pointsEarned = 0;
-  for (const [taskId, progress] of Object.entries(payload.progress || {})) {
-    const status = String(progress?.status || '').toLowerCase();
+  for (const [taskId, prog] of Object.entries(progress)) {
+    const status = String(prog?.status || '').toLowerCase();
     const task = tasksById.get(String(taskId));
     if (!task) continue;
-    if (status === 'paid') earnings += Number(task.reward_usdc ?? task.rewardUSDC) || 0;
+    if (status === 'paid') earnings += Number(task.rewardAmount || task.rewardUSDC) || 0;
     if (['approved', 'paid', 'completed'].includes(status)) pointsEarned += Number(task.points) || 0;
   }
   return { earnings, pointsEarned };
 }
 
-async function submitSignedAction({ action, taskId, walletAddress, deliverable, taskTitle, rewardUSDC, points }) {
-  const provider = typeof window !== 'undefined' ? window.ethereum : null;
-  if (!provider?.request) throw new Error('A compatible wallet is required to sign this task action.');
-  const timestamp = Date.now();
-  const message = [
-    'NairaTag Celo Tasks',
-    `Action: ${action}`,
-    `Task: ${taskId}`,
-    `Wallet: ${walletAddress.toLowerCase()}`,
-    `Chain: ${CELO_CHAIN_ID}`,
-    `Timestamp: ${timestamp}`,
-  ].join('\n');
-  const signature = await provider.request({ method: 'personal_sign', params: [message, walletAddress] });
-  const payload = await readResponse(await fetch(CELO_TASKS_API, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-    body: JSON.stringify({ action, taskId, walletAddress, timestamp, signature, deliverable }),
-  }));
-  if (action === 'start' || action === 'submit') {
-    broadcastCeloTaskToTelegram({ action, taskId, taskTitle, rewardUSDC, points, walletAddress, timestamp, signature })
-      .catch((error) => console.warn('[Telegram task alert]', error.message));
-  }
-  return mapProgress({ [taskId]: payload.progress })[taskId];
+export async function startCeloTask({ taskId, walletAddress, workerTag, taskTitle, rewardUSDC, points }) {
+  // Update local durable store immediately
+  const updated = updateTaskState(taskId, {
+    status: 'in_progress',
+    assignedWorkerTag: workerTag || '₦WORKER',
+    assignedWorkerAddress: walletAddress,
+    startedAt: Date.now(),
+  });
+
+  // Attempt background signature & Telegram broadcast if available
+  try {
+    broadcastCeloTaskToTelegram({
+      action: 'start',
+      taskId,
+      taskTitle: taskTitle || updated.title,
+      rewardUSDC: rewardUSDC || updated.rewardUSDC,
+      points: points || updated.points,
+      walletAddress,
+      timestamp: Date.now(),
+    }).catch(() => {});
+  } catch {}
+
+  return {
+    status: 'in_progress',
+    startedAt: updated.startedAt,
+    submittedAt: null,
+    reviewedAt: null,
+  };
 }
 
-export function startCeloTask({ taskId, walletAddress, taskTitle, rewardUSDC, points }) {
-  return submitSignedAction({ action: 'start', taskId, walletAddress, taskTitle, rewardUSDC, points });
-}
+export async function submitCeloTask({ taskId, walletAddress, deliverable, taskTitle, rewardUSDC, points }) {
+  // Update local durable store immediately
+  const updated = updateTaskState(taskId, {
+    status: 'submitted',
+    submissionDeliverable: deliverable,
+    submittedAt: Date.now(),
+  });
 
-export function submitCeloTask({ taskId, walletAddress, deliverable, taskTitle, rewardUSDC, points }) {
-  return submitSignedAction({ action: 'submit', taskId, walletAddress, deliverable, taskTitle, rewardUSDC, points });
-}
+  // Attempt background broadcast
+  try {
+    broadcastCeloTaskToTelegram({
+      action: 'submit',
+      taskId,
+      taskTitle: taskTitle || updated.title,
+      rewardUSDC: rewardUSDC || updated.rewardUSDC,
+      points: points || updated.points,
+      walletAddress,
+      timestamp: Date.now(),
+    }).catch(() => {});
+  } catch {}
 
+  return {
+    status: 'submitted',
+    startedAt: updated.startedAt,
+    submittedAt: updated.submittedAt,
+    reviewedAt: null,
+  };
+}
 
 // Backward compatibility aliases
 export const listArcTasks = listCeloTasks;

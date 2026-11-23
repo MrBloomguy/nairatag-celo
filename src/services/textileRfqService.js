@@ -53,21 +53,30 @@ export async function fetchTextile(endpoint, options = {}) {
   const cleanEndpoint = endpoint.replace(/^\//, '');
   const directUrl = `${TEXTILE_BASE_URL}/${cleanEndpoint}`;
   const isBrowser = typeof window !== 'undefined';
-  const proxyUrl = `/api/textile-proxy?path=${encodeURIComponent(cleanEndpoint)}`;
+  const proxyUrl = `/api/textile-proxy?endpoint=${encodeURIComponent(cleanEndpoint)}`;
 
   const primaryUrl = isBrowser ? proxyUrl : directUrl;
   const fallbackUrl = isBrowser ? directUrl : proxyUrl;
 
+  // Ensure options.headers has x-textile-endpoint
+  const requestOptions = {
+    ...options,
+    headers: {
+      ...(options.headers || {}),
+      'x-textile-endpoint': cleanEndpoint,
+    },
+  };
+
   try {
-    const res = await fetch(primaryUrl, options);
+    const res = await fetch(primaryUrl, requestOptions);
     if (!res.ok && isBrowser && res.status >= 500) {
-      return await fetch(fallbackUrl, options);
+      return await fetch(fallbackUrl, requestOptions);
     }
     return res;
   } catch (err) {
     if (isBrowser) {
       console.warn('[Textile primary fetch failed, attempting fallback]:', err.message);
-      return await fetch(fallbackUrl, options);
+      return await fetch(fallbackUrl, requestOptions);
     }
     throw err;
   }

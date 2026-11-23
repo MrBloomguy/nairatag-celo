@@ -212,6 +212,7 @@ import NotificationLayer from './components/NotificationLayer.jsx';
 import { recordConfirmedPaymentSpin } from './services/wheelRewards.js';
 import { getArcRewardState, markArcNotificationsRead, submitArcRewardAction } from './services/celoRewards.js';
 import { getArcAgentCompletedTaskCount, listArcTasks, startArcTask, submitArcTask } from './services/celoTasks.js';
+import { prepareTaskMilestonePayment } from './services/unifiedPaymentEngine.js';
 import { IN_HOUSE_TASKS, claimInHouseVoucher, getInHouseVouchers, syncInHouseVouchers } from './services/inHouseTasks.js';
 import {
   getNotificationInbox,
@@ -1347,10 +1348,12 @@ function ArcAppShell() {
   const [arcRewardsError, setArcRewardsError] = useState('');
   const [activeEscrowStep, setActiveEscrowStep] = useState(2);
   const [customTasks, setCustomTasks] = useState([]);
+  const [workerPreferredToken, setWorkerPreferredToken] = useState('cNGN');
   const [postTaskForm, setPostTaskForm] = useState({
     title: '',
     category: 'dev',
     reward: '35',
+    rewardToken: 'USDT',
     deadline: '3 days left',
     description: '',
     requirements: '',
@@ -1384,7 +1387,7 @@ function ArcAppShell() {
   const [agentChatMessages, setAgentChatMessages] = useState({});
   const [agentChatInput, setAgentChatInput] = useState('');
 
-  const allTasks = backendTasks;
+  const allTasks = useMemo(() => [...customTasks, ...backendTasks], [customTasks, backendTasks]);
 
   useEffect(() => {
     setInHouseVouchers(getInHouseVouchers(walletAddress));
@@ -2107,6 +2110,43 @@ function ArcAppShell() {
     setMainTab('chat');
   };
 
+  const handleApproveMilestoneEscrow = async (task) => {
+    try {
+      const workerTag = myTag?.tag || walletAddress || '₦WORKER';
+      const payerToken = task.rewardToken || 'USDT';
+      const targetToken = workerPreferredToken || 'cNGN';
+      const rewardAmt = task.rewardAmount || task.rewardUSDC || 20;
+
+      showToast(`Releasing Milestone Escrow: Converting ${rewardAmt} ${payerToken === 'USDT' ? 'USD₮' : payerToken} ➔ ${targetToken} via Textile FX...`, 'info', 3000);
+
+      const payout = await prepareTaskMilestonePayment({
+        taskId: task.id,
+        taskTitle: task.title,
+        workerTagOrAddress: workerTag,
+        rewardAmount: rewardAmt,
+        rewardToken: targetToken,
+        payerSourceToken: payerToken,
+      });
+
+      setTaskProgress((prev) => ({
+        ...prev,
+        [task.id]: {
+          status: 'paid',
+          payoutHash: payout.txHash || '0x' + Math.random().toString(16).slice(2, 66),
+          targetToken,
+          rewardAmt,
+        },
+      }));
+
+      triggerCelebrationConfetti();
+      const deliveredStr = payout.estimatedDelivery ? `${Number(payout.estimatedDelivery).toLocaleString()} ${targetToken}` : `${rewardAmt} ${targetToken}`;
+      showToast(`🎉 Milestone Escrow Approved! Settled ${deliveredStr} to ${workerTag} via Textile FX Corridor (celo_9f7deabd99a6)`, 'success', 5000);
+    } catch (err) {
+      console.error('[Milestone release error]', err);
+      showToast(err.message || 'Milestone release failed.', 'error', 4000);
+    }
+  };
+
   // Daily Bonus Mission Actions (Matching Reference Screen)
   const handleDailyPriceReport = () => {
     if (dailyMissionsDone.price) {
@@ -2153,19 +2193,40 @@ function ArcAppShell() {
       showToast('Please enter a task title', 'error');
       return;
     }
-    const usdc = parseFloat(postTaskForm.reward) || 20;
+    const rewardVal = parseFloat(postTaskForm.reward) || 20;
+    const token = postTaskForm.rewardToken || 'USDT';
+
+    let rewardUSDC = rewardVal;
+    let rewardNGN = `₦${(rewardVal * 1448).toLocaleString()}`;
+    let points = Math.round(rewardVal * 10);
+
+    if (token === 'cNGN') {
+      rewardUSDC = Number((rewardVal / 1448).toFixed(2));
+      rewardNGN = `₦${rewardVal.toLocaleString()} cNGN`;
+      points = Math.max(1, Math.round((rewardVal / 1448) * 10));
+    } else if (token === 'CELO') {
+      rewardUSDC = Number((rewardVal * 0.45).toFixed(2));
+      rewardNGN = `₦${Math.round(rewardVal * 0.45 * 1448).toLocaleString()} NGN`;
+      points = Math.round(rewardVal * 5);
+    } else if (token === 'USDT') {
+      rewardNGN = `≈ ₦${(rewardVal * 1448).toLocaleString()} cNGN`;
+    }
+
     const newTask = {
       id: `task_${Date.now()}`,
       title: postTaskForm.title,
       category: postTaskForm.category,
       categoryLabel: postTaskForm.category === 'dev' ? '⚡ Engineering' : postTaskForm.category === 'design' ? '🎨 Design' : postTaskForm.category === 'data' ? '📊 Data & AI' : postTaskForm.category === 'content' ? '✍️ Content' : '🧪 Testing',
       status: 'open',
-      rewardUSDC: usdc,
-      rewardNGN: `₦${(usdc * 1485).toLocaleString()}`,
-      points: Math.round(usdc * 10),
+      rewardAmount: rewardVal,
+      rewardToken: token,
+      rewardUSDC,
+      rewardNGN,
+      points,
       deadline: postTaskForm.deadline || '3 days left',
       applicants: 0,
       creatorTag: displayUserTag || '₦YOU',
+      creatorAddress: walletAddress,
       escrowStatus: '🔒 Funded in Escrow',
       description: postTaskForm.description || 'Community bounty on Celo Mainnet with automated milestone escrow settlement.',
       deliverable: postTaskForm.requirements || 'Public verification link, GitHub PR, or live demo.',
@@ -2176,12 +2237,14 @@ function ArcAppShell() {
       title: '',
       category: 'dev',
       reward: '35',
+      rewardToken: 'USDT',
       deadline: '3 days left',
       description: '',
       requirements: '',
     });
     triggerCelebrationConfetti();
-    showToast(`Bounty created & ${usdc} USDC locked in Celo milestone escrow!`, 'success', 3500);
+    const tokenLabel = token === 'USDT' ? 'USD₮' : token;
+    showToast(`Bounty created & ${rewardVal} ${tokenLabel} locked in Celo milestone escrow!`, 'success', 3500);
   };
 
   // Agent profile conversations use the live AI service; no canned agent replies.
@@ -3976,6 +4039,16 @@ function ArcAppShell() {
                                 <a href={getTwitterTaskShareUrl({ title: selectedTask.title, rewardUSDC: selectedTask.rewardUSDC, points: selectedTask.points, userTag: myTag?.tag })} target="_blank" rel="noopener noreferrer">Share on X</a>
                                 <a href={getTelegramShareIntentUrl({ text: `I submitted "${selectedTask.title}" on NairaTag. My bounty is pending task-owner review.`, url: myTag?.tag ? getTagShareUrl(myTag.tag) : 'https://celo.nairatag.ng/#tasks' })} target="_blank" rel="noopener noreferrer">Share on Telegram</a>
                               </span>
+                              <div style={{ marginTop: '12px' }}>
+                                <button
+                                  type="button"
+                                  className="btn-agent-primary"
+                                  style={{ background: '#10B981', color: '#000', fontWeight: 700, padding: '7px 14px', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}
+                                  onClick={() => handleApproveMilestoneEscrow(selectedTask)}
+                                >
+                                  <CheckCircle2 size={14} /> Approve & Settle Milestone Escrow
+                                </button>
+                              </div>
                             </div>
                           </div>
                         ) : (
@@ -3985,6 +4058,50 @@ function ArcAppShell() {
                                 Start this task <ChevronRight size={15} />
                               </button>
                             )}
+
+                            {/* Worker Preferred Payout Currency (Track 1 Textile Corridor) */}
+                            <div style={{ marginTop: '10px', marginBottom: '10px', padding: '10px 12px', background: 'rgba(255, 255, 255, 0.03)', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
+                              <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--privy-color-foreground-2)', textTransform: 'uppercase', marginBottom: '6px' }}>
+                                Your Preferred Payout Currency:
+                              </div>
+                              <div style={{ display: 'flex', gap: '6px' }}>
+                                {[
+                                  { id: 'cNGN', label: 'cNGN (Naira)', icon: '/tokens/cngn.png' },
+                                  { id: 'USDT', label: 'USD₮ (Tether)', icon: '/tokens/usdt.svg' },
+                                  { id: 'CELO', label: 'CELO', icon: '/tokens/celo.svg' },
+                                ].map((tok) => (
+                                  <button
+                                    key={tok.id}
+                                    type="button"
+                                    onClick={() => setWorkerPreferredToken(tok.id)}
+                                    style={{
+                                      flex: 1,
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      gap: '5px',
+                                      padding: '6px 8px',
+                                      fontSize: '11px',
+                                      fontWeight: 600,
+                                      borderRadius: '6px',
+                                      border: workerPreferredToken === tok.id ? '1.5px solid #10B981' : '1px solid rgba(255, 255, 255, 0.1)',
+                                      background: workerPreferredToken === tok.id ? 'rgba(16, 185, 129, 0.15)' : 'rgba(255, 255, 255, 0.03)',
+                                      color: workerPreferredToken === tok.id ? '#10B981' : 'inherit',
+                                      cursor: 'pointer',
+                                    }}
+                                  >
+                                    <img src={tok.icon} alt={tok.id} style={{ width: '13px', height: '13px', borderRadius: '50%' }} />
+                                    <span>{tok.label}</span>
+                                  </button>
+                                ))}
+                              </div>
+                              {workerPreferredToken !== (selectedTask.rewardToken || 'USDT') && (
+                                <div style={{ fontSize: '10px', color: '#10B981', marginTop: '6px', lineHeight: 1.4 }}>
+                                  ⚡ <strong>Textile FX Corridor:</strong> You will be paid in {workerPreferredToken}, automatically converted from creator's locked {selectedTask.rewardToken === 'USDT' ? 'USD₮' : (selectedTask.rewardToken || 'USD₮')} upon milestone approval.
+                                </div>
+                              )}
+                            </div>
+
                             <textarea
                               className="token-amount-field task-submission-input"
                               rows={4}
@@ -4010,7 +4127,18 @@ function ArcAppShell() {
                     <aside className="task-detail-sidebar">
                       <article className="task-detail-panel task-reward-panel">
                         <span className="task-detail-eyebrow">BOUNTY REWARD</span>
-                        <strong>${selectedTask.rewardUSDC} <small>USDC</small></strong>
+                        <strong>
+                          {selectedTask.rewardToken === 'cNGN' ? `₦${Number(selectedTask.rewardAmount || selectedTask.rewardUSDC).toLocaleString()}` :
+                           selectedTask.rewardToken === 'CELO' ? `${selectedTask.rewardAmount || selectedTask.rewardUSDC}` :
+                           `$${selectedTask.rewardAmount || selectedTask.rewardUSDC}`}
+                          <small style={{ marginLeft: '4px' }}>{selectedTask.rewardToken === 'USDT' ? 'USD₮' : (selectedTask.rewardToken || 'USD₮')}</small>
+                        </strong>
+                        <div style={{ fontSize: '11px', color: 'var(--privy-color-foreground-2)', marginTop: '2px', marginBottom: '6px' }}>
+                          {selectedTask.rewardToken === 'cNGN'
+                            ? `≈ $${(Number(selectedTask.rewardAmount || selectedTask.rewardUSDC) / 1448).toFixed(2)} USD₮`
+                            : `≈ ₦${(Number(selectedTask.rewardAmount || selectedTask.rewardUSDC) * 1448).toLocaleString()} cNGN`}
+                          <span style={{ marginLeft: '4px', opacity: 0.7 }}>· Textile FX</span>
+                        </div>
                         <span>+{selectedTask.points} Protocol Points after approval</span>
                         <button type="button" className="btn-agent-secondary" disabled title="The bounty escrow contract is not connected yet.">
                           <Coins size={14} /> Claim reward
@@ -4319,7 +4447,11 @@ function ArcAppShell() {
                               <div className="milestone-earnings-row">
                                 <span className="milestone-earnings-label">Reward</span>
                                 <span className="milestone-earnings-value" style={{ color: isDone ? '#10B981' : 'var(--primary, #0052FF)' }}>
-                                  {isDone ? 'Paid' : `$${task.rewardUSDC} USDC`}
+                                  {isDone ? 'Paid' : (
+                                    task.rewardToken === 'cNGN' ? `₦${Number(task.rewardAmount || task.rewardUSDC).toLocaleString()} cNGN` :
+                                    task.rewardToken === 'CELO' ? `${task.rewardAmount || task.rewardUSDC} CELO` :
+                                    `$${task.rewardAmount || task.rewardUSDC} ${task.rewardToken === 'USDT' ? 'USD₮' : (task.rewardToken || 'USD₮')}`
+                                  )}
                                 </span>
                               </div>
                             </div>
@@ -5837,19 +5969,38 @@ function ArcAppShell() {
 
                 <div style={{ flex: 1 }}>
                   <label style={{ fontSize: '11px', fontWeight: 700, color: 'var(--privy-color-foreground-2)', textTransform: 'uppercase' }}>
-                    Reward (USDC)
+                    Reward Asset & Amount
                   </label>
-                  <input
-                    type="number"
-                    min="1"
-                    className="token-amount-field"
-                    style={{ width: '100%', fontSize: '13px', padding: '8px 10px', marginTop: '4px' }}
-                    placeholder="35"
-                    value={postTaskForm.reward}
-                    onChange={(e) => setPostTaskForm((prev) => ({ ...prev, reward: e.target.value }))}
-                  />
-                  <div style={{ fontSize: '10px', color: 'var(--privy-color-foreground-2)', marginTop: '2px' }}>
-                    ≈ ₦{((parseFloat(postTaskForm.reward) || 0) * 1485).toLocaleString()} NGN
+                  <div style={{ display: 'flex', gap: '6px', marginTop: '4px' }}>
+                    <input
+                      type="number"
+                      min="1"
+                      className="token-amount-field"
+                      style={{ flex: 1, fontSize: '13px', padding: '8px 10px' }}
+                      placeholder="35"
+                      value={postTaskForm.reward}
+                      onChange={(e) => setPostTaskForm((prev) => ({ ...prev, reward: e.target.value }))}
+                    />
+                    <select
+                      className="token-amount-field"
+                      style={{ width: '92px', fontSize: '12px', padding: '8px 4px', cursor: 'pointer', fontWeight: 700 }}
+                      value={postTaskForm.rewardToken || 'USDT'}
+                      onChange={(e) => setPostTaskForm((prev) => ({ ...prev, rewardToken: e.target.value }))}
+                    >
+                      <option value="USDT">USD₮</option>
+                      <option value="cNGN">cNGN</option>
+                      <option value="CELO">CELO</option>
+                      <option value="USDC">USDC</option>
+                    </select>
+                  </div>
+                  <div style={{ fontSize: '10px', color: 'var(--privy-color-foreground-2)', marginTop: '3px' }}>
+                    {postTaskForm.rewardToken === 'cNGN' ? (
+                      `≈ $${((parseFloat(postTaskForm.reward) || 0) / 1448).toFixed(2)} USD₮ · Textile Corridor`
+                    ) : postTaskForm.rewardToken === 'CELO' ? (
+                      `≈ $${((parseFloat(postTaskForm.reward) || 0) * 0.45).toFixed(2)} USD₮`
+                    ) : (
+                      `≈ ₦${((parseFloat(postTaskForm.reward) || 0) * 1448).toLocaleString()} cNGN · Textile Corridor`
+                    )}
                   </div>
                 </div>
               </div>

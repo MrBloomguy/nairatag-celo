@@ -147,8 +147,8 @@ test('4. Availability Service: Slot Generation & Working Hours in UTC', () => {
     bufferMinutes: 0,
   });
 
-  // Monday: 2026-11-23
-  const slots = getAvailableSlots(service, '2026-11-23', []);
+  // Monday (future date so slots are not marked in past): 2026-11-30
+  const slots = getAvailableSlots(service, '2026-11-30', []);
   assert.ok(slots.length >= 3);
   assert.equal(slots[0].timeLabel, '10:00 UTC');
   assert.equal(slots[0].available, true);

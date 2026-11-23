@@ -4,7 +4,7 @@ import { usePrivy, useWallets } from '@privy-io/react-auth';
 import ProfileAvatar from './components/ProfileAvatar';
 import ChatActivityIndicator from './components/chat/ChatActivityIndicator';
 import PersonalAgentPanel from './components/chat/PersonalAgentPanel';
-import CorridorSwapCard from './components/CorridorSwapCard';
+import TagToTagSendCard from './components/TagToTagSendCard.jsx';
 import SelfAgentVerificationCard from './components/SelfAgentVerificationCard';
 import SelfAgentIdBadge, { SelfIcon } from './components/SelfAgentIdBadge.jsx';
 import ChatVerificationCard from './components/chat/ChatVerificationCard.jsx';
@@ -1480,7 +1480,6 @@ function ArcAppShell() {
     : null;
 
   // Pay / Send Terminal State
-  const [paySubMode, setPaySubMode] = useState('corridor'); // 'corridor' | 'direct'
   const [recipientInput, setRecipientInput] = useState('');
   const [amountInput, setAmountInput] = useState('10.00');
   const [memoInput, setMemoInput] = useState('');
@@ -3439,227 +3438,24 @@ function ArcAppShell() {
         )}
 
         {/* ───────────────────────────────────────────────────────────────────
-            TAB 1: PAY & RESOLVE TERMINAL (SWAP & DIRECT SEND)
+            TAB 1: TAG-TO-TAG SEND TERMINAL (POWERED BY TEXTILE FX CORRIDORS)
             ─────────────────────────────────────────────────────────────────── */}
         {mainTab === 'pay' && (
           <div className="terminal-layout-centered" style={{ maxWidth: '412px' }}>
-            {paySubMode === 'corridor' ? (
-              <CorridorSwapCard
-                walletAddress={walletAddress}
-                onConnectWallet={() => setIsConnectModalOpen(true)}
-                paySubMode={paySubMode}
-                onSelectSubMode={setPaySubMode}
-              />
-            ) : (
-              <div className="swap-widget-card">
-                {/* In-Box Sub-Mode Toggle */}
-                <div className="swap-widget-header">
-                  <div className="swap-widget-toggle">
-                    <button
-                      type="button"
-                      className={`swap-widget-toggle-btn ${paySubMode === 'corridor' ? 'active' : ''}`}
-                      onClick={() => setPaySubMode('corridor')}
-                    >
-                      <ArrowDownUp size={13} />
-                      <span>Swap</span>
-                    </button>
-                    <button
-                      type="button"
-                      className={`swap-widget-toggle-btn ${paySubMode === 'direct' ? 'active' : ''}`}
-                      onClick={() => setPaySubMode('direct')}
-                    >
-                      <Send size={13} />
-                      <span>Send to ₦Tag</span>
-                    </button>
-                  </div>
-
-                  <div className="swap-header-controls">
-                    <span className="swap-route-badge" style={{ fontSize: '10.5px' }}>
-                      <span className="swap-pulse-dot" style={{ background: '#3b82f6' }} />
-                      <span>Direct Pay</span>
-                    </span>
-                  </div>
-                </div>
-
-                {/* 1. Recipient ₦Tag Input Box */}
-                <div className="swap-card-box">
-                  <div className="swap-card-top-row">
-                    <span className="swap-card-label">To (₦Tag or Address)</span>
-                    <span style={{ fontSize: '10.5px', color: 'var(--privy-color-foreground-3)' }}>Instant Resolution</span>
-                  </div>
-                  <div className="swap-recipient-input-wrap" style={{ marginTop: '2px' }}>
-                    <span className="swap-recipient-tag-prefix">₦</span>
-                    <input
-                      type="text"
-                      className="swap-recipient-input"
-                      placeholder="SEGUN, FOOD, or 0x..."
-                      value={recipientInput.replace(/^[$₦]/, '')}
-                      onChange={(e) => setRecipientInput(e.target.value)}
-                    />
-                    {resolution.loading && <RefreshCw size={13} className="animate-spin" style={{ position: 'absolute', right: '10px' }} color="var(--privy-color-border-interactive)" />}
-                  </div>
-
-                  {/* Quick suggestions chips */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap', marginTop: '2px' }}>
-                    <span style={{ fontSize: '10px', color: 'var(--privy-color-foreground-3)' }}>Suggestions:</span>
-                    {['segun', 'alice', 'food', 'ride', 'pay'].map((tag) => (
-                      <button
-                        key={tag}
-                        type="button"
-                        className="swap-slippage-chip"
-                        style={{ padding: '2px 6px', fontSize: '10px' }}
-                        onClick={() => setRecipientInput(`₦${tag}`)}
-                      >
-                        ₦{tag}
-                      </button>
-                    ))}
-                  </div>
-
-                  {/* Resolved Recipient Card */}
-                  {resolution.data && resolution.data.resolvedAddress && (
-                    <div style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      padding: '8px 10px',
-                      borderRadius: '10px',
-                      background: 'rgba(16, 185, 129, 0.08)',
-                      border: '1px solid rgba(16, 185, 129, 0.25)',
-                      marginTop: '4px',
-                    }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <div style={{
-                          width: '26px',
-                          height: '26px',
-                          borderRadius: '50%',
-                          background: '#10b981',
-                          color: '#ffffff',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          fontWeight: 800,
-                          fontSize: '12px',
-                        }}>
-                          {resolution.data.tag ? resolution.data.tag.slice(1, 2) : '₦'}
-                        </div>
-                        <div>
-                          <div style={{ fontSize: '12px', fontWeight: 700, color: '#047857', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            <span>{resolution.data.tag || 'Verified Recipient'}</span>
-                            <span style={{ fontSize: '9px', background: '#059669', color: '#fff', padding: '1px 4px', borderRadius: '4px' }}>RESOLVED</span>
-                          </div>
-                          <div style={{ fontSize: '10.5px', color: 'var(--privy-color-foreground-3)', fontFamily: 'monospace' }}>
-                            {shorten(resolution.data.resolvedAddress)}
-                          </div>
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        className="swap-icon-btn"
-                        style={{ width: '26px', height: '26px' }}
-                        onClick={() => triggerCopy('resolved_copy', resolution.data.resolvedAddress)}
-                        title="Copy address"
-                      >
-                        <Copy size={12} />
-                      </button>
-                    </div>
-                  )}
-
-                  {resolution.error && (
-                    <div style={{ fontSize: '11px', color: 'var(--privy-color-error)', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '3px' }}>
-                      <AlertCircle size={12} />
-                      <span>{resolution.error}</span>
-                    </div>
-                  )}
-                </div>
-
-                {/* 2. Amount Input Box */}
-                <div className="swap-card-box">
-                  <div className="swap-card-top-row">
-                    <span className="swap-card-label">You Send</span>
-                    <div className="swap-balance-row">
-                      <span>Balance: {usdcBalance.formatted} CELO</span>
-                      <button
-                        type="button"
-                        className="swap-max-btn"
-                        onClick={() => setAmountInput(usdcBalance.formatted !== '0.00' ? usdcBalance.formatted : '1.0')}
-                      >
-                        MAX
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="swap-card-main-row">
-                    <input
-                      type="number"
-                      step="any"
-                      className="swap-number-input"
-                      placeholder="0.00"
-                      value={amountInput}
-                      onChange={(e) => setAmountInput(e.target.value)}
-                    />
-                    <div className="swap-token-pill" style={{ cursor: 'default' }}>
-                      <div className="swap-token-badge-icon" style={{ background: '#35D07F', color: '#042f2e', fontWeight: 800, fontSize: '12px' }}>
-                        C
-                      </div>
-                      <div className="swap-token-info-stack">
-                        <span className="swap-token-network">Celo</span>
-                        <span className="swap-token-symbol">CELO</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="swap-card-bottom-row" style={{ justifyContent: 'flex-end', marginTop: '2px' }}>
-                    <div style={{ display: 'flex', gap: '3px' }}>
-                      {['0.1', '0.5', '1.0'].map((val) => (
-                        <button
-                          key={val}
-                          type="button"
-                          className="swap-slippage-chip"
-                          style={{ padding: '1px 6px', fontSize: '10px' }}
-                          onClick={() => setAmountInput(val)}
-                        >
-                          {val}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                {/* 3. Optional Memo */}
-                <div style={{ padding: '2px 4px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <button
-                      type="button"
-                      style={{ background: 'none', border: 'none', color: '#059669', fontSize: '11px', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '3px', padding: 0 }}
-                      onClick={() => setShowMemoField(!showMemoField)}
-                    >
-                      <span>{showMemoField ? '− Hide Memo' : '+ Add Memo (Optional)'}</span>
-                    </button>
-                  </div>
-                  {showMemoField && (
-                    <input
-                      type="text"
-                      className="swap-recipient-input"
-                      style={{ marginTop: '4px', paddingLeft: '10px' }}
-                      placeholder="e.g. Lunch / Invoice #104"
-                      value={memoInput}
-                      onChange={(e) => setMemoInput(e.target.value)}
-                    />
-                  )}
-                </div>
-
-                {/* Action Button */}
-                <button
-                  type="button"
-                  className="swap-primary-action-btn"
-                  disabled={resolution.loading && !recipientInput.startsWith('0x')}
-                  onClick={handleInitiateSend}
-                >
-                  <Send size={15} />
-                  <span>Review & Send</span>
-                </button>
-              </div>
-            )}
+            <TagToTagSendCard
+              walletAddress={walletAddress}
+              onConnectWallet={() => setIsConnectModalOpen(true)}
+              initialRecipient={recipientInput}
+              onPaymentSuccess={(rcpt) => {
+                triggerCelebrationConfetti();
+                setCelebrationDetails({
+                  type: 'payment',
+                  txHash: rcpt.transferTxHash || rcpt.payoutTxHash || rcpt.swapTxHash,
+                  recipient: rcpt.recipientTag || rcpt.recipientAddress,
+                  amount: `${rcpt.amountDelivered || rcpt.amountSent} ${rcpt.tokenDelivered || rcpt.tokenSent}`,
+                });
+              }}
+            />
           </div>
         )}
 
@@ -4609,14 +4405,14 @@ function ArcAppShell() {
                     <span className="ref-action-title">Tasks</span>
                   </button>
 
-                  {/* Card 2: Swap */}
+                  {/* Card 2: Send to ₦Tag */}
                   <button
                     type="button"
                     className="ref-action-card card-swap"
-                    onClick={() => handleSendChatPrompt('I want to swap tokens')}
+                    onClick={() => setMainTab('pay')}
                   >
-                    <div className="ref-action-icon-circle icon-circle-swap"><ChevronsLeftRightIcon size={16} /></div>
-                    <span className="ref-action-title">Swap</span>
+                    <div className="ref-action-icon-circle icon-circle-swap"><Send size={16} /></div>
+                    <span className="ref-action-title">Send ₦Tag</span>
                   </button>
 
                   {/* Card 3: Ride */}

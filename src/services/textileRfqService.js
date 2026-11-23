@@ -13,6 +13,13 @@
  * Strict specifications from OpenAPI 3.1.0 (https://api.textilecredit.com/v2/openapi.json).
  */
 
+// Polyfill BigInt serialization for JSON.stringify across all RPC/wallet calls
+if (typeof BigInt !== 'undefined' && !('toJSON' in BigInt.prototype)) {
+  BigInt.prototype.toJSON = function () {
+    return this.toString();
+  };
+}
+
 import {
   parseUnits,
   formatUnits,

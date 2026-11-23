@@ -1,3 +1,10 @@
+// Global BigInt serialization polyfill for JSON.stringify across all RPC/wallet calls
+if (typeof BigInt !== 'undefined' && !('toJSON' in BigInt.prototype)) {
+  BigInt.prototype.toJSON = function () {
+    return this.toString();
+  };
+}
+
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { PrivyProvider } from '@privy-io/react-auth';

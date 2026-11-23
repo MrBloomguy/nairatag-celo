@@ -1,4 +1,11 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+
+// Polyfill BigInt serialization for JSON.stringify across all RPC/wallet calls
+if (typeof BigInt !== 'undefined' && !('toJSON' in BigInt.prototype)) {
+  BigInt.prototype.toJSON = function () {
+    return this.toString();
+  };
+}
 import {
   Send,
   ArrowDown,
@@ -185,6 +192,19 @@ export default function TagToTagSendCard({
     return sourceToken !== targetToken;
   }, [sourceToken, targetToken]);
 
+  // Dynamic Recipient Label for Received Card
+  const recipientReceivesLabel = useMemo(() => {
+    if (resolvedRecipient?.displayName) {
+      return `${resolvedRecipient.displayName} Receives`;
+    }
+    const clean = (recipientInput || '').trim().replace(/^[$@#]/, '');
+    if (clean) {
+      const formatted = clean.startsWith('₦') ? clean : `₦${clean.toUpperCase()}`;
+      return `${formatted} Receives`;
+    }
+    return 'Recipient Receives';
+  }, [resolvedRecipient, recipientInput]);
+
   // Active Sender Balance
   const activeSenderBalance = useMemo(() => {
     if (sourceToken === 'USD₮' || sourceToken === 'USDT') return balances.usdt;
@@ -368,12 +388,15 @@ export default function TagToTagSendCard({
             console.warn('[signTypedData] walletClient error, attempting direct RPC fallback:', signErr);
             if (provider && typeof provider.request === 'function') {
               try {
-                const payload = JSON.stringify({
-                  types: args.types,
-                  domain: args.domain,
-                  primaryType: args.primaryType,
-                  message: args.message,
-                });
+                const payload = JSON.stringify(
+                  {
+                    types: args.types,
+                    domain: args.domain,
+                    primaryType: args.primaryType,
+                    message: args.message,
+                  },
+                  (key, value) => (typeof value === 'bigint' ? value.toString() : value)
+                );
                 const directSig = await provider.request({
                   method: 'eth_signTypedData_v4',
                   params: [walletAddress, payload],
@@ -736,7 +759,7 @@ export default function TagToTagSendCard({
       {/* ── SECTION 3: RECIPIENT RECEIVES ── */}
       <div className="swap-card-box">
         <div className="swap-card-top-row">
-          <span className="swap-card-label">Recipient Receives</span>
+          <span className="swap-card-label">{recipientReceivesLabel}</span>
           {firmQuote && quoteSecondsLeft !== null && (
             <div className={`swap-countdown-pill ${quoteSecondsLeft <= 10 ? 'urgent' : ''}`} style={{ fontSize: '10px', padding: '1px 6px' }}>
               <Clock size={9} />

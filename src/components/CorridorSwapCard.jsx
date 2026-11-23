@@ -1,4 +1,11 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+
+// Polyfill BigInt serialization for JSON.stringify across all RPC/wallet calls
+if (typeof BigInt !== 'undefined' && !('toJSON' in BigInt.prototype)) {
+  BigInt.prototype.toJSON = function () {
+    return this.toString();
+  };
+}
 import {
   ArrowDown,
   ArrowDownUp,
@@ -347,12 +354,15 @@ export default function CorridorSwapCard({
             console.warn('[signTypedData] walletClient error, attempting direct RPC fallback:', signErr);
             if (provider && typeof provider.request === 'function') {
               try {
-                const payload = JSON.stringify({
-                  types: args.types,
-                  domain: args.domain,
-                  primaryType: args.primaryType,
-                  message: args.message,
-                });
+                const payload = JSON.stringify(
+                  {
+                    types: args.types,
+                    domain: args.domain,
+                    primaryType: args.primaryType,
+                    message: args.message,
+                  },
+                  (key, value) => (typeof value === 'bigint' ? value.toString() : value)
+                );
                 const directSig = await provider.request({
                   method: 'eth_signTypedData_v4',
                   params: [walletAddress, payload],

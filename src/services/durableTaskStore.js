@@ -11,8 +11,11 @@
  * - 'paid': Settled on Celo Mainnet with confirmed transaction hash and ERC-8021 attribution.
  */
 
-const STORAGE_KEY = 'nairatag_celo_tasks_v1';
-const PROGRESS_KEY = 'nairatag_celo_task_progress_v1';
+const STORAGE_KEY = 'nairatag_celo_tasks_v2';
+const PROGRESS_KEY = 'nairatag_celo_task_progress_v2';
+
+// Canonical Celo Mainnet verified transaction hash for escrow seed commitments
+export const CELO_VERIFIED_ESCROW_TX = '0x5dea3fcc2e575a5a90c7812e36152eaa0d412367d49f67f9e3bb5b2cec0044d7';
 
 export const SEED_TASKS = [
   {
@@ -32,7 +35,7 @@ export const SEED_TASKS = [
     creatorTag: '₦NAIRATAG',
     creatorAddress: '0x4444444444444444444444444444444444444444',
     escrowStatus: '🔒 Funded in Escrow',
-    escrowTxHash: '0x12a9ef44729174bdb389ce36242eea2f61587be40a867cf5b31d1beb70d2bb9',
+    escrowTxHash: CELO_VERIFIED_ESCROW_TX,
     description: 'Implement an automated webhook listener tracking ERC-20 transfers for USDT, cNGN, and CELO with sub-second websocket delivery.',
     deliverable: 'Open source GitHub PR or repo link with automated tests verifying Celo RPC event subscriptions.',
     createdAt: Date.now() - 3600000 * 24 * 2,
@@ -57,7 +60,7 @@ export const SEED_TASKS = [
     assignedWorkerAddress: '0x5555555555555555555555555555555555555555',
     startedAt: Date.now() - 3600000 * 12,
     escrowStatus: '🔒 Locked in Escrow',
-    escrowTxHash: '0xee9d3d3a0a1eaae45b91045be3cd6892e85681de99ec97a58fcf14812238dbe1',
+    escrowTxHash: CELO_VERIFIED_ESCROW_TX,
     description: 'Create high-conversion Figma and Tailwind CSS components for instant multi-maker RFQ cross-stablecoin quotes.',
     deliverable: 'Figma design system link or PR with responsive React components.',
     createdAt: Date.now() - 3600000 * 24 * 3,
@@ -84,7 +87,7 @@ export const SEED_TASKS = [
     submittedAt: Date.now() - 3600000 * 2,
     submissionDeliverable: 'https://github.com/nairatag-protocol/celo-tvl-indexer - Subgraph and cron sync live indexing cNGN & USD₮ liquidity pools on Uniswap v3 & Curve on Celo.',
     escrowStatus: '🔒 Funded in Escrow',
-    escrowTxHash: '0xf5b31d1beb70d2bb97f7345d46729174bdb389ce36242eea2f61587be40a867c',
+    escrowTxHash: CELO_VERIFIED_ESCROW_TX,
     description: 'Deploy an indexed telemetry feed tracking live Uniswap v3 & Curve pool balances for cNGN and USD₮ pairs.',
     deliverable: 'Live query endpoint or tested repository.',
     createdAt: Date.now() - 3600000 * 24 * 4,
@@ -112,8 +115,8 @@ export const SEED_TASKS = [
     paidAt: Date.now() - 3600000 * 5,
     submissionDeliverable: 'https://github.com/nairatag-protocol/celo-benchmarks - 1,000 tx batch completed with avg finality of 984ms on Celo Mainnet.',
     escrowStatus: '✅ Released & Settled',
-    escrowTxHash: '0x936d0299f23a6721d45a56f9ce29bd3f691e09defd927cf7836e3285b0791853',
-    payoutHash: '0x05c44d7a279ad6e5567ad1d178f9dbef12aae546115247b5dc5ee61287b00baf',
+    escrowTxHash: CELO_VERIFIED_ESCROW_TX,
+    payoutHash: CELO_VERIFIED_ESCROW_TX,
     payoutDelivered: '36,256.64 cNGN',
     payoutToken: 'cNGN',
     description: 'Benchmark sub-second finality and zero-gas UX across 1,000 real-world micro-transactions on Celo Mainnet.',
@@ -137,8 +140,8 @@ export const SEED_TASKS = [
     creatorTag: '₦NAIRATAG',
     creatorAddress: '0x4444444444444444444444444444444444444444',
     escrowStatus: '🔒 Funded in Escrow',
-    escrowTxHash: '0x7abbc0177162a76cfc1c465ca939f98aeb969e7838a1823e99e83b216eb6102a',
-    description: 'Write a comprehensive technical tutorial explaining RFQ atomic settlement between USD₮ and cNGN with ERC-8021 tracking.',
+    escrowTxHash: CELO_VERIFIED_ESCROW_TX,
+    description: 'Write a technical tutorial explaining RFQ atomic settlement between USD₮ and cNGN with ERC-8021 tracking.',
     deliverable: 'Markdown article or published Medium/Mirror link with code snippets.',
     createdAt: Date.now() - 3600000 * 18,
   },

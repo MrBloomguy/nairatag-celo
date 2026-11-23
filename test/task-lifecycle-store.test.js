@@ -6,9 +6,15 @@ import {
   updateTaskState,
   getTaskById,
   resetDurableTasks,
-  SEED_TASKS
+  SEED_TASKS,
+  CELO_VERIFIED_ESCROW_TX,
 } from '../src/services/durableTaskStore.js';
 import { listCeloTasks, startCeloTask, submitCeloTask } from '../src/services/celoTasks.js';
+import {
+  getTaskChatMessages,
+  sendTaskChatMessage,
+  generateAgentTaskReply,
+} from '../src/services/taskChatService.js';
 
 test('Durable Task Store & Lifecycle Suite', async (t) => {
   // Reset clean state before tests
@@ -146,5 +152,54 @@ test('Durable Task Store & Lifecycle Suite', async (t) => {
     assert.ok(tasks.length >= 4);
     assert.ok(progress['celo_task_1']);
     assert.equal(progress['celo_task_1'].status, 'paid');
+  });
+
+  await t.test('7. Validates Celo Mainnet verified escrow deposit hash on seed tasks', () => {
+    const tasks = getDurableTasks();
+    assert.ok(tasks.length > 0);
+    tasks.forEach((t) => {
+      if (t.escrowTxHash) {
+        assert.match(t.escrowTxHash, /^0x[0-9a-fA-F]{64}$/, 'Escrow tx hash must be a valid 64-char EVM hex hash');
+      }
+    });
+    assert.equal(CELO_VERIFIED_ESCROW_TX, '0x5dea3fcc2e575a5a90c7812e36152eaa0d412367d49f67f9e3bb5b2cec0044d7');
+  });
+
+  await t.test('8. Initializes in-place task workspace chat with chronological milestone logs', () => {
+    const task = getTaskById('celo_task_1');
+    const messages = getTaskChatMessages(task.id, task);
+    assert.ok(Array.isArray(messages));
+    assert.ok(messages.length >= 1, 'Should contain at least the initial Escrow Funded log');
+
+    const escrowEvent = messages.find((m) => m.senderTag === 'ESCROW');
+    assert.ok(escrowEvent, 'Must contain escrow lock milestone event');
+    assert.ok(escrowEvent.text.includes('Milestone Escrow Funded'));
+  });
+
+  await t.test('9. Sends in-place project workspace message and appends to chat stream', async () => {
+    const task = getTaskById('celo_task_1');
+    const res = await sendTaskChatMessage(task.id, {
+      sender: '0x653f773C9062e71A6554b42a9525fcD47fCC1693',
+      senderTag: '₦SEGUN',
+      text: 'Deliverable has been completed and verified with test suite passing.',
+      isAgent: false,
+    }, task);
+
+    assert.ok(res);
+    assert.ok(res.message);
+    assert.equal(res.message.senderTag, '₦SEGUN');
+    assert.ok(res.allMessages.length >= 2);
+  });
+
+  await t.test('10. Generates contextual intelligent agent replies for task milestones', () => {
+    const task = getTaskById('celo_task_1');
+    const reply1 = generateAgentTaskReply(task, 'I have completed and submitted the PR');
+    assert.ok(reply1.includes('deliverable') || reply1.includes('review'));
+
+    const reply2 = generateAgentTaskReply(task, 'Is the escrow locked safely on Celo?');
+    assert.ok(reply2.includes('Milestone Escrow') || reply2.includes('Celo Mainnet'));
+
+    const reply3 = generateAgentTaskReply(task, 'What are the requirements?');
+    assert.ok(reply3.includes(task.title) || reply3.includes('deliverable'));
   });
 });

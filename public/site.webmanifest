@@ -1,7 +1,7 @@
 {
-  "name": "NairaTag • Send USDC on Arc",
+  "name": "NairaTag • Agent Identity",
   "short_name": "NairaTag",
-  "description": "Send USDC on Arc to a name, not an address.",
+  "description": "Human-readable identity and agent discovery.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0A0B0E",

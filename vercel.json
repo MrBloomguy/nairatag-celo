@@ -1,26 +1,22 @@
 {
   "buildCommand": "npm run vercel-build",
   "outputDirectory": "dist",
-  "rewrites": [
+  "routes": [
     {
-      "source": "/agent/:handle",
-      "destination": "/api/agent?handle=:handle"
+      "src": "^/agent/([^/]+)$",
+      "dest": "/api/agent?handle=$1"
     },
     {
-      "source": "/tag/:handle",
-      "destination": "/api/tag?handle=:handle"
+      "src": "^/tag/([^/]+)$",
+      "dest": "/api/tag?handle=$1"
     },
     {
-      "source": "/cards/:handle",
-      "destination": "/api/cards?handle=:handle"
+      "src": "^/cards/([^/]+)$",
+      "dest": "/api/cards?handle=$1"
     },
     {
-      "source": "/api/:path*",
-      "destination": "/api/:path*"
-    },
-    {
-      "source": "/(.*)",
-      "destination": "/index.html"
+      "src": "^/(?!api(?:/|$)|assets(?:/|$))(?!.*\\.[^/]+$)(.*)$",
+      "dest": "/index.html"
     }
   ]
 }

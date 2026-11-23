@@ -21,6 +21,7 @@ import { resolveTagProfile, generateAvatarSvg } from '../services/tagAvatar.js';
 import { resolveTag } from '../services/nairatagResolver.js';
 import { CELO_NAIRATAG_RESOLVER_ADDRESS as ARC_NAIRATAG_RESOLVER_ADDRESS, CELO_MAINNET_CONFIG as ARC_TESTNET_CONFIG } from '../config/celo.js';
 import SelfAgentIdBadge from './SelfAgentIdBadge.jsx';
+import { IS_CONCORDIUM_SITE, CONCORDIUM_SITE } from '../config/siteMode.js';
 import confetti from 'canvas-confetti';
 
 export default function PublicProfilePage({ rawHandle, type = 'agent' }) {
@@ -33,6 +34,8 @@ export default function PublicProfilePage({ rawHandle, type = 'agent' }) {
   const [copied, setCopied] = useState(false);
   const [resolvedAddress, setResolvedAddress] = useState(null);
   const [agentMetadata, setAgentMetadata] = useState(null);
+  const [concordiumCard, setConcordiumCard] = useState(null);
+  const [concordiumCardAvailable, setConcordiumCardAvailable] = useState(false);
   const [loading, setLoading] = useState(true);
   const [isPayModalOpen, setIsPayModalOpen] = useState(false);
   const [payAmount, setPayAmount] = useState('25');
@@ -55,6 +58,22 @@ export default function PublicProfilePage({ rawHandle, type = 'agent' }) {
     let isMounted = true;
     async function loadIdentity() {
       setLoading(true);
+      if (IS_CONCORDIUM_SITE) {
+        try {
+          const response = await fetch(CONCORDIUM_SITE.cardPath(cleanTag), { cache: 'no-store', headers: { Accept: 'application/json' } });
+          if (!response.ok) return;
+          const card = await response.json();
+          if (!isMounted || !card || typeof card !== 'object') return;
+          setConcordiumCard(card);
+          setConcordiumCardAvailable(true);
+          setAgentMetadata(card);
+        } catch (error) {
+          console.warn('Could not load the Concordium Agent Card:', error);
+        } finally {
+          if (isMounted) setLoading(false);
+        }
+        return;
+      }
       try {
         const res = await resolveTag(cleanTag);
         if (isMounted && res) {
@@ -348,7 +367,7 @@ export default function PublicProfilePage({ rawHandle, type = 'agent' }) {
                 opacity: 0.75,
                 marginTop: '4px'
               }}>
-                Sovereign Onchain Identity
+                {IS_CONCORDIUM_SITE ? 'Concordium Testnet Agent Card' : 'Sovereign Onchain Identity'}
               </div>
             </div>
 
@@ -362,7 +381,7 @@ export default function PublicProfilePage({ rawHandle, type = 'agent' }) {
               justifyContent: 'center',
               color: '#ffffff'
             }}>
-              <Check size={18} strokeWidth={3} />
+              {IS_CONCORDIUM_SITE ? <ShieldCheck size={18} strokeWidth={2.5} /> : <Check size={18} strokeWidth={3} />}
             </div>
           </div>
         </div>
@@ -388,7 +407,7 @@ export default function PublicProfilePage({ rawHandle, type = 'agent' }) {
             fontWeight: 600
           }}>
             <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#10b981' }} />
-            <span>Verified Sovereign Agent • ERC-8004</span>
+            <span>{IS_CONCORDIUM_SITE ? `Concordium Testnet Agent Card · ${concordiumCardAvailable ? 'Published' : 'Not published'}` : 'Verified Sovereign Agent • ERC-8004'}</span>
           </div>
 
           <h1 style={{
@@ -401,7 +420,7 @@ export default function PublicProfilePage({ rawHandle, type = 'agent' }) {
             gap: '10px'
           }}>
             <span>{displayTag}</span>
-            <span style={{
+            {!IS_CONCORDIUM_SITE && <span style={{
               display: 'inline-flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -411,7 +430,7 @@ export default function PublicProfilePage({ rawHandle, type = 'agent' }) {
               backgroundColor: '#3b82f6',
               color: '#ffffff',
               fontSize: '14px'
-            }}>✓</span>
+            }}>✓</span>}
           </h1>
 
           <p style={{
@@ -420,7 +439,9 @@ export default function PublicProfilePage({ rawHandle, type = 'agent' }) {
             lineHeight: 1.5,
             margin: 0
           }}>
-            {agentMetadata?.description || `Autonomous sovereign agent on Celo Mainnet. Sub-second cNGN & USD₮ settlement, multi-tool AI capabilities, and verified reputation.`}
+            {IS_CONCORDIUM_SITE
+              ? (concordiumCard?.description || 'NairaTag agent identity with a Concordium Testnet registry link and public Agent Card.')
+              : (agentMetadata?.description || 'Autonomous sovereign agent on Celo Mainnet. Sub-second cNGN & USD₮ settlement, multi-tool AI capabilities, and verified reputation.')}
           </p>
         </div>
 
@@ -457,7 +478,13 @@ export default function PublicProfilePage({ rawHandle, type = 'agent' }) {
             <span>Chat with Agent</span>
           </button>
 
-          <button
+          {IS_CONCORDIUM_SITE && concordiumCardAvailable && (
+            <a href={CONCORDIUM_SITE.cardPath(cleanTag)} target="_blank" rel="noopener noreferrer" style={{ flex: '1 1 180px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '14px 24px', borderRadius: '16px', background: theme === 'dark' ? '#181b26' : '#ffffff', color: 'inherit', fontWeight: 700, fontSize: '15px', border: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.12)'}`, textDecoration: 'none' }}>
+              <ExternalLink size={18} /><span>Open Agent Card</span>
+            </a>
+          )}
+
+          {!IS_CONCORDIUM_SITE && <button
             onClick={() => setIsPayModalOpen(true)}
             style={{
               flex: '1 1 180px',
@@ -478,9 +505,9 @@ export default function PublicProfilePage({ rawHandle, type = 'agent' }) {
           >
             <Send size={18} />
             <span>Send Crypto</span>
-          </button>
+          </button>}
 
-          <button
+          {!IS_CONCORDIUM_SITE && <button
             onClick={copyAddress}
             style={{
               display: 'flex',
@@ -499,9 +526,9 @@ export default function PublicProfilePage({ rawHandle, type = 'agent' }) {
           >
             {copied ? <Check size={16} color="#10b981" /> : <Copy size={16} />}
             <span>{copied ? 'Address Copied!' : 'Copy 0x'}</span>
-          </button>
+          </button>}
 
-          <button
+          {!IS_CONCORDIUM_SITE && <button
             onClick={copyLink}
             style={{
               display: 'flex',
@@ -520,7 +547,7 @@ export default function PublicProfilePage({ rawHandle, type = 'agent' }) {
           >
             <Share2 size={16} />
             <span>Share</span>
-          </button>
+          </button>}
         </div>
 
         {/* Share Channel Quick Bar */}
@@ -562,7 +589,7 @@ export default function PublicProfilePage({ rawHandle, type = 'agent' }) {
         }}>
           <h2 style={{ fontSize: '16px', fontWeight: 700, margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
             <ShieldCheck size={18} color="#10b981" />
-            <span>Onchain Resolver & Rails</span>
+            <span>{IS_CONCORDIUM_SITE ? 'Concordium Agent Identity' : 'Onchain Resolver & Rails'}</span>
           </h2>
 
           <div style={{
@@ -576,10 +603,10 @@ export default function PublicProfilePage({ rawHandle, type = 'agent' }) {
               borderRadius: '14px',
               border: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)'}`
             }}>
-              <div style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', fontWeight: 700 }}>Network Rail</div>
+              <div style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', fontWeight: 700 }}>{IS_CONCORDIUM_SITE ? 'Registry Network' : 'Network Rail'}</div>
               <div style={{ fontSize: '14px', fontWeight: 700, marginTop: '2px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#6366f1' }} />
-                <span>Celo Mainnet (42220)</span>
+                <span>{IS_CONCORDIUM_SITE ? 'Concordium Testnet' : 'Celo Mainnet (42220)'}</span>
               </div>
             </div>
 
@@ -589,9 +616,9 @@ export default function PublicProfilePage({ rawHandle, type = 'agent' }) {
               borderRadius: '14px',
               border: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)'}`
             }}>
-              <div style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', fontWeight: 700 }}>ERC-8004 Score</div>
+              <div style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', fontWeight: 700 }}>{IS_CONCORDIUM_SITE ? 'Agent Card Status' : 'ERC-8004 Score'}</div>
               <div style={{ fontSize: '14px', fontWeight: 700, marginTop: '2px', color: '#10b981' }}>
-                99% Reputation (Verified)
+                {IS_CONCORDIUM_SITE ? (loading ? 'Checking…' : concordiumCardAvailable ? 'Published' : 'Not published') : '99% Reputation (Verified)'}
               </div>
             </div>
 
@@ -602,7 +629,7 @@ export default function PublicProfilePage({ rawHandle, type = 'agent' }) {
               border: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)'}`,
               gridColumn: '1 / -1'
             }}>
-              <div style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', fontWeight: 700 }}>Resolved Address</div>
+              <div style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', fontWeight: 700 }}>{IS_CONCORDIUM_SITE ? 'Public Agent Card' : 'Resolved Address'}</div>
               <div style={{
                 fontFamily: 'monospace',
                 fontSize: '13px',
@@ -610,14 +637,16 @@ export default function PublicProfilePage({ rawHandle, type = 'agent' }) {
                 wordBreak: 'break-all',
                 color: theme === 'dark' ? '#cbd5e1' : '#334155'
               }}>
-                {resolvedAddress || '0x71C8A9b284D7207452d308BE307e5f309a7291A2'}
+                {IS_CONCORDIUM_SITE
+                  ? (concordiumCardAvailable ? <a href={CONCORDIUM_SITE.cardPath(cleanTag)} target="_blank" rel="noopener noreferrer" style={{ color: 'inherit' }}>{window.location.origin}{CONCORDIUM_SITE.cardPath(cleanTag)}</a> : 'No Agent Card is published for this NairaTag.')
+                  : (resolvedAddress || '0x71C8A9b284D7207452d308BE307e5f309a7291A2')}
               </div>
             </div>
           </div>
         </div>
 
         {/* Sleek Minimal Verification Strip */}
-        {type === 'agent' && (
+        {type === 'agent' && !IS_CONCORDIUM_SITE && (
           <div style={{
             width: '100%',
             maxWidth: '580px',
@@ -644,6 +673,16 @@ export default function PublicProfilePage({ rawHandle, type = 'agent' }) {
               <span>CeloScan Registry</span>
               <ExternalLink size={11} />
             </a>
+          </div>
+        )}
+
+        {type === 'agent' && IS_CONCORDIUM_SITE && (
+          <div style={{ width: '100%', maxWidth: '580px', backgroundColor: theme === 'dark' ? '#12141e' : '#ffffff', borderRadius: '16px', border: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}`, padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <ShieldCheck size={16} color="#059669" />
+              <span style={{ fontSize: '12px', color: theme === 'dark' ? '#94a3b8' : '#64748b' }}>Concordium Testnet Agent Card</span>
+            </div>
+            {concordiumCardAvailable && <a href={CONCORDIUM_SITE.cardPath(cleanTag)} target="_blank" rel="noopener noreferrer" style={{ color: '#059669', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', fontWeight: 600 }}>View card <ExternalLink size={11} /></a>}
           </div>
         )}
 
@@ -690,7 +729,7 @@ export default function PublicProfilePage({ rawHandle, type = 'agent' }) {
       </main>
 
       {/* Pay Modal */}
-      {isPayModalOpen && (
+      {!IS_CONCORDIUM_SITE && isPayModalOpen && (
         <div style={{
           position: 'fixed',
           inset: 0,

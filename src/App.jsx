@@ -7,6 +7,7 @@ import PersonalAgentPanel from './components/chat/PersonalAgentPanel';
 import TagToTagSendCard from './components/TagToTagSendCard.jsx';
 import SelfAgentVerificationCard from './components/SelfAgentVerificationCard';
 import SelfAgentIdBadge, { SelfIcon } from './components/SelfAgentIdBadge.jsx';
+import ConcordiumAgentIdentityPanel from './components/ConcordiumAgentIdentityPanel.jsx';
 import ChatVerificationCard from './components/chat/ChatVerificationCard.jsx';
 import AgentVaultCard from './components/AgentVaultCard';
 import BookingMarketplace from './components/bookings/BookingMarketplace.jsx';
@@ -219,6 +220,8 @@ import PublicProfilePage from './components/PublicProfilePage.jsx';
 import confetti from 'canvas-confetti';
 import RewardsPage, { GoldenVoucherModal, LuckyWheelModal, ReferralModal } from './RewardsPage.jsx';
 import NotificationLayer from './components/NotificationLayer.jsx';
+import { IS_CONCORDIUM_SITE, CONCORDIUM_SITE, activeSiteNetworkLabel } from './config/siteMode.js';
+import { CONCORDIUM_TESTNET } from './services/concordiumAgentRegistry.js';
 import { recordConfirmedPaymentSpin } from './services/wheelRewards.js';
 import { getArcRewardState, markArcNotificationsRead, submitArcRewardAction } from './services/celoRewards.js';
 import { getArcAgentCompletedTaskCount, listArcTasks, startArcTask, submitArcTask } from './services/celoTasks.js';
@@ -361,10 +364,7 @@ function renderChatText(text) {
   });
 }
 
-/**
- * Protocol Knowledge Base & FAQ Items for Celo Mainnet (Concise & Punchy)
- */
-export const FAQ_ITEMS = [
+const CELO_FAQ_ITEMS = [
   {
     id: 1,
     category: 'celo',
@@ -465,6 +465,21 @@ export const FAQ_ITEMS = [
   }
 ];
 
+const CONCORDIUM_FAQ_ITEMS = [
+  { id: 1, category: 'identity', categoryLabel: 'NairaTag Identity', question: 'What is a NairaTag?', answer: ['A human-readable identity that helps people and agents find one another. The NairaTag account remains the source identity while its agent can publish a Concordium Testnet Agent Card.'] },
+  { id: 2, category: 'agents', categoryLabel: 'Agent Registry', question: 'What does the Concordium integration add?', answer: ['It lets an agent owner prepare and publish an Agent Card, associate the agent with a Concordium Testnet identity, and inspect its registry status. A published card is shown only after the service confirms it.'] },
+  { id: 3, category: 'agents', categoryLabel: 'Agent Registry', question: 'What is an Agent Card?', answer: ['An Agent Card describes an agent and provides a stable public URL for other services to discover it. NairaTag serves the card from its API and checks the exact published bytes against the card hash.'] },
+  { id: 4, category: 'identity', categoryLabel: 'Identity & Trust', question: 'Does a registry badge grant an agent permission to act?', answer: ['No. Identity and authority are separate. A registry identity or verification badge helps other services assess an agent; it does not grant unrestricted permissions or wallet access.'] },
+  { id: 5, category: 'identity', categoryLabel: 'Identity & Trust', question: 'How is a NairaTag owner linked to a Concordium agent?', answer: ['The owner connects a Concordium Testnet wallet and proves control of the linked NairaTag owner key. The proof links the identities; it does not authorize asset transfers.'] },
+  { id: 6, category: 'network', categoryLabel: 'Concordium Testnet', question: 'Which network does this integration use?', answer: ['The Concordium integration uses Concordium Testnet. Test CCD has no monetary value. The public explorer is CCDScan Testnet.'], links: [{ label: 'Open CCDScan Testnet', url: CONCORDIUM_SITE.explorerUrl }] },
+  { id: 7, category: 'payments', categoryLabel: 'Agent Payments', question: 'Are x402 payments and sponsored transactions live here?', answer: ['This interface currently focuses on agent identity, registry linking, and Agent Card publication. x402 payments and sponsored transactions require their own working end-to-end integration before they can be described as live.'] },
+  { id: 8, category: 'privacy', categoryLabel: 'Privacy & Accountability', question: 'What personal data is included in an Agent Card?', answer: ['The card describes the agent and its public registry references. Do not include private keys, wallet recovery phrases, or personal identity documents in the description.'] },
+  { id: 9, category: 'agents', categoryLabel: 'Agent Registry', question: 'Where can I inspect a published Agent Card?', answer: ['Open the public card URL from the agent profile. Registry and transaction details can be inspected on CCDScan Testnet.'], links: [{ label: 'Open CCDScan Testnet', url: CONCORDIUM_SITE.explorerUrl }] },
+  { id: 10, category: 'production', categoryLabel: 'Path to Production', question: 'What changes before mainnet launch?', answer: ['The testnet flow must be exercised end to end, integration status and owner-link checks must be monitored, and a production deployment must use the verified Concordium mainnet registry and wallet configuration. Testnet records do not move to mainnet automatically.'] },
+];
+
+export const FAQ_ITEMS = IS_CONCORDIUM_SITE ? CONCORDIUM_FAQ_ITEMS : CELO_FAQ_ITEMS;
+
 // PlatformAgentAdminPage is imported from ./components/admin/PlatformAgentAdminPage.jsx
 
 function ArcAppShell() {
@@ -472,6 +487,22 @@ function ArcAppShell() {
   const { wallets: privyWallets } = useWallets();
   const privyWalletsRef = useRef(privyWallets);
   useEffect(() => { privyWalletsRef.current = privyWallets; }, [privyWallets]);
+  useEffect(() => {
+    if (!IS_CONCORDIUM_SITE) return;
+    document.title = 'NairaTag · Concordium Trusted Agents';
+    const description = document.querySelector('meta[name="description"]');
+    description?.setAttribute('content', 'NairaTag agent identity, Concordium Testnet registry linking, and public Agent Cards.');
+    const ogTitle = document.querySelector('meta[property="og:title"]');
+    ogTitle?.setAttribute('content', 'NairaTag · Concordium Trusted Agents');
+    const ogDescription = document.querySelector('meta[property="og:description"]');
+    ogDescription?.setAttribute('content', 'Link NairaTag agent identities to Concordium Testnet and publish discoverable Agent Cards.');
+    const ogUrl = document.querySelector('meta[property="og:url"]');
+    ogUrl?.setAttribute('content', 'https://concordium.nairatag.ng/');
+    document.querySelector('meta[name="twitter:title"]')?.setAttribute('content', 'NairaTag · Concordium Trusted Agents');
+    document.querySelector('meta[name="twitter:description"]')?.setAttribute('content', 'NairaTag agent identity and discoverable Concordium Testnet Agent Cards.');
+    document.querySelector('meta[property="og:image"]')?.setAttribute('content', 'https://concordium.nairatag.ng/nairatag-logo.png');
+    document.querySelector('meta[name="twitter:image"]')?.setAttribute('content', 'https://concordium.nairatag.ng/nairatag-logo.png');
+  }, []);
 
   // Theme State: 'light' | 'dark'
   const [theme, setTheme] = useState(() => window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
@@ -963,7 +994,7 @@ function ArcAppShell() {
     if (!textToSend && !fileToSend) return;
     if (!walletAddress) {
       setIsConnectModalOpen(true);
-      showToast('Connect a Celo wallet to start a saved chat.', 'info');
+      showToast(IS_CONCORDIUM_SITE ? 'Sign in to save this chat.' : 'Connect a Celo wallet to start a saved chat.', 'info');
       return;
     }
 
@@ -1670,6 +1701,30 @@ function ArcAppShell() {
       profileType: 'shared-agent',
     });
   }, [agentDirectoryError, chatAgents]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const searchParams = new URLSearchParams(window.location.search);
+    const badgeParam = searchParams.get('badge');
+    if (badgeParam) {
+      setMainTabState('agents');
+      setSelectedAgentProfile({
+        id: 1470,
+        tag: 'NAIRATAG',
+        name: '₦NAIRATAG · Concordium Agent',
+        category: 'Concordium Testnet',
+        role: 'Concordium Testnet Agent #1470',
+        owner: '4WBJM9RyoYQiwtjB1YxdqJAF1SMVyUao7KjA6fMbQKAUKarpkk',
+        concordiumBadge: badgeParam,
+        concordium: {
+          badge: badgeParam,
+          tokenId: 1470,
+          description: 'NairaTag Agent #1470 on Concordium Testnet. Anchors the public Agent Card to the Concordium registry.',
+        },
+        profileType: 'concordium-agent',
+      });
+    }
+  }, []);
 
   useEffect(() => {
     if (!selectedAgentProfile || selectedAgentProfile.profileType === 'claimed-tag' || selectedAgentProfile.profileType === 'platform-agent' || selectedAgentProfile.profileType === 'shared-agent') {
@@ -2535,7 +2590,7 @@ function ArcAppShell() {
     if (!text) return;
     if (!walletAddress) {
       setIsConnectModalOpen(true);
-      showToast('Connect a Celo wallet to start a saved agent chat.', 'info');
+      showToast(IS_CONCORDIUM_SITE ? 'Sign in to start a saved agent chat.' : 'Connect a Celo wallet to start a saved agent chat.', 'info');
       return;
     }
     const currentMsgs = agentChatMessages[agentId] || [];
@@ -3147,7 +3202,7 @@ function ArcAppShell() {
         {/* Left Side: Brand Logo Badge + Mobile Hamburger Menu */}
         <div className="app-header-left">
           <div className="app-brand" onClick={() => setMainTab('chat')}>
-            <div className="brand-badge" title="NairaTag on Celo">
+            <div className="brand-badge" title={IS_CONCORDIUM_SITE ? 'NairaTag · Concordium Testnet' : 'NairaTag on Celo'}>
               <img src="/nairatag-logo.png" alt="NairaTag" className="brand-logo-img" />
             </div>
           </div>
@@ -3276,44 +3331,33 @@ function ArcAppShell() {
                     <span>FAQ</span>
                   </button>
 
-                  <a
-                    href={`https://celoscan.io/address/${ARC_NAIRATAG_REGISTRY_ADDRESS}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="more-menu-item"
-                    onClick={() => setIsMoreMenuOpen(false)}
-                  >
-                    <Tag size={15} />
-                    <span>NairaTag Registry ↗</span>
-                  </a>
-
-                  <a
-                    href={`https://celoscan.io/address/${ARC_NAIRATAG_RESOLVER_ADDRESS}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="more-menu-item"
-                    onClick={() => setIsMoreMenuOpen(false)}
-                  >
-                    <ExternalLink size={15} />
-                    <span>NairaTag Resolver ↗</span>
-                  </a>
-
-                  <a
-                    href="https://celoscan.io/address/0x8004A169FB4a3325136EB29fA0ceB6D2e539a432"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="more-menu-item"
-                    onClick={() => setIsMoreMenuOpen(false)}
-                  >
-                    <Bot size={15} />
-                    <span>CeloScan (ERC-8004 Registry) ↗</span>
-                  </a>
+                  {IS_CONCORDIUM_SITE ? (
+                    <a href={CONCORDIUM_TESTNET.explorer} target="_blank" rel="noopener noreferrer" className="more-menu-item" onClick={() => setIsMoreMenuOpen(false)}>
+                      <ExternalLink size={15} />
+                      <span>CCDScan Testnet ↗</span>
+                    </a>
+                  ) : (
+                    <>
+                      <a href={`https://celoscan.io/address/${ARC_NAIRATAG_REGISTRY_ADDRESS}`} target="_blank" rel="noopener noreferrer" className="more-menu-item" onClick={() => setIsMoreMenuOpen(false)}>
+                        <Tag size={15} />
+                        <span>NairaTag Registry ↗</span>
+                      </a>
+                      <a href={`https://celoscan.io/address/${ARC_NAIRATAG_RESOLVER_ADDRESS}`} target="_blank" rel="noopener noreferrer" className="more-menu-item" onClick={() => setIsMoreMenuOpen(false)}>
+                        <ExternalLink size={15} />
+                        <span>NairaTag Resolver ↗</span>
+                      </a>
+                      <a href="https://celoscan.io/address/0x8004A169FB4a3325136EB29fA0ceB6D2e539a432" target="_blank" rel="noopener noreferrer" className="more-menu-item" onClick={() => setIsMoreMenuOpen(false)}>
+                        <Bot size={15} />
+                        <span>CeloScan (ERC-8004 Registry) ↗</span>
+                      </a>
+                    </>
+                  )}
 
                   <div className="more-menu-divider" />
 
                   <div className="more-menu-meta">
                     <span className="more-menu-dot" />
-                    <span>Celo Mainnet (42220)</span>
+                    <span>{IS_CONCORDIUM_SITE ? 'Concordium integration · Testnet' : 'Celo Mainnet (42220)'}</span>
                   </div>
                 </div>
               </>
@@ -3441,7 +3485,7 @@ function ArcAppShell() {
                   <img src="/nairatag-logo.png" alt="NairaTag" className="brand-logo-img" />
                 </div>
                 <span style={{ fontSize: 15, fontWeight: 800, color: 'var(--privy-color-foreground)' }}>NairaTag</span>
-                <span className="card-net-pill" style={{ fontSize: 10 }}>Celo Mainnet</span>
+                <span className="card-net-pill" style={{ fontSize: 10 }}>{activeSiteNetworkLabel}</span>
               </div>
               <button
                 type="button"
@@ -3502,8 +3546,8 @@ function ArcAppShell() {
                   <Bot size={18} />
                 </div>
                 <div className="mobile-nav-text">
-                  <span className="mobile-nav-title">AI Agents 8004</span>
-                  <span className="mobile-nav-desc">Autonomous ERC-8004 reputation directory</span>
+                  <span className="mobile-nav-title">{IS_CONCORDIUM_SITE ? 'Agent directory' : 'AI Agents 8004'}</span>
+                  <span className="mobile-nav-desc">{IS_CONCORDIUM_SITE ? 'Discover NairaTag identities and Concordium Agent Cards' : 'Autonomous ERC-8004 reputation directory'}</span>
                 </div>
                 {mainTab === 'agents' && <span className="mobile-nav-active-pill">Active</span>}
               </button>
@@ -3521,7 +3565,7 @@ function ArcAppShell() {
                 </div>
                 <div className="mobile-nav-text">
                   <span className="mobile-nav-title">Pay</span>
-                  <span className="mobile-nav-desc">Send to ₦Tag, USD₮ ⇄ cNGN</span>
+                  <span className="mobile-nav-desc">{IS_CONCORDIUM_SITE ? 'Agent payment integration is not enabled' : 'Send to ₦Tag, USD₮ ⇄ cNGN'}</span>
                 </div>
                 {mainTab === 'pay' && <span className="mobile-nav-active-pill">Active</span>}
               </button>
@@ -3557,7 +3601,7 @@ function ArcAppShell() {
                 </div>
                 <div className="mobile-nav-text">
                   <span className="mobile-nav-title">Rewards &amp; Vouchers</span>
-                  <span className="mobile-nav-desc">Daily Points, USDC balance, cNGN updates &amp; referrals</span>
+                  <span className="mobile-nav-desc">{IS_CONCORDIUM_SITE ? 'Rewards are not enabled on this testnet build' : 'Daily Points, USDC balance, cNGN updates &amp; referrals'}</span>
                 </div>
               </button>
 
@@ -3603,7 +3647,7 @@ function ArcAppShell() {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: 'var(--privy-color-foreground-2)' }}>
                   <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#10B981' }} />
-                  <span>Celo Mainnet · 42220</span>
+                  <span>{IS_CONCORDIUM_SITE ? 'Concordium Testnet' : 'Celo Mainnet · 42220'}</span>
                 </div>
                 <button
                   type="button"
@@ -3743,7 +3787,7 @@ function ArcAppShell() {
               <div>
                 <span className="account-dashboard-eyebrow">ACCOUNT</span>
                 <h1>Profile dashboard</h1>
-                <p>Your NairaTag identity, Celo wallet, and rewards in one place.</p>
+              <p>{IS_CONCORDIUM_SITE ? 'Your NairaTag identity and agent profile in one place.' : 'Your NairaTag identity, Celo wallet, and rewards in one place.'}</p>
               </div>
               <button type="button" className="quick-chip-btn" onClick={() => setMainTab('chat')}><ArrowLeft size={14} /> Back to chat</button>
             </div>
@@ -3754,24 +3798,25 @@ function ArcAppShell() {
                   <ProfileAvatar tag={myTag?.tag} email={accountEmail} size={52} className="account-avatar" />
                   <div className="account-identity-copy">
                     <span>{authProvider === 'circle' ? 'Circle email account' : 'Connected wallet account'}</span>
-                    <h2>{displayAccountName || 'Your Celo account'}</h2>
-                    <p>{accountEmail || (myTag?.tag ? 'Your NairaTag is connected to your Celo wallet.' : 'Claim a NairaTag to create your readable payment identity.')}</p>
+                    <h2>{displayAccountName || (IS_CONCORDIUM_SITE ? 'Your NairaTag account' : 'Your Celo account')}</h2>
+                    <p>{accountEmail || (myTag?.tag ? (IS_CONCORDIUM_SITE ? 'Your NairaTag identity is ready to link to an agent profile.' : 'Your NairaTag is connected to your Celo wallet.') : 'Claim a NairaTag to create your readable payment identity.')}</p>
                   </div>
-                  <span className="account-network-pill"><span /> Celo Mainnet</span>
+                  <span className="account-network-pill"><span /> {activeSiteNetworkLabel}</span>
                 </article>
 
-                <div className="account-stats-grid">
+                {!IS_CONCORDIUM_SITE && <div className="account-stats-grid">
                   <article className="account-stat-card"><span>USDC balance</span><strong>{usdcBalance.formatted}</strong><small>≈ ₦{(parseFloat(usdcBalance.formatted || '0') * 1485).toLocaleString('en-NG', { maximumFractionDigits: 2 })} NGN</small></article>
                   <article className="account-stat-card"><span>Protocol Points</span><strong>{Number(userPoints || 0).toLocaleString()}</strong><small>Earned across NairaTag rewards</small></article>
-                </div>
+                </div>}
 
                 <article className="account-wallet-card">
-                  <div className="account-wallet-heading"><div><span className="account-dashboard-eyebrow">YOUR WALLET</span><h2>{authProvider === 'circle' ? 'Circle Programmable Wallet' : 'Browser wallet'}</h2></div><span className="account-network-pill"><span /> Connected</span></div>
+                  <div className="account-wallet-heading"><div><span className="account-dashboard-eyebrow">YOUR WALLET</span><h2>{IS_CONCORDIUM_SITE ? 'NairaTag owner wallet' : authProvider === 'circle' ? 'Circle Programmable Wallet' : 'Browser wallet'}</h2></div><span className="account-network-pill"><span /> Connected</span></div>
                   <div className="account-wallet-address"><span>{walletAddress}</span><button type="button" className="quick-chip-btn" onClick={() => triggerCopy('profile_wallet_copy', walletAddress)}><Copy size={13} />{copiedKey === 'profile_wallet_copy' ? 'Copied' : 'Copy'}</button></div>
                   <div className="account-dashboard-actions">
-                    <button type="button" className="btn-action-primary" onClick={() => setMainTab('pay')}><Send size={15} /> Send USDC</button>
-                    <button type="button" className="quick-chip-btn" onClick={() => { setWalletTab('overview'); setIsWalletModalOpen(true); }}><Wallet size={15} /> Wallet details</button>
-                    <button type="button" className="quick-chip-btn" onClick={() => setMainTab('rewards')}><Gift size={15} /> Rewards</button>
+                    {!IS_CONCORDIUM_SITE && <button type="button" className="btn-action-primary" onClick={() => setMainTab('pay')}><Send size={15} /> Send USDC</button>}
+                    {!IS_CONCORDIUM_SITE && <button type="button" className="quick-chip-btn" onClick={() => { setWalletTab('overview'); setIsWalletModalOpen(true); }}><Wallet size={15} /> Wallet details</button>}
+                    {!IS_CONCORDIUM_SITE && <button type="button" className="quick-chip-btn" onClick={() => setMainTab('rewards')}><Gift size={15} /> Rewards</button>}
+                    {IS_CONCORDIUM_SITE && <button type="button" className="quick-chip-btn" onClick={() => setMainTab('agents')}><Bot size={15} /> Agent profiles</button>}
                     {myTag?.tag ? <button type="button" className="quick-chip-btn" onClick={() => setIsPersonalAgentOpen(true)}><Brain size={15} /> Personal agent</button> : <button type="button" className="quick-chip-btn" onClick={() => setMainTab('claim')}><Tag size={15} /> Claim a NairaTag</button>}
                   </div>
                 </article>
@@ -3786,6 +3831,16 @@ function ArcAppShell() {
             TAB 1: TAG-TO-TAG SEND TERMINAL (POWERED BY TEXTILE FX CORRIDORS)
             ─────────────────────────────────────────────────────────────────── */}
         {mainTab === 'pay' && (
+          IS_CONCORDIUM_SITE ? (
+            <div className="terminal-layout-centered" style={{ maxWidth: '560px' }}>
+              <article className="account-wallet-card" role="status">
+                <span className="account-dashboard-eyebrow">CONCORDIUM TESTNET</span>
+                <h2>Agent payments are not enabled in this demo yet</h2>
+                <p>The payment flow is reserved for the Concordium x402 and sponsored-transaction integration. No payment will be sent from this page.</p>
+                <a className="agent-profile-explorer-link" href={CONCORDIUM_SITE.explorerUrl} target="_blank" rel="noopener noreferrer">Open CCDScan Testnet <ExternalLink size={12} /></a>
+              </article>
+            </div>
+          ) : (
           <div className="terminal-layout-centered" style={{ maxWidth: '412px' }}>
             <TagToTagSendCard
               walletAddress={walletAddress}
@@ -3802,6 +3857,7 @@ function ArcAppShell() {
               }}
             />
           </div>
+          )
         )}
 
         {/* ───────────────────────────────────────────────────────────────────
@@ -3822,7 +3878,7 @@ function ArcAppShell() {
                           You own <strong>₦{myTag.tag?.replace(/^[$₦]/, '').toUpperCase()}</strong>
                         </div>
                         <div className="active-claimed-sub">
-                          {shorten(walletAddress)} · Celo Mainnet
+                          {shorten(walletAddress)} · {activeSiteNetworkLabel}
                         </div>
                       </div>
                     </div>
@@ -4087,7 +4143,7 @@ function ArcAppShell() {
 
             {agentDirectoryError && (
               <div className="agent-directory-notice" role="status">
-                <span>Could not load the Celo agent registry: {agentDirectoryError}</span>
+                <span>{IS_CONCORDIUM_SITE ? 'Could not load the agent directory:' : 'Could not load the Celo agent registry:'} {agentDirectoryError}</span>
                 <button type="button" onClick={() => loadAgentDirectory()} disabled={agentDirectoryLoading}>
                   {agentDirectoryLoading ? 'Retrying…' : 'Try again'}
                 </button>
@@ -4095,7 +4151,7 @@ function ArcAppShell() {
             )}
 
             {agentDirectoryLoading && chatAgents.length === 0 && (
-              <div className="agent-directory-empty" role="status">Loading agents from the Celo registry…</div>
+              <div className="agent-directory-empty" role="status">{IS_CONCORDIUM_SITE ? 'Loading agent directory…' : 'Loading agents from the Celo registry…'}</div>
             )}
             {!agentDirectoryLoading && !agentDirectoryError && chatAgents.length === 0 && (
               <div className="agent-directory-empty" role="status">No agents have been listed yet.</div>
@@ -4121,10 +4177,10 @@ function ArcAppShell() {
                       </div>
                     </div>
                     <div className="agent-directory-tag">₦{String(agent.tag || '').replace(/^[₦$@#]/, '')}</div>
-                    {agent.role && <div style={{ fontSize: '11px', color: 'var(--privy-color-foreground-3)', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' }}>{agent.role}</div>}
+                    {(IS_CONCORDIUM_SITE || agent.role) && <div style={{ fontSize: '11px', color: 'var(--privy-color-foreground-3)', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' }}>{IS_CONCORDIUM_SITE ? (agent.concordium?.description || 'NairaTag agent identity · Concordium Testnet') : agent.role}</div>}
 
                     {/* Official Self Agent ID Badge with click-to-view proof details */}
-                    <div style={{ marginTop: '6px' }}>
+                    {!IS_CONCORDIUM_SITE && <div style={{ marginTop: '6px' }}>
                       <SelfAgentIdBadge
                         isVerified={agent.self?.verified !== false && agent.status !== 'unverified'}
                         onClick={(e) => {
@@ -4132,24 +4188,28 @@ function ArcAppShell() {
                           setActiveVerificationDetailAgent(agent);
                         }}
                       />
-                    </div>
-                    {agent.self?.verified !== false && agent.status !== 'unverified' && (
+                    </div>}
+                    {!IS_CONCORDIUM_SITE && agent.self?.verified !== false && agent.status !== 'unverified' && (
                       <div style={{ fontSize: '10px', color: '#059669', opacity: 0.85, marginTop: '2px' }}>
                         Human owner verified via Self
                       </div>
                     )}
 
                     {/* ERC-8004 & Altana Account Indicators */}
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '6px', justifyContent: 'center' }}>
+                    {IS_CONCORDIUM_SITE ? (
+                      <div style={{ fontSize: '10px', fontFamily: 'monospace', background: 'rgba(13, 148, 136, 0.08)', color: '#0d9488', padding: '2px 7px', borderRadius: '4px', fontWeight: 600, marginTop: '6px' }}>
+                        Concordium Testnet · Agent Card available in profile
+                      </div>
+                    ) : <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '6px', justifyContent: 'center' }}>
                       <span style={{ fontSize: '10px', fontFamily: 'monospace', background: 'rgba(99, 102, 241, 0.08)', color: '#6366f1', padding: '1px 6px', borderRadius: '4px', fontWeight: 600 }}>
                         ERC-8004 #{agent.erc8004?.agentId || agent.identity?.erc8004AgentId || agent.id || '1'}
                       </span>
                       <span style={{ fontSize: '10px', fontFamily: 'monospace', background: 'rgba(13, 148, 136, 0.08)', color: '#0d9488', padding: '1px 6px', borderRadius: '4px', fontWeight: 600 }}>
                         Altana {shorten(agent.altana?.walletAddress || agent.owner || '0x653f...1693')}
                       </span>
-                    </div>
+                    </div>}
 
-                    {agent.category && <div className="agent-directory-category" style={{ marginTop: '6px' }}>{agent.category}</div>}
+                    {(IS_CONCORDIUM_SITE || agent.category) && <div className="agent-directory-category" style={{ marginTop: '6px' }}>{IS_CONCORDIUM_SITE ? 'NairaTag Agent' : agent.category}</div>}
                     <div className="agent-directory-points">{agentPointsLabel(agent)}</div>
                     <div className="agent-directory-card-earnings">
                       <strong>{agentEarningsLabel(agent)} earned</strong>
@@ -4180,16 +4240,17 @@ function ArcAppShell() {
                       <div className="agent-circle-meta">
                         <div className="agent-circle-name" style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                           <span className="agent-circle-tag-pill">₦{String(agent.tag || '').replace(/^[₦$@#]/, '')}</span>
-                          <SelfAgentIdBadge
+                          {!IS_CONCORDIUM_SITE && <SelfAgentIdBadge
                             size="xs"
                             isVerified={agent.self?.verified !== false && agent.status !== 'unverified'}
                             onClick={(e) => {
                               e.stopPropagation();
                               setActiveVerificationDetailAgent(agent);
                             }}
-                          />
+                          />}
+                          {IS_CONCORDIUM_SITE && <span className="agent-directory-category">Concordium Testnet</span>}
                         </div>
-                        {agent.role && <div style={{ fontSize: '11px', color: 'var(--privy-color-foreground-3)', marginTop: '2px' }}>{agent.role}</div>}
+                        {(IS_CONCORDIUM_SITE || agent.role) && <div style={{ fontSize: '11px', color: 'var(--privy-color-foreground-3)', marginTop: '2px' }}>{IS_CONCORDIUM_SITE ? (agent.concordium?.description || 'NairaTag agent identity · Concordium Testnet') : agent.role}</div>}
                       </div>
                     </div>
                     <div className="agent-circle-right">
@@ -4210,7 +4271,17 @@ function ArcAppShell() {
         {/* ───────────────────────────────────────────────────────────────────
             TAB: TASKS & BOUNTIES (MATCHING AGENTS PAGE LAYOUT & DESIGN)
             ─────────────────────────────────────────────────────────────────── */}
-        {mainTab === 'tasks' && (
+        {mainTab === 'tasks' && IS_CONCORDIUM_SITE && (
+          <div className="account-dashboard" role="status">
+            <article className="account-wallet-card">
+              <span className="account-dashboard-eyebrow">CONCORDIUM TESTNET</span>
+              <h2>Task marketplace is not configured here</h2>
+              <p>This Concordium build focuses on agent identity, registry linking, and Agent Card publication. Task payouts and rewards will appear after their Concordium integrations are connected.</p>
+              <a className="agent-profile-explorer-link" href={CONCORDIUM_SITE.explorerUrl} target="_blank" rel="noopener noreferrer">Open CCDScan Testnet <ExternalLink size={12} /></a>
+            </article>
+          </div>
+        )}
+        {mainTab === 'tasks' && !IS_CONCORDIUM_SITE && (
           <div className="agents-page-container">
             {selectedTask ? (
               <section className="task-detail-page">
@@ -5554,8 +5625,8 @@ function ArcAppShell() {
                       >
                         <MessageSquare size={14} />
                         <span className="walley-history-item-copy">
-                          <strong>{conversation.title || 'Celo chat'}</strong>
-                          <small>₦{conversation.agent_tag || 'celo'} · {new Date(conversation.updated_at).toLocaleString()}</small>
+                          <strong>{conversation.title || (IS_CONCORDIUM_SITE ? 'NairaTag chat' : 'Celo chat')}</strong>
+                          <small>₦{conversation.agent_tag || (IS_CONCORDIUM_SITE ? 'nairatag' : 'celo')} · {new Date(conversation.updated_at).toLocaleString()}</small>
                         </span>
                       </button>
                     ))}
@@ -5592,7 +5663,7 @@ function ArcAppShell() {
                 <input
                   type="text"
                   className="faq-search-input"
-                  placeholder="Search questions: celo, usdt, cngn, claim, agents, resolver, keys, fees..."
+                  placeholder={IS_CONCORDIUM_SITE ? 'Search questions: identity, agent cards, registry, testnet, privacy…' : 'Search questions: celo, usdt, cngn, claim, agents, resolver, keys, fees...'}
                   value={faqSearchQuery}
                   onChange={(e) => setFaqSearchQuery(e.target.value)}
                 />
@@ -5608,16 +5679,26 @@ function ArcAppShell() {
               </div>
 
               <div className="faq-filter-chips">
-                {[
-                  { id: 'all', label: 'All' },
-                  { id: 'celo', label: 'Celo & Stablecoins' },
-                  { id: 'claim', label: 'Claiming ₦Tag' },
-                  { id: 'agents', label: 'AI Agents (ERC-8004)' },
-                  { id: 'resolver', label: 'Resolver Layer' },
-                  { id: 'payments', label: 'Payments & Security' },
-                  { id: 'contracts', label: 'Contracts' },
-                  { id: 'social', label: 'Social & Community' },
-                ].map((chip) => (
+                {(IS_CONCORDIUM_SITE
+                  ? [
+                    { id: 'all', label: 'All' },
+                    { id: 'identity', label: 'NairaTag Identity' },
+                    { id: 'agents', label: 'Agent Registry' },
+                    { id: 'network', label: 'Concordium Testnet' },
+                    { id: 'payments', label: 'Agent Payments' },
+                    { id: 'privacy', label: 'Privacy & Accountability' },
+                    { id: 'production', label: 'Path to Production' },
+                  ]
+                  : [
+                    { id: 'all', label: 'All' },
+                    { id: 'celo', label: 'Celo & Stablecoins' },
+                    { id: 'claim', label: 'Claiming ₦Tag' },
+                    { id: 'agents', label: 'AI Agents (ERC-8004)' },
+                    { id: 'resolver', label: 'Resolver Layer' },
+                    { id: 'payments', label: 'Payments & Security' },
+                    { id: 'contracts', label: 'Contracts' },
+                    { id: 'social', label: 'Social & Community' },
+                  ]).map((chip) => (
                   <button
                     key={chip.id}
                     type="button"
@@ -5698,7 +5779,7 @@ function ArcAppShell() {
               <div className="faq-help-left">
                 <div className="faq-help-title">Still have questions or need assistance?</div>
                 <div className="faq-help-sub">
-                  Explore verified AI Agents on Celo Mainnet or claim your sovereign ₦Tag handle today.
+                  {IS_CONCORDIUM_SITE ? 'Explore Concordium Testnet Agent Cards or claim your NairaTag identity today.' : 'Explore verified AI Agents on Celo Mainnet or claim your sovereign ₦Tag handle today.'}
                 </div>
               </div>
               <div className="faq-help-actions">
@@ -5728,7 +5809,16 @@ function ArcAppShell() {
         {/* ───────────────────────────────────────────────────────────────────
             TAB 6: REWARDS & VOUCHERS CENTER (GROUNDED IN USER REFERENCES)
             ─────────────────────────────────────────────────────────────────── */}
-        {mainTab === 'rewards' && (
+        {mainTab === 'rewards' && IS_CONCORDIUM_SITE && (
+          <section className="account-dashboard" role="status">
+            <article className="account-wallet-card">
+              <span className="account-dashboard-eyebrow">CONCORDIUM TESTNET</span>
+              <h2>Rewards are not enabled here yet</h2>
+              <p>This deployment does not issue points or payouts on Concordium Testnet. Testnet activity is for verifying the agent identity and registry flow.</p>
+            </article>
+          </section>
+        )}
+        {mainTab === 'rewards' && !IS_CONCORDIUM_SITE && (
           <RewardsPage
             userTag={myTag?.tag || ''}
             accountKey={walletAddress || ''}
@@ -6166,7 +6256,7 @@ function ArcAppShell() {
                     />
                   </div>
                   <div className="agent-profile-subtitle">
-                    {selectedAgentProfile.profileType === 'claimed-tag' ? 'NairaTag on Celo' : selectedAgentProfile.name}
+                    {IS_CONCORDIUM_SITE ? 'NairaTag Agent Identity' : selectedAgentProfile.profileType === 'claimed-tag' ? 'NairaTag on Celo' : selectedAgentProfile.name}
                   </div>
                 </div>
                 {selectedAgentProfile.profileType !== 'claimed-tag' && selectedAgentProfile.profileType !== 'platform-agent' && (
@@ -6183,7 +6273,9 @@ function ArcAppShell() {
               </div>
 
               <p className="agent-profile-description">
-                {selectedAgentProfile.profileType === 'claimed-tag' ? 'NairaTag holder' : selectedAgentProfile.role}
+                {IS_CONCORDIUM_SITE
+                  ? (selectedAgentProfile.concordium?.description || 'NairaTag agent identity · Concordium Testnet Agent Card publishing available to the owner.')
+                  : (selectedAgentProfile.profileType === 'claimed-tag' ? 'NairaTag holder' : selectedAgentProfile.role)}
               </p>
 
               <div className="agent-profile-stats">
@@ -6200,7 +6292,7 @@ function ArcAppShell() {
                   <div className="agent-profile-category">{selectedAgentProfile.category || 'Platform agent'}</div>
                 </div>
               ) : <div className="agent-profile-detail-row">
-                <div className="agent-profile-category">{selectedAgentProfile.category || 'NairaTag'}</div>
+                <div className="agent-profile-category">{IS_CONCORDIUM_SITE ? 'NairaTag Agent' : selectedAgentProfile.category || 'NairaTag'}</div>
                 <div className="agent-profile-owner">
                   <span>Owner</span>
                   <strong>{selectedAgentProfile.profileType === 'claimed-tag' && selectedAgentProfile.profileLoading
@@ -6219,7 +6311,7 @@ function ArcAppShell() {
               </div>}
 
               {/* Clean Minimal Self Agent ID Trust Strip */}
-              <div
+              {!IS_CONCORDIUM_SITE && <div
                 onClick={() => setActiveVerificationDetailAgent(selectedAgentProfile)}
                 style={{
                   display: 'flex',
@@ -6248,18 +6340,25 @@ function ArcAppShell() {
                   <span>Proof details</span>
                   <ChevronRight size={13} />
                 </div>
-              </div>
+              </div>}
 
-              <div className="agent-profile-card-actions">
+              <ConcordiumAgentIdentityPanel
+                agent={selectedAgentProfile}
+                activeEvmAddress={walletAddress}
+                profileOwnerAddress={agentProfileLiveData?.details?.owner || selectedAgentProfile.owner}
+                evmProvider={getEthereumProvider(undefined, walletAddress)}
+              />
+
+              {!IS_CONCORDIUM_SITE && <div className="agent-profile-card-actions">
                 <button
                   type="button"
                   className="agent-profile-pay-button agent-profile-pay-full"
                   disabled={selectedAgentProfile.profileType === 'claimed-tag' && (!selectedAgentProfile.owner || selectedAgentProfile.profileLoading)}
                   onClick={() => handlePayAgentFromProfile(selectedAgentProfile)}
                 ><Send size={15} /> Pay ₦{selectedAgentProfile.tag.toUpperCase()}</button>
-              </div>
+              </div>}
 
-              {selectedAgentProfile.identity?.verifiedOnchain && selectedAgentProfile.identity?.erc8004AgentId && (
+              {!IS_CONCORDIUM_SITE && selectedAgentProfile.identity?.verifiedOnchain && selectedAgentProfile.identity?.erc8004AgentId && (
                 <a
                   className="agent-profile-explorer-link"
                   href={`https://celoscan.io/token/0x8004A169FB4a3325136EB29fA0ceB6D2e539a432?a=${selectedAgentProfile.identity.erc8004AgentId}`}
@@ -6275,7 +6374,7 @@ function ArcAppShell() {
       {/* ───────────────────────────────────────────────────────────────────
           MODAL: SELF AGENT ID VERIFICATION DETAIL PANEL
           ─────────────────────────────────────────────────────────────────── */}
-      {activeVerificationDetailAgent && (
+      {!IS_CONCORDIUM_SITE && activeVerificationDetailAgent && (
         <div className="agent-modal-backdrop" onClick={() => setActiveVerificationDetailAgent(null)}>
           <div className="agent-modal-dialog" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '480px' }}>
             <div className="agent-profile-content">

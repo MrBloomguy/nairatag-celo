@@ -42,35 +42,49 @@ import './swap/SwapWidget.css';
 
 // ── High-Fidelity Official Token Icons ──
 export function TokenIcon({ symbol, size = 26 }) {
-  if (symbol === 'USD₮') {
+  if (symbol === 'USD₮' || symbol === 'USDT') {
     return (
-      <svg width={size} height={size} viewBox="0 0 32 32" fill="none">
-        <circle cx="16" cy="16" r="16" fill="#26A17B" />
-        <path
-          d="M17.9 12.2V9.5H23V6.5H9V9.5H14.1V12.2C10.5 12.4 7.8 13.3 7.8 14.3C7.8 15.3 10.5 16.2 14.1 16.4V22H17.9V16.4C21.5 16.2 24.2 15.3 24.2 14.3C24.2 13.3 21.5 12.4 17.9 12.2ZM16 15.3C12.8 15.3 10.3 14.7 10.3 14C10.3 13.3 12.8 12.7 16 12.7C19.2 12.7 21.7 13.3 21.7 14C21.7 14.7 19.2 15.3 16 15.3Z"
-          fill="white"
-        />
-        <path d="M16 22V25.5H16V22Z" fill="white" />
-      </svg>
+      <img
+        src="/tokens/usdt.svg"
+        alt="USD₮"
+        width={size}
+        height={size}
+        style={{ display: 'block', borderRadius: '50%', flexShrink: 0 }}
+        onError={(e) => {
+          e.target.onerror = null;
+          e.target.src = 'https://raw.githubusercontent.com/spothq/cryptocurrency-icons/master/svg/color/usdt.svg';
+        }}
+      />
     );
   }
   if (symbol === 'cNGN') {
     return (
-      <svg width={size} height={size} viewBox="0 0 32 32" fill="none">
-        <circle cx="16" cy="16" r="16" fill="#059669" />
-        <circle cx="16" cy="16" r="14.5" stroke="#34D399" strokeWidth="1" strokeOpacity="0.4" />
-        <text
-          x="16"
-          y="20.5"
-          textAnchor="middle"
-          fill="white"
-          fontSize="14"
-          fontWeight="800"
-          fontFamily="system-ui, -apple-system, sans-serif"
-        >
-          ₦
-        </text>
-      </svg>
+      <img
+        src="/tokens/cngn.png"
+        alt="cNGN"
+        width={size}
+        height={size}
+        style={{ display: 'block', borderRadius: '50%', objectFit: 'contain', flexShrink: 0 }}
+        onError={(e) => {
+          e.target.onerror = null;
+          e.target.src = 'https://celo-org.github.io/celo-token-list/assets/cngn.png';
+        }}
+      />
+    );
+  }
+  if (symbol === 'CELO') {
+    return (
+      <img
+        src="/tokens/celo.svg"
+        alt="CELO"
+        width={size}
+        height={size}
+        style={{ display: 'block', borderRadius: '50%', flexShrink: 0 }}
+        onError={(e) => {
+          e.target.onerror = null;
+          e.target.src = 'https://celo-org.github.io/celo-token-list/assets/celo_logo.svg';
+        }}
+      />
     );
   }
   if (symbol === 'cUSD') {
@@ -93,11 +107,13 @@ export function TokenIcon({ symbol, size = 26 }) {
   }
   // CELO native
   return (
-    <svg width={size} height={size} viewBox="0 0 32 32" fill="none">
-      <circle cx="16" cy="16" r="16" fill="#FCFF52" />
-      <circle cx="12.5" cy="13.5" r="5.5" stroke="#1E1E1E" strokeWidth="2.5" fill="none" />
-      <circle cx="19.5" cy="18.5" r="5.5" stroke="#1E1E1E" strokeWidth="2.5" fill="none" />
-    </svg>
+    <img
+      src="/tokens/celo.svg"
+      alt={symbol}
+      width={size}
+      height={size}
+      style={{ display: 'block', borderRadius: '50%', flexShrink: 0 }}
+    />
   );
 }
 

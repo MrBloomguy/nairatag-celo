@@ -40,37 +40,51 @@ import { resolveTag } from '../services/nairatagResolver.js';
 import { getEthereumProvider } from '../services/celoPayment.js';
 import './swap/SwapWidget.css';
 
-// ── Official Token SVG Icons ──
+// ── Official Token SVG Icons & Assets ──
 export function TokenIcon({ symbol, size = 24 }) {
   if (symbol === 'USD₮' || symbol === 'USDT') {
     return (
-      <svg width={size} height={size} viewBox="0 0 32 32" fill="none">
-        <circle cx="16" cy="16" r="16" fill="#26A17B" />
-        <path
-          d="M17.9 12.2V9.5H23V6.5H9V9.5H14.1V12.2C10.5 12.4 7.8 13.3 7.8 14.3C7.8 15.3 10.5 16.2 14.1 16.4V22H17.9V16.4C21.5 16.2 24.2 15.3 24.2 14.3C24.2 13.3 21.5 12.4 17.9 12.2ZM16 15.3C12.8 15.3 10.3 14.7 10.3 14C10.3 13.3 12.8 12.7 16 12.7C19.2 12.7 21.7 13.3 21.7 14C21.7 14.7 19.2 15.3 16 15.3Z"
-          fill="white"
-        />
-        <path d="M16 22V25.5H16V22Z" fill="white" />
-      </svg>
+      <img
+        src="/tokens/usdt.svg"
+        alt="USD₮"
+        width={size}
+        height={size}
+        style={{ display: 'block', borderRadius: '50%', flexShrink: 0 }}
+        onError={(e) => {
+          e.target.onerror = null;
+          e.target.src = 'https://raw.githubusercontent.com/spothq/cryptocurrency-icons/master/svg/color/usdt.svg';
+        }}
+      />
     );
   }
   if (symbol === 'cNGN') {
     return (
-      <svg width={size} height={size} viewBox="0 0 32 32" fill="none">
-        <circle cx="16" cy="16" r="16" fill="#059669" />
-        <circle cx="16" cy="16" r="14.5" stroke="#34D399" strokeWidth="1" strokeOpacity="0.4" />
-        <text
-          x="16"
-          y="20.5"
-          textAnchor="middle"
-          fill="white"
-          fontSize="14"
-          fontWeight="800"
-          fontFamily="system-ui, -apple-system, sans-serif"
-        >
-          ₦
-        </text>
-      </svg>
+      <img
+        src="/tokens/cngn.png"
+        alt="cNGN"
+        width={size}
+        height={size}
+        style={{ display: 'block', borderRadius: '50%', objectFit: 'contain', flexShrink: 0 }}
+        onError={(e) => {
+          e.target.onerror = null;
+          e.target.src = 'https://celo-org.github.io/celo-token-list/assets/cngn.png';
+        }}
+      />
+    );
+  }
+  if (symbol === 'CELO') {
+    return (
+      <img
+        src="/tokens/celo.svg"
+        alt="CELO"
+        width={size}
+        height={size}
+        style={{ display: 'block', borderRadius: '50%', flexShrink: 0 }}
+        onError={(e) => {
+          e.target.onerror = null;
+          e.target.src = 'https://celo-org.github.io/celo-token-list/assets/celo_logo.svg';
+        }}
+      />
     );
   }
   if (symbol === 'cUSD') {
@@ -101,13 +115,14 @@ export function TokenIcon({ symbol, size = 24 }) {
       </svg>
     );
   }
-  // CELO native
   return (
-    <svg width={size} height={size} viewBox="0 0 32 32" fill="none">
-      <circle cx="16" cy="16" r="16" fill="#FCFF52" />
-      <circle cx="12.5" cy="13.5" r="5.5" stroke="#1E1E1E" strokeWidth="2.5" fill="none" />
-      <circle cx="19.5" cy="18.5" r="5.5" stroke="#1E1E1E" strokeWidth="2.5" fill="none" />
-    </svg>
+    <img
+      src="/tokens/celo.svg"
+      alt={symbol}
+      width={size}
+      height={size}
+      style={{ display: 'block', borderRadius: '50%', flexShrink: 0 }}
+    />
   );
 }
 
@@ -155,7 +170,7 @@ export default function TagToTagSendCard({
 
   // ── Settings & Micro-interactions ──
   const [showSettings, setShowSettings] = useState(false);
-  const [showDetails, setShowDetails] = useState(true);
+  const [showDetails, setShowDetails] = useState(false);
   const [slippageTolerance, setSlippageTolerance] = useState('0.5');
   const [tokenModalMode, setTokenModalMode] = useState(null); // 'source' | 'target' | null
   const [copiedKey, setCopiedKey] = useState(null);
@@ -487,40 +502,32 @@ export default function TagToTagSendCard({
 
   return (
     <div className="swap-widget-card" style={{ maxWidth: '412px' }}>
-      {/* ── Top Header: Send to ₦Tag (Zero Standalone Swap) ── */}
+      {/* ── Top Header: Send to ₦Tag ── */}
       <div className="swap-widget-header">
         <div className="swap-widget-title-wrap">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
-            <div
-              style={{
-                width: '28px',
-                height: '28px',
-                borderRadius: '8px',
-                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                color: '#ffffff',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                boxShadow: '0 2px 8px rgba(16, 185, 129, 0.3)',
-              }}
-            >
-              <Send size={14} />
-            </div>
-            <div>
-              <div style={{ fontSize: '15px', fontWeight: 800, color: 'var(--privy-color-foreground, #111111)', lineHeight: 1.1 }}>
-                Send to ₦Tag
-              </div>
-              <div style={{ fontSize: '10px', color: 'var(--privy-color-foreground-3, #9ca3af)', fontWeight: 600 }}>
-                Textile FX Cross-Currency
-              </div>
-            </div>
+          <div
+            style={{
+              width: '26px',
+              height: '26px',
+              borderRadius: '7px',
+              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+              color: '#ffffff',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <Send size={13} />
           </div>
+          <span style={{ fontSize: '15px', fontWeight: 800, color: 'var(--privy-color-foreground, #111111)' }}>
+            Send to ₦Tag
+          </span>
         </div>
 
         <div className="swap-header-controls">
           <span className="swap-route-badge" style={{ fontSize: '10px', padding: '3px 7px' }}>
             <span className="swap-pulse-dot" />
-            <span>Celo Mainnet</span>
+            <span>Celo</span>
           </span>
           {isCrossToken && (
             <button
@@ -547,7 +554,7 @@ export default function TagToTagSendCard({
       {showSettings && isCrossToken && (
         <div className="swap-slippage-popover">
           <span style={{ fontWeight: 600, color: 'var(--privy-color-foreground-2, #6b7280)' }}>
-            Slippage Tolerance:
+            Slippage:
           </span>
           <div className="swap-slippage-pill-group">
             {['0.1', '0.5', '1.0'].map((val) => (
@@ -564,13 +571,15 @@ export default function TagToTagSendCard({
         </div>
       )}
 
-      {/* ── SECTION 1: RECIPIENT ₦TAG INPUT ── */}
+      {/* ── SECTION 1: RECIPIENT ── */}
       <div className="swap-card-box">
         <div className="swap-card-top-row">
-          <span className="swap-card-label">Recipient (₦Tag or Address)</span>
-          <span style={{ fontSize: '10.5px', color: 'var(--privy-color-foreground-3)' }}>
-            Instant Resolution
-          </span>
+          <span className="swap-card-label">To</span>
+          {resolvedRecipient && (
+            <span style={{ fontSize: '10.5px', color: '#059669', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '3px' }}>
+              <Check size={11} /> Resolved
+            </span>
+          )}
         </div>
 
         <div className="swap-recipient-input-wrap" style={{ marginTop: '2px' }}>
@@ -595,93 +604,69 @@ export default function TagToTagSendCard({
           )}
         </div>
 
-        {/* Quick Suggestion Chips */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap', marginTop: '3px' }}>
-          <span style={{ fontSize: '10px', color: 'var(--privy-color-foreground-3)' }}>Quick:</span>
-          {['segun', 'bloom', 'alice', 'food', 'ride'].map((tag) => (
-            <button
-              key={tag}
-              type="button"
-              className="swap-slippage-chip"
-              style={{ padding: '2px 6px', fontSize: '10px' }}
-              onClick={() => setRecipientInput(`₦${tag}`)}
-            >
-              ₦{tag}
-            </button>
-          ))}
-        </div>
+        {/* Suggestion Chips: only show when input is empty */}
+        {!recipientInput && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginTop: '2px' }}>
+            {['segun', 'bloom', 'alice'].map((tag) => (
+              <button
+                key={tag}
+                type="button"
+                className="swap-slippage-chip"
+                style={{ padding: '2px 7px', fontSize: '10.5px', borderRadius: '9999px' }}
+                onClick={() => setRecipientInput(`₦${tag}`)}
+              >
+                ₦{tag}
+              </button>
+            ))}
+          </div>
+        )}
 
-        {/* Verified Recipient Card */}
+        {/* Verified Recipient Address Preview */}
         {resolvedRecipient && (
           <div
             style={{
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
-              padding: '7px 10px',
-              borderRadius: '10px',
-              background: 'rgba(16, 185, 129, 0.08)',
-              border: '1px solid rgba(16, 185, 129, 0.25)',
-              marginTop: '4px',
+              padding: '4px 8px',
+              borderRadius: '8px',
+              background: 'rgba(16, 185, 129, 0.07)',
+              marginTop: '3px',
+              fontSize: '11px',
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <div
-                style={{
-                  width: '26px',
-                  height: '26px',
-                  borderRadius: '50%',
-                  background: '#10b981',
-                  color: '#ffffff',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontWeight: 800,
-                  fontSize: '12px',
-                }}
-              >
-                {resolvedRecipient.tag ? resolvedRecipient.tag.slice(1, 2) : '₦'}
-              </div>
-              <div>
-                <div style={{ fontSize: '12px', fontWeight: 700, color: '#047857', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <span>{resolvedRecipient.displayName}</span>
-                  <span style={{ fontSize: '9px', background: '#059669', color: '#fff', padding: '1px 4px', borderRadius: '4px' }}>
-                    RESOLVED
-                  </span>
-                </div>
-                <div style={{ fontSize: '10px', color: 'var(--privy-color-foreground-3)', fontFamily: 'monospace' }}>
-                  {resolvedRecipient.address.slice(0, 8)}...{resolvedRecipient.address.slice(-6)}
-                </div>
-              </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span style={{ fontWeight: 800, color: '#047857' }}>{resolvedRecipient.displayName}</span>
+              <span style={{ color: 'var(--privy-color-foreground-3)', fontFamily: 'monospace', fontSize: '10.5px' }}>
+                ({resolvedRecipient.address.slice(0, 6)}...{resolvedRecipient.address.slice(-4)})
+              </span>
             </div>
             <button
               type="button"
               className="swap-icon-btn"
-              style={{ width: '26px', height: '26px' }}
+              style={{ width: '22px', height: '22px' }}
               onClick={() => copyText('recip_addr', resolvedRecipient.address)}
               title="Copy address"
             >
-              {copiedKey === 'recip_addr' ? <Check size={12} color="#10b981" /> : <Copy size={12} />}
+              {copiedKey === 'recip_addr' ? <Check size={11} color="#10b981" /> : <Copy size={11} />}
             </button>
           </div>
         )}
 
         {resolutionError && (
           <div style={{ fontSize: '11px', color: '#dc2626', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px' }}>
-            <AlertCircle size={12} />
+            <AlertCircle size={11} />
             <span>{resolutionError}</span>
           </div>
         )}
       </div>
 
-      {/* ── SECTION 2: YOU SEND (SOURCE CURRENCY) ── */}
+      {/* ── SECTION 2: YOU PAY ── */}
       <div className="swap-card-box">
         <div className="swap-card-top-row">
-          <span className="swap-card-label">You Send (Source Asset)</span>
+          <span className="swap-card-label">You Pay</span>
           <div className="swap-balance-row">
-            <span>
-              Bal: {activeSenderBalance} {sourceToken}
-            </span>
+            <span>Bal: {activeSenderBalance}</span>
             {walletAddress && activeSenderBalanceNum > 0 && (
               <button
                 type="button"
@@ -712,13 +697,12 @@ export default function TagToTagSendCard({
             type="button"
             className="swap-token-pill"
             onClick={() => setTokenModalMode('source')}
-            title="Change source token"
+            title="Change token"
           >
             <div className="swap-token-badge-icon">
               <TokenIcon symbol={sourceToken} size={22} />
             </div>
             <div className="swap-token-info-stack">
-              <span className="swap-token-network">Celo</span>
               <span className="swap-token-symbol">{sourceToken}</span>
             </div>
             <ChevronDown size={13} className="swap-token-chevron" />
@@ -726,51 +710,39 @@ export default function TagToTagSendCard({
         </div>
 
         <div className="swap-card-bottom-row">
-          <span>≈ ${parseFloat(amountIn || '0').toFixed(2)} USD</span>
+          <span>≈ ${parseFloat(amountIn || '0').toFixed(2)}</span>
           {isInsufficientBalance && (
-            <span className="swap-card-warning">Exceeds available balance</span>
+            <span className="swap-card-warning">Exceeds balance</span>
           )}
         </div>
       </div>
 
-      {/* ── ROUTE CONNECTOR (Direct vs Textile FX Corridor) ── */}
+      {/* ── Central Switcher Arrow ── */}
       <div className="swap-flip-divider-wrap">
-        <div
-          style={{
-            padding: '3px 10px',
-            borderRadius: '9999px',
-            background: isCrossToken ? 'rgba(16, 185, 129, 0.12)' : 'var(--input-bg, #f1f3f5)',
-            border: isCrossToken ? '1px solid rgba(16, 185, 129, 0.3)' : '1px solid var(--border-color, #e5e7eb)',
-            fontSize: '10.5px',
-            fontWeight: 700,
-            color: isCrossToken ? '#059669' : 'var(--privy-color-foreground-2, #6b7280)',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '5px',
-            boxShadow: '0 2px 6px rgba(0, 0, 0, 0.05)',
+        <button
+          type="button"
+          className="swap-flip-circle-btn"
+          onClick={() => {
+            const prevSource = sourceToken;
+            setSourceToken(targetToken);
+            setTargetToken(prevSource);
           }}
+          title="Switch currencies"
         >
-          {isCrossToken ? (
-            <>
-              <Zap size={11} color="#059669" />
-              <span>Textile FX Corridor ({sourceToken} ➔ {targetToken})</span>
-            </>
-          ) : (
-            <>
-              <ArrowDown size={11} />
-              <span>Direct Same-Token Send</span>
-            </>
-          )}
-        </div>
+          <ArrowDown size={14} />
+        </button>
       </div>
 
-      {/* ── SECTION 3: RECIPIENT RECEIVES (DELIVERED ASSET) ── */}
+      {/* ── SECTION 3: RECIPIENT RECEIVES ── */}
       <div className="swap-card-box">
         <div className="swap-card-top-row">
-          <span className="swap-card-label">Recipient Receives (Delivered)</span>
-          <div className="swap-balance-row">
-            <span>Destination: {resolvedRecipient?.displayName || '₦TAG'}</span>
-          </div>
+          <span className="swap-card-label">Recipient Receives</span>
+          {firmQuote && quoteSecondsLeft !== null && (
+            <div className={`swap-countdown-pill ${quoteSecondsLeft <= 10 ? 'urgent' : ''}`} style={{ fontSize: '10px', padding: '1px 6px' }}>
+              <Clock size={9} />
+              <span>{quoteSecondsLeft}s</span>
+            </div>
+          )}
         </div>
 
         <div className="swap-card-main-row">
@@ -792,7 +764,6 @@ export default function TagToTagSendCard({
               <TokenIcon symbol={targetToken} size={22} />
             </div>
             <div className="swap-token-info-stack">
-              <span className="swap-token-network">Celo</span>
               <span className="swap-token-symbol">{targetToken}</span>
             </div>
             <ChevronDown size={13} className="swap-token-chevron" />
@@ -803,47 +774,33 @@ export default function TagToTagSendCard({
           <span>
             {targetToken === 'cNGN' ? `₦${estimatedDisplay}` : `≈ $${parseFloat(amountIn || '0').toFixed(2)}`}
           </span>
-          {firmQuote && quoteSecondsLeft !== null && (
-            <div className={`swap-countdown-pill ${quoteSecondsLeft <= 10 ? 'urgent' : ''}`}>
-              <Clock size={10} />
-              <span>{quoteSecondsLeft}s left</span>
-            </div>
+          {isCrossToken && (
+            <span style={{ fontSize: '10.5px', color: '#059669', fontWeight: 600 }}>
+              Textile FX Corridor
+            </span>
           )}
         </div>
       </div>
 
-      {/* ── Centered Live Exchange Rate Pill (When Cross-Token) ── */}
-      {isCrossToken && (
-        <div className="swap-center-rate-pill-wrap">
-          <div className="swap-center-rate-pill">
-            <span className="swap-pulse-dot" />
-            <span>
-              1 {sourceToken} ≈{' '}
-              {(firmQuote?.effectiveRate || rates.rateUsdtToCngn).toLocaleString('en-US', {
-                maximumFractionDigits: 2,
-              })}{' '}
-              {targetToken}
-            </span>
-          </div>
-        </div>
-      )}
-
-      {/* ── Textile FX Corridor Breakdown Drawer ── */}
+      {/* ── Live Rate Bar & Collapsed Details ── */}
       {isCrossToken && (
         <div className="swap-rate-intelligence-strip">
           <div
             className="swap-rate-summary-bar"
             onClick={() => setShowDetails(!showDetails)}
             title="Toggle corridor details"
+            style={{ cursor: 'pointer', padding: '5px 8px' }}
           >
-            <div className="swap-rate-text">
-              <span>Route</span>
-              <span className="swap-route-badge">Textile RFQ v2 · Best Rate</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px' }}>
+              <span className="swap-pulse-dot" />
+              <span style={{ fontWeight: 600, color: 'var(--privy-color-foreground-2)' }}>
+                1 {sourceToken} ≈ {(firmQuote?.effectiveRate || rates.rateUsdtToCngn).toLocaleString('en-US', { maximumFractionDigits: 2 })} {targetToken}
+              </span>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-              <span style={{ fontSize: '11px', color: '#059669', fontWeight: 700 }}>&lt; 1s</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <span style={{ fontSize: '10px', color: '#059669', fontWeight: 700 }}>Textile FX</span>
               <ChevronDown
-                size={13}
+                size={12}
                 style={{
                   transform: showDetails ? 'rotate(180deg)' : 'rotate(0deg)',
                   transition: 'transform 0.2s ease',
@@ -854,35 +811,23 @@ export default function TagToTagSendCard({
           </div>
 
           {showDetails && (
-            <div className="swap-breakdown-table">
+            <div className="swap-breakdown-table" style={{ padding: '4px 8px 6px' }}>
               <div className="swap-breakdown-row">
-                <span title="Guaranteed minimum received amount after slippage">
-                  Guaranteed Minimum Delivered
-                </span>
-                <span>
-                  {minimumReceived} {targetToken}
-                </span>
+                <span>Min Received</span>
+                <span>{minimumReceived} {targetToken}</span>
               </div>
               <div className="swap-breakdown-row">
-                <span title="Slippage tolerance threshold">Slippage Tolerance</span>
+                <span>Slippage</span>
                 <span>{slippageTolerance}% (Auto)</span>
               </div>
               <div className="swap-breakdown-row">
-                <span title="Difference between market rate and execution rate">Price Impact</span>
-                <span style={{ color: '#059669' }}>&lt; 0.01%</span>
-              </div>
-              <div className="swap-breakdown-row">
-                <span title="Celo sub-second gas settlement">Network Fee</span>
-                <span>&lt; 0.0001 CELO (~ $0.0001)</span>
-              </div>
-              <div className="swap-breakdown-row">
-                <span title="Protocol fee">Conversion Fee</span>
-                <span style={{ color: '#059669' }}>Free (0%)</span>
+                <span>Network Fee</span>
+                <span>&lt; 0.0001 CELO</span>
               </div>
               <div className="swap-breakdown-row">
                 <span>Attribution</span>
                 <span style={{ fontSize: '10px', color: '#059669', fontWeight: 700 }}>
-                  ERC-8021 Tagged (celo_9f7deabd99a6)
+                  celo_9f7deabd99a6
                 </span>
               </div>
             </div>
@@ -890,8 +835,8 @@ export default function TagToTagSendCard({
         </div>
       )}
 
-      {/* ── Optional Memo / Invoice Ref ── */}
-      <div style={{ padding: '2px 4px' }}>
+      {/* ── Optional Memo / Note ── */}
+      <div style={{ padding: '0 2px' }}>
         <button
           type="button"
           style={{
@@ -899,23 +844,20 @@ export default function TagToTagSendCard({
             border: 'none',
             color: '#059669',
             fontSize: '11px',
-            fontWeight: 700,
+            fontWeight: 600,
             cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '3px',
             padding: 0,
           }}
           onClick={() => setShowMemoField(!showMemoField)}
         >
-          <span>{showMemoField ? '− Hide Memo' : '+ Add Memo / Payment Reference'}</span>
+          {showMemoField ? '− Remove memo' : '+ Add memo'}
         </button>
         {showMemoField && (
           <input
             type="text"
             className="swap-recipient-input"
-            style={{ marginTop: '4px', paddingLeft: '10px' }}
-            placeholder="e.g. Design milestone / Lunch / Invoice #104"
+            style={{ marginTop: '4px', paddingLeft: '8px', fontSize: '12px' }}
+            placeholder="e.g. Design milestone / Lunch"
             value={memoInput}
             onChange={(e) => setMemoInput(e.target.value)}
           />
@@ -925,15 +867,15 @@ export default function TagToTagSendCard({
       {/* ── Primary Action Button ── */}
       {!walletAddress ? (
         <button type="button" className="swap-primary-action-btn" onClick={onConnectWallet}>
-          <span>Connect Wallet to Send</span>
+          <span>Connect Wallet</span>
         </button>
       ) : !recipientInput.trim() ? (
         <button type="button" className="swap-primary-action-btn" disabled>
-          <span>Enter Recipient ₦Tag</span>
+          <span>Enter Recipient</span>
         </button>
       ) : isResolving ? (
         <button type="button" className="swap-primary-action-btn" disabled>
-          <RefreshCw size={15} className="animate-spin" />
+          <RefreshCw size={14} className="animate-spin" />
           <span>Resolving ₦Tag...</span>
         </button>
       ) : !resolvedRecipient ? (
@@ -942,7 +884,7 @@ export default function TagToTagSendCard({
         </button>
       ) : !amountIn || Number(amountIn) <= 0 ? (
         <button type="button" className="swap-primary-action-btn" disabled>
-          <span>Enter an Amount</span>
+          <span>Enter Amount</span>
         </button>
       ) : isInsufficientBalance ? (
         <button type="button" className="swap-primary-action-btn" disabled>
@@ -957,13 +899,13 @@ export default function TagToTagSendCard({
         >
           {isRequestingFirmQuote ? (
             <>
-              <RefreshCw size={16} className="animate-spin" />
-              <span>Soliciting Textile Market Makers…</span>
+              <RefreshCw size={15} className="animate-spin" />
+              <span>Getting Textile Quote…</span>
             </>
           ) : (
             <>
-              <ShieldCheck size={16} />
-              <span>Review Textile Quote ({sourceToken} ➔ {targetToken})</span>
+              <ShieldCheck size={15} />
+              <span>Review Textile Quote</span>
             </>
           )}
         </button>
@@ -976,15 +918,15 @@ export default function TagToTagSendCard({
         >
           {isExecuting ? (
             <>
-              <RefreshCw size={16} className="animate-spin" />
-              <span>{statusMessage || 'Settling payment on Celo…'}</span>
+              <RefreshCw size={15} className="animate-spin" />
+              <span>{statusMessage || 'Settling on Celo…'}</span>
             </>
           ) : (
             <>
-              <Send size={15} />
+              <Send size={14} />
               <span>
                 {isCrossToken
-                  ? `Convert & Deliver ${firmQuote?.formattedBuyAmount || estimatedDisplay} ${targetToken} to ${resolvedRecipient.displayName}`
+                  ? `Send ${firmQuote?.formattedBuyAmount || estimatedDisplay} ${targetToken} to ${resolvedRecipient.displayName}`
                   : `Send ${amountIn} ${sourceToken} to ${resolvedRecipient.displayName}`}
               </span>
             </>

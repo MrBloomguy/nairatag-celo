@@ -2193,7 +2193,11 @@ function ArcAppShell() {
       showToast('Please enter a task title', 'error');
       return;
     }
-    const rewardVal = parseFloat(postTaskForm.reward) || 20;
+    const rewardVal = parseFloat(postTaskForm.reward);
+    if (!postTaskForm.reward || isNaN(rewardVal) || rewardVal <= 0) {
+      showToast('Please enter a valid reward amount greater than 0', 'error');
+      return;
+    }
     const token = postTaskForm.rewardToken || 'USDT';
 
     let rewardUSDC = rewardVal;
@@ -5974,12 +5978,14 @@ function ArcAppShell() {
                   <div style={{ display: 'flex', gap: '6px', marginTop: '4px' }}>
                     <input
                       type="number"
-                      min="1"
+                      step="any"
+                      min="0.000001"
                       className="token-amount-field"
                       style={{ flex: 1, fontSize: '13px', padding: '8px 10px' }}
-                      placeholder="35"
+                      placeholder="0.0001"
                       value={postTaskForm.reward}
                       onChange={(e) => setPostTaskForm((prev) => ({ ...prev, reward: e.target.value }))}
+                      required
                     />
                     <select
                       className="token-amount-field"

@@ -44,6 +44,35 @@ import { getEthereumProvider, publicClient } from './celoPayment.js';
 export const TEXTILE_BASE_URL = 'https://api.textilecredit.com/v2';
 export const CELO_CHAIN_ID = 42220;
 
+/**
+ * Smart fetch wrapper that routes through serverless /api/textile-proxy in browsers
+ * to prevent CORS preflight failures (as Textile's serverless ALB returns 404 on OPTIONS).
+ * In Node.js / CLI test environments, calls TEXTILE_BASE_URL directly.
+ */
+export async function fetchTextile(endpoint, options = {}) {
+  const cleanEndpoint = endpoint.replace(/^\//, '');
+  const directUrl = `${TEXTILE_BASE_URL}/${cleanEndpoint}`;
+  const isBrowser = typeof window !== 'undefined';
+  const proxyUrl = `/api/textile-proxy?path=${encodeURIComponent(cleanEndpoint)}`;
+
+  const primaryUrl = isBrowser ? proxyUrl : directUrl;
+  const fallbackUrl = isBrowser ? directUrl : proxyUrl;
+
+  try {
+    const res = await fetch(primaryUrl, options);
+    if (!res.ok && isBrowser && res.status >= 500) {
+      return await fetch(fallbackUrl, options);
+    }
+    return res;
+  } catch (err) {
+    if (isBrowser) {
+      console.warn('[Textile primary fetch failed, attempting fallback]:', err.message);
+      return await fetch(fallbackUrl, options);
+    }
+    throw err;
+  }
+}
+
 // Token decimals on Celo Mainnet
 export const TOKEN_DECIMALS = {
   [CELO_USDT_ADDRESS.toLowerCase()]: 6,
@@ -187,7 +216,7 @@ export async function getIndicativePreview({
     ...(buyAmount ? { buyAmount: String(buyAmount) } : {}),
   };
 
-  const response = await fetch(`${TEXTILE_BASE_URL}/rfq/preview`, {
+  const response = await fetchTextile('rfq/preview', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -376,7 +405,7 @@ export async function requestFirmQuote({
   }
 
   try {
-    const response = await fetch(`${TEXTILE_BASE_URL}/rfq/request`, {
+    const response = await fetchTextile('rfq/request', {
       method: 'POST',
       headers,
       body: JSON.stringify(payload),
@@ -477,7 +506,7 @@ export async function getRfqStatus(rfqId, apiKey = null) {
   const headers = { Accept: 'application/json' };
   if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`;
 
-  const response = await fetch(`${TEXTILE_BASE_URL}/rfq/${rfqId}`, {
+  const response = await fetchTextile(`rfq/${rfqId}`, {
     method: 'GET',
     headers,
   });
@@ -500,7 +529,7 @@ export async function cancelRfq(rfqId, apiKey = null) {
     const headers = { 'Content-Type': 'application/json' };
     if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`;
 
-    await fetch(`${TEXTILE_BASE_URL}/rfq/${rfqId}/cancel`, {
+    await fetchTextile(`rfq/${rfqId}/cancel`, {
       method: 'POST',
       headers,
       body: JSON.stringify({ rfqId }),

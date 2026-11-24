@@ -1,6 +1,6 @@
 {
   "name": "NairaTag",
-  "description": "NairaTag is an African-first digital identity and agent discovery platform. This is its native Concordium Testnet agent identity. It anchors the public agent card to a Concordium account and helps people, wallets, developers, and agents discover one another. The identity record does not grant additional permissions or authorize agent actions.",
+  "description": "NairaTag is an African-first digital identity and agent discovery platform. Native Concordium Testnet agent.",
   "url": "https://concordium.nairatag.ng/nairatag-agent-card.json",
   "version": "1.0.0",
   "defaultInputModes": [
@@ -14,28 +14,7 @@
   "authentication": {
     "schemes": []
   },
-  "skills": [
-    {
-      "id": "nairatag-identity",
-      "name": "NairaTag identity",
-      "description": "Provides a human-readable identity and profile layer for NairaTag agents.",
-      "tags": [
-        "identity",
-        "agent profile",
-        "Concordium"
-      ]
-    },
-    {
-      "id": "agent-discovery",
-      "name": "Agent discovery",
-      "description": "Helps users and software discover NairaTag agents and their public capabilities.",
-      "tags": [
-        "discovery",
-        "directory",
-        "agents"
-      ]
-    }
-  ],
+  "skills": [],
   "capabilities": {
     "streaming": false,
     "pushNotifications": false,
@@ -45,7 +24,7 @@
         "description": "Verified by Concordium badge — on-chain agent identity in a CIS-8004 registry",
         "required": false,
         "params": {
-          "tokenAddress": "ccd:4221332d34e1694168c2a0c0b3fd0f27/cis-2:JyP9XUNvw8NAUcf2Twrh5",
+          "tokenAddress": "ccd:4221332d34e1694168c2a0c0b3fd0f27/cis-2:JyP9XWZtoBN28s8bCdkiy",
           "owner": {
             "account": "ccd:4221332d34e1694168c2a0c0b3fd0f27:4WBJM9RyoYQiwtjB1YxdqJAF1SMVyUao7KjA6fMbQKAUKarpkk"
           },
@@ -54,13 +33,10 @@
             "cis8004": "ccd:4221332d34e1694168c2a0c0b3fd0f27:12802.0",
             "cis8": "ccd:4221332d34e1694168c2a0c0b3fd0f27:12801.0"
           },
-          "services": {
-            "website": "https://concordium.nairatag.ng"
-          },
           "verify": "Resolve tokenAddress via CIS-8004 agent_of; confirm owner + status=Active + card SHA-256 == metadata_hash.",
           "verification": {
             "service": "Concordium Agent Registry",
-            "verifyUrl": "https://agent-registry-mcp.concordium.com/v1/badge-check/JyP9XUNvw8NAUcf2Twrh5",
+            "verifyUrl": "https://agent-registry-mcp.concordium.com/v1/badge-check/JyP9XWZtoBN28s8bCdkiy",
             "mcp": "https://agent-registry-mcp.concordium.com/mcp",
             "docs": "https://docs.concordium.com/en/mainnet/technical-reference/agent-registry/concordium-badge.html"
           }
@@ -68,13 +44,9 @@
       }
     ]
   },
-  "provider": {
-    "organization": "NairaTag",
-    "url": "https://concordium.nairatag.ng"
-  },
   "registrations": [
     {
-      "agentId": 1470,
+      "agentId": 1472,
       "agentRegistry": "ccd:4221332d34e1694168c2a0c0b3fd0f27:12802.0"
     }
   ]

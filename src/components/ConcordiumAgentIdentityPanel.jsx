@@ -371,7 +371,7 @@ export default function ConcordiumAgentIdentityPanel({ agent, activeEvmAddress, 
     setSetUriTx('');
     try {
       const uriToAnchor = agentUri || (typeof window !== 'undefined' ? `${window.location.origin}/nairatag-agent-card.json` : 'https://concordium.nairatag.ng/nairatag-agent-card.json');
-      const hashToAnchor = cardDraft?.metadataHash || '476e62ee7727509499dddf66ffc506eb331ef00674c5a4498b25a6c487de9bb4';
+      const hashToAnchor = cardDraft?.metadataHash || '262a1b0b1eb7808a3b287f9ccc4f4d26d9e8738d68c127efa211267d76d4d1e2';
       const payload = await buildConcordiumSetAgentUri({
         tokenId: result.tokenId,
         agentUri: uriToAnchor,
@@ -605,6 +605,24 @@ export default function ConcordiumAgentIdentityPanel({ agent, activeEvmAddress, 
           {cardDraft.notes.map((note, index) => <p key={index} style={{ margin: '6px 0 0', color: 'var(--text-secondary, #64748b)' }}>{note}</p>)}
         </div>
       )}
+
+      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6, margin: '8px 0 6px' }}>
+        <span style={{ fontSize: 10, color: 'var(--text-muted, #94a3b8)' }}>Quick load:</span>
+        <button
+          type="button"
+          onClick={() => setBadgeInput('JyP9XWZtoBN28s8bCdkiy')}
+          style={{ fontSize: 10, padding: '3px 7px', borderRadius: 6, border: '1px solid var(--border-color, #e2e8f0)', background: 'var(--surface-1, #fff)', cursor: 'pointer' }}
+        >
+          Agent #1472 (Active)
+        </button>
+        <button
+          type="button"
+          onClick={() => setBadgeInput('JyP9XUNvw8NAUcf2Twrh5')}
+          style={{ fontSize: 10, padding: '3px 7px', borderRadius: 6, border: '1px solid var(--border-color, #e2e8f0)', background: 'var(--surface-1, #fff)', cursor: 'pointer' }}
+        >
+          Agent #1470
+        </button>
+      </div>
 
       <form onSubmit={checkBadge} style={{ display: 'flex', gap: 8 }}>
         <input

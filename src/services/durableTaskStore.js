@@ -215,6 +215,7 @@ export function saveDurableTask(task) {
   }
 
   notifyTaskUpdate(task);
+  syncTaskToRemote(task);
   return task;
 }
 
@@ -265,7 +266,100 @@ export function updateTaskState(taskId, updates = {}) {
   }
 
   notifyTaskUpdate(updatedTask);
+  syncTaskPatchToRemote(taskId, updates);
   return updatedTask;
+}
+
+const SUPABASE_REST_URL = 'https://bbpdupijsgdghemfpijr.supabase.co/rest/v1/celo_tasks';
+const SUPABASE_ANON_KEY = 'sb_publishable_3mRhhwX9BhnJyobyCX7uWw_h2-idCPf';
+
+async function syncTaskToRemote(task) {
+  try {
+    const apiRes = await fetch('/api/tasks', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(task),
+    }).catch(() => null);
+
+    if (apiRes && apiRes.ok) return;
+
+    // Direct Supabase REST fallback
+    await fetch(SUPABASE_REST_URL, {
+      method: 'POST',
+      headers: {
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+        'Content-Type': 'application/json',
+        Prefer: 'resolution=merge-duplicates',
+      },
+      body: JSON.stringify({
+        id: task.id,
+        chain_id: task.chainId || 42220,
+        title: task.title,
+        description: task.description || '',
+        category: task.category,
+        category_label: task.categoryLabel,
+        creator_tag: task.creatorTag,
+        creator_address: task.creatorAddress,
+        deliverable: task.deliverable,
+        reward_amount: task.rewardAmount,
+        reward_token: task.rewardToken,
+        reward_usdc: task.rewardUSDC,
+        reward_ngn: task.rewardNGN,
+        points: task.points,
+        deadline: task.deadline,
+        applicants: task.applicants || 0,
+        status: task.status,
+        escrow_status: task.escrowStatus,
+        escrow_contract: task.escrowContract,
+        escrow_tx_hash: task.escrowTxHash,
+        assigned_worker_tag: task.assignedWorkerTag,
+        assigned_worker_address: task.assignedWorkerAddress,
+        submission_deliverable: task.submissionDeliverable,
+        payout_hash: task.payoutHash,
+        payout_delivered: task.payoutDelivered,
+        payout_token: task.payoutToken,
+        created_at: task.createdAt ? new Date(task.createdAt).toISOString() : new Date().toISOString(),
+      }),
+    }).catch(() => null);
+  } catch (err) {
+    console.debug('[DurableTaskStore] Background sync ignored:', err?.message);
+  }
+}
+
+async function syncTaskPatchToRemote(taskId, updates) {
+  try {
+    const apiRes = await fetch(`/api/tasks?id=${encodeURIComponent(taskId)}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updates),
+    }).catch(() => null);
+
+    if (apiRes && apiRes.ok) return;
+
+    const patchBody = {};
+    if (updates.status) patchBody.status = updates.status;
+    if (updates.escrowStatus) patchBody.escrow_status = updates.escrowStatus;
+    if (updates.assignedWorkerTag) patchBody.assigned_worker_tag = updates.assignedWorkerTag;
+    if (updates.assignedWorkerAddress) patchBody.assigned_worker_address = updates.assignedWorkerAddress;
+    if (updates.submissionDeliverable) patchBody.submission_deliverable = updates.submissionDeliverable;
+    if (updates.payoutHash) patchBody.payout_hash = updates.payoutHash;
+    if (updates.payoutDelivered) patchBody.payout_delivered = updates.payoutDelivered;
+    if (updates.payoutToken) patchBody.payout_token = updates.payoutToken;
+    patchBody.updated_at = new Date().toISOString();
+
+    await fetch(`${SUPABASE_REST_URL}?id=eq.${encodeURIComponent(taskId)}`, {
+      method: 'PATCH',
+      headers: {
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(patchBody),
+    }).catch(() => null);
+  } catch (err) {
+    console.debug('[DurableTaskStore] Background patch ignored:', err?.message);
+  }
 }
 
 /**

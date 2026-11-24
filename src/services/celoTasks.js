@@ -2,13 +2,18 @@ import { broadcastCeloPaidTaskToTelegram, broadcastCeloTaskToTelegram } from './
 import { getDurableTasks, saveDurableTask, updateTaskState, getTaskById } from './durableTaskStore.js';
 
 const CELO_TASKS_API = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_CELO_TASKS_API)
-  || (typeof import.meta !== 'undefined' && import.meta.env?.DEV ? '/api/arc-tasks' : 'https://nairatag.ng/api/arc-tasks');
+  || '/api/tasks';
 const CELO_CHAIN_ID = 42220;
 const alertedPaidTasks = new Set();
 
-function arcTasksUrl() {
-  const base = typeof window !== 'undefined' ? window.location.origin : 'https://nairatag.ng';
-  return new URL(CELO_TASKS_API, base);
+const SUPABASE_REST_URL = 'https://bbpdupijsgdghemfpijr.supabase.co/rest/v1/celo_tasks?select=*&order=created_at.desc';
+const SUPABASE_ANON_KEY = 'sb_publishable_3mRhhwX9BhnJyobyCX7uWw_h2-idCPf';
+
+function getTasksUrl() {
+  if (typeof window !== 'undefined') {
+    return new URL(CELO_TASKS_API, window.location.origin).toString();
+  }
+  return CELO_TASKS_API;
 }
 
 function mapTask(row) {
@@ -54,35 +59,79 @@ export async function listCeloTasks(walletAddress = '') {
     };
   }
 
-  // 2. Attempt remote sync if API is responding
+  // 2. Attempt remote sync from serverless API or Supabase REST
   try {
-    const url = arcTasksUrl();
-    if (walletAddress) url.searchParams.set('wallet', walletAddress);
-    const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
-    const timeoutId = controller ? setTimeout(() => controller.abort(), 2000) : null;
-    
-    const res = await fetch(url, {
-      headers: { Accept: 'application/json' },
-      signal: controller?.signal,
-    }).catch(() => null);
+    let remoteRows = null;
 
-    if (timeoutId) clearTimeout(timeoutId);
+    // Try primary serverless /api/tasks endpoint
+    try {
+      const url = getTasksUrl();
+      const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+      const timeoutId = controller ? setTimeout(() => controller.abort(), 3500) : null;
+      const res = await fetch(url, {
+        headers: { Accept: 'application/json' },
+        signal: controller?.signal,
+      }).catch(() => null);
+      if (timeoutId) clearTimeout(timeoutId);
 
-    if (res && res.ok) {
-      const payload = await res.json().catch(() => ({}));
-      if (payload.ok && Array.isArray(payload.tasks) && payload.tasks.length > 0) {
-        const remoteTasks = payload.tasks.map(mapTask);
-        // Merge remote tasks with local tasks, keeping local custom/updated state prioritized
-        const remoteIds = new Set(remoteTasks.map((t) => t.id));
-        const merged = [
-          ...localTasks.filter((lt) => !remoteIds.has(lt.id)),
-          ...remoteTasks,
-        ];
-        return { tasks: merged, progress: { ...localProgress, ...(payload.progress || {}) } };
+      if (res && res.ok) {
+        const payload = await res.json().catch(() => ({}));
+        if (payload.ok && Array.isArray(payload.tasks)) {
+          remoteRows = payload.tasks;
+        }
+      }
+    } catch (apiErr) {
+      console.debug('[listCeloTasks] Primary /api/tasks bypass, attempting Supabase fallback:', apiErr.message);
+    }
+
+    // Direct Supabase REST fallback
+    if (!remoteRows) {
+      const res = await fetch(SUPABASE_REST_URL, {
+        headers: {
+          apikey: SUPABASE_ANON_KEY,
+          Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+          Accept: 'application/json',
+        },
+      }).catch(() => null);
+
+      if (res && res.ok) {
+        const rows = await res.json().catch(() => []);
+        if (Array.isArray(rows) && rows.length > 0) {
+          remoteRows = rows;
+        }
       }
     }
+
+    if (remoteRows && remoteRows.length > 0) {
+      const remoteTasks = remoteRows.map(mapTask);
+      const remoteIds = new Set(remoteTasks.map((t) => t.id));
+
+      // Merge remote tasks with local tasks, prioritizing remote persistent updates
+      const merged = [
+        ...remoteTasks,
+        ...localTasks.filter((lt) => !remoteIds.has(lt.id)),
+      ];
+
+      // Cache merged tasks in local storage so next reload is instantaneous
+      if (typeof window !== 'undefined' && window.localStorage) {
+        try {
+          window.localStorage.setItem('nairatag_celo_tasks_v2', JSON.stringify(merged));
+        } catch {}
+      }
+
+      const remoteProgress = {};
+      for (const t of merged) {
+        remoteProgress[t.id] = {
+          status: t.status,
+          startedAt: t.startedAt || null,
+          submittedAt: t.submittedAt || null,
+          reviewedAt: t.paidAt || null,
+        };
+      }
+
+      return { tasks: merged, progress: remoteProgress };
+    }
   } catch (err) {
-    // Graceful offline fallback
     console.debug('[listCeloTasks] Remote fetch bypassed, using durable store:', err.message);
   }
 

@@ -87,6 +87,10 @@ contract CeloTagsEscrow {
 
         // Native CELO approved by default
         approvedTokens[address(0)] = true;
+        // Pre-approve standard Celo Mainnet stablecoins
+        approvedTokens[0x48065fbBE25f71C9282ddf5e1cD6D6A887483D5e] = true; // USDT
+        approvedTokens[0xF6829D7393dAe24509eb1E52eE8e572e2E271a4f] = true; // cNGN
+        approvedTokens[0x765DE816845861e75A25fCA122bb6898B8B1282a] = true; // cUSD
     }
 
     function setTokenApproval(address token, bool approved) external onlyProtocolOwner {
@@ -299,4 +303,7 @@ contract CeloTagsEscrow {
     function getTask(bytes32 id) external view returns (Task memory) {
         return tasks[id];
     }
+
+    receive() external payable {}
+    fallback() external payable {}
 }

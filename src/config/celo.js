@@ -67,7 +67,7 @@ export const TEXTILE_FX_ROUTER = '0xa9AA0a64769cBed4d3B1Ceb4Df01CdE915C235b3';
  */
 export const CELO_NAIRATAG_REGISTRY_ADDRESS = '0x6D3950a390c7F60287d545cC5785c594e07439F9';
 export const CELO_NAIRATAG_RESOLVER_ADDRESS = '0xa3760573DE321DA2955573c69a4f497d57C769A2';
-export const CELO_NAIRATAG_ESCROW_ADDRESS = '0xb9a0250a6C0908fA01574a5416321096279c4d53';
+export const CELO_NAIRATAG_ESCROW_ADDRESS = '0x9f3de805eAa94516d216d6f1add78860B291BB76';
 
 export const CELO_MAINNET_CONFIG = {
   chainId: 42220,
@@ -255,6 +255,73 @@ export const ERC8004_REPUTATION_ABI = [
 
 export const ERC8004_VALIDATION_ABI = [];
 export const ARC_MEMO_ABI = [];
+
+export const CELO_ESCROW_ABI = [
+  {
+    type: 'function',
+    name: 'createTask',
+    stateMutability: 'payable',
+    inputs: [
+      { name: 'id', type: 'bytes32' },
+      { name: 'creatorUrn', type: 'string' },
+      { name: 'token', type: 'address' },
+      { name: 'amount', type: 'uint256' },
+      { name: 'deadline', type: 'uint64' },
+      { name: 'disputeWindow', type: 'uint32' },
+      { name: 'initialAssignee', type: 'address' },
+      { name: 'assigneeUrn', type: 'string' },
+    ],
+    outputs: [],
+  },
+  {
+    type: 'function',
+    name: 'releaseTask',
+    stateMutability: 'nonpayable',
+    inputs: [{ name: 'id', type: 'bytes32' }],
+    outputs: [],
+  },
+  {
+    type: 'function',
+    name: 'assignAgent',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'id', type: 'bytes32' },
+      { name: 'assignee', type: 'address' },
+      { name: 'assigneeUrn', type: 'string' },
+    ],
+    outputs: [],
+  },
+  {
+    type: 'function',
+    name: 'submitDeliverable',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'id', type: 'bytes32' },
+      { name: 'deliverableHash', type: 'bytes32' },
+    ],
+    outputs: [],
+  },
+  {
+    type: 'function',
+    name: 'tasks',
+    stateMutability: 'view',
+    inputs: [{ name: 'id', type: 'bytes32' }],
+    outputs: [
+      { name: 'id', type: 'bytes32' },
+      { name: 'creator', type: 'address' },
+      { name: 'creatorUrn', type: 'string' },
+      { name: 'assignee', type: 'address' },
+      { name: 'assigneeUrn', type: 'string' },
+      { name: 'token', type: 'address' },
+      { name: 'amount', type: 'uint256' },
+      { name: 'deadline', type: 'uint64' },
+      { name: 'disputeWindow', type: 'uint32' },
+      { name: 'submittedAt', type: 'uint64' },
+      { name: 'status', type: 'uint8' },
+      { name: 'deliverableHash', type: 'bytes32' },
+    ],
+  },
+];
 
 // Compatibility aliases
 export const CELO_TESTNET_CONFIG = CELO_MAINNET_CONFIG;

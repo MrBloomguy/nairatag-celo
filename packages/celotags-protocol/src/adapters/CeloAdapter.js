@@ -19,7 +19,7 @@ export const CELO_NETWORKS = {
       resolver: '0x293EA56588b8abac78Bab6241466ad8C30bB955A',
       bountyEscrow: '0x83B369A1C504065620857D0bDb09172A2a7C88C9',
       marketplace: '0xa379EC02E8709582AEd02efeD0a27B9ED71bec34',
-      paymentRequest: '0xb9a0250a6C0908fA01574a5416321096279c4d53'
+      paymentRequest: '0x9f3de805eAa94516d216d6f1add78860B291BB76'
     },
     tokens: {
       cNGN: {
@@ -54,7 +54,7 @@ export const CELO_NETWORKS = {
       resolver: '0x293EA56588b8abac78Bab6241466ad8C30bB955A',
       bountyEscrow: '0x83B369A1C504065620857D0bDb09172A2a7C88C9',
       marketplace: '0xa379EC02E8709582AEd02efeD0a27B9ED71bec34',
-      paymentRequest: '0xb9a0250a6C0908fA01574a5416321096279c4d53'
+      paymentRequest: '0x9f3de805eAa94516d216d6f1add78860B291BB76'
     },
     tokens: {
       cNGN: {

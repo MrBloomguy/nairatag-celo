@@ -4781,7 +4781,13 @@ function ArcAppShell() {
                             Worker: <strong style={{ color: '#10B981' }}>{selectedTask.assignedWorkerTag}</strong>
                           </div>
                         )}
-                        <p style={{ marginTop: '8px' }}>Celo Mainnet Escrow (Chain 42220) · celo_9f7deabd99a6</p>
+                        <div style={{ marginTop: '8px', fontSize: '11px', color: 'var(--privy-color-foreground-2)' }}>
+                          <div>Celo Mainnet Escrow Contract:</div>
+                          <a href={`https://celoscan.io/address/${CELO_NAIRATAG_ESCROW_ADDRESS}`} target="_blank" rel="noopener noreferrer" style={{ color: '#0052FF', textDecoration: 'underline', fontFamily: 'var(--font-mono)' }}>
+                            {CELO_NAIRATAG_ESCROW_ADDRESS}
+                          </a>
+                          <div style={{ marginTop: '2px', opacity: 0.8 }}>Attribution: <code style={{ color: '#10B981' }}>celo_9f7deabd99a6</code></div>
+                        </div>
                       </article>
 
                       <button type="button" className="btn-agent-secondary task-chat-button" onClick={() => handleTaskChat(selectedTask)}>

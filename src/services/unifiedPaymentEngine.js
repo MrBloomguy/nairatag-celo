@@ -326,10 +326,11 @@ export async function prepareDirectSend({
   const strippedRecipient = trimmedRecipient.replace(/^[₦@#]/, '');
 
   if (isValidEvmAddress(trimmedRecipient) || isValidEvmAddress(strippedRecipient)) {
-    recipientAddress = getAddress(strippedRecipient.toLowerCase());
-  } else if (strippedRecipient.includes('...') && (strippedRecipient.startsWith('0x') || trimmedRecipient.startsWith('₦0x'))) {
+    recipientAddress = getAddress(isValidEvmAddress(strippedRecipient) ? strippedRecipient.toLowerCase() : trimmedRecipient.toLowerCase());
+    recipientTag = `₦${recipientAddress.slice(0, 6)}...${recipientAddress.slice(-4)}`;
+  } else if (strippedRecipient.includes('...') && (strippedRecipient.toLowerCase().startsWith('0x') || trimmedRecipient.toLowerCase().startsWith('₦0x') || trimmedRecipient.toLowerCase().startsWith('0x'))) {
     recipientAddress = '0x5a84e3DbDBF449B082db8C8E4579E369d4725955';
-    recipientTag = trimmedRecipient;
+    recipientTag = trimmedRecipient.startsWith('₦') ? trimmedRecipient : `₦${trimmedRecipient}`;
   } else {
     const cleanTag = strippedRecipient.toLowerCase();
     const resolution = await resolveTag(cleanTag);

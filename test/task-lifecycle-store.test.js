@@ -165,9 +165,9 @@ test('Durable Task Store & Lifecycle Suite', async (t) => {
     assert.equal(CELO_VERIFIED_ESCROW_TX, '0x5dea3fcc2e575a5a90c7812e36152eaa0d412367d49f67f9e3bb5b2cec0044d7');
   });
 
-  await t.test('8. Initializes in-place task workspace chat with chronological milestone logs', () => {
+  await t.test('8. Initializes in-place task workspace chat with chronological milestone logs', async () => {
     const task = getTaskById('celo_task_1');
-    const messages = getTaskChatMessages(task.id, task);
+    const messages = await getTaskChatMessages(task.id, task);
     assert.ok(Array.isArray(messages));
     assert.ok(messages.length >= 1, 'Should contain at least the initial Escrow Funded log');
 

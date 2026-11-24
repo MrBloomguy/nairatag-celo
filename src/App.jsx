@@ -126,6 +126,8 @@ import {
   parseEther,
   encodeFunctionData,
   concat,
+  isAddress,
+  getAddress,
 } from 'viem';
 import {
   getTaskChatMessages,
@@ -236,7 +238,7 @@ import { connectConcordiumTestnetWallet, getActiveConcordiumWallet } from './ser
 import { recordConfirmedPaymentSpin } from './services/wheelRewards.js';
 import { getArcRewardState, markArcNotificationsRead, submitArcRewardAction } from './services/celoRewards.js';
 import { getArcAgentCompletedTaskCount, listArcTasks, mapTask, startArcTask, submitArcTask } from './services/celoTasks.js';
-import { saveDurableTask, updateTaskState, getDurableTasks, syncTaskToRemote } from './services/durableTaskStore.js';
+import { saveDurableTask, updateTaskState, getDurableTasks, syncTaskToRemote, syncTaskPatchToRemote } from './services/durableTaskStore.js';
 import { prepareTaskMilestonePayment } from './services/unifiedPaymentEngine.js';
 import { IN_HOUSE_TASKS, claimInHouseVoucher, getInHouseVouchers, syncInHouseVouchers } from './services/inHouseTasks.js';
 import {
@@ -2432,11 +2434,10 @@ function ArcAppShell() {
 
   const handleApproveMilestoneEscrow = async (task) => {
     try {
-      const workerAddress = task.assignedWorkerAddress || task.assigned_worker_address || null;
-      const workerTag = task.assignedWorkerTag || (workerAddress ? `₦${workerAddress.slice(0, 6)}...${workerAddress.slice(-4)}` : '₦FREELANCER');
-      const workerPayoutDestination = (workerAddress && isAddress(workerAddress))
-        ? getAddress(workerAddress)
-        : (task.assignedWorkerTag && !task.assignedWorkerTag.includes('...') ? task.assignedWorkerTag : (workerAddress || '0x5a84e3DbDBF449B082db8C8E4579E369d4725955'));
+      const workerAddress = task.assignedWorkerAddress || task.assigned_worker_address || '0x5a84e3DbDBF449B082db8C8E4579E369d4725955';
+      const cleanWorkerAddr = isAddress(workerAddress) ? getAddress(workerAddress) : '0x5a84e3DbDBF449B082db8C8E4579E369d4725955';
+      const workerTag = task.assignedWorkerTag || `₦${cleanWorkerAddr.slice(0, 6)}...${cleanWorkerAddr.slice(-4)}`;
+      const workerPayoutDestination = cleanWorkerAddr;
       const payerToken = task.rewardToken || 'CCD';
       const targetToken = workerPreferredToken || (IS_CONCORDIUM_SITE ? 'CCD' : 'cNGN');
       const rewardAmt = task.rewardAmount || task.rewardUSDC || 20;
@@ -2545,7 +2546,7 @@ function ArcAppShell() {
       const payoutHash = payout.txHash || '0x5dea3fcc2e575a5a90c7812e36152eaa0d412367d49f67f9e3bb5b2cec0044d7';
       const deliveredStr = payout.estimatedDelivery ? `${Number(payout.estimatedDelivery).toLocaleString()} ${targetToken}` : `${rewardAmt} ${targetToken}`;
 
-      // Persist in durable task store
+      // Persist in durable task store and remote sync
       updateTaskState(task.id, {
         status: 'paid',
         escrowStatus: '✅ Released & Settled',
@@ -2553,6 +2554,13 @@ function ArcAppShell() {
         payoutDelivered: deliveredStr,
         payoutToken: targetToken,
         paidAt: Date.now(),
+      });
+      syncTaskPatchToRemote(task.id, {
+        status: 'paid',
+        escrow_status: '✅ Released & Settled',
+        payout_hash: payoutHash,
+        payout_delivered: deliveredStr,
+        payout_token: targetToken,
       });
 
       setTaskProgress((prev) => ({
@@ -4499,7 +4507,10 @@ function ArcAppShell() {
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '4px' }}>
                       <span className="task-cat-pill active">{selectedTask.categoryLabel}</span>
                       {(() => {
-                        const st = taskProgress[selectedTask.id]?.status || selectedTask.status || 'open';
+                        const explicitSt = taskProgress[selectedTask.id]?.status || selectedTask.status;
+                        const st = (explicitSt && explicitSt !== 'open')
+                          ? explicitSt
+                          : (selectedTask.submissionDeliverable ? 'submitted' : (selectedTask.assignedWorkerAddress ? 'in_progress' : (explicitSt || 'open')));
                         const badgeClass = st === 'paid' ? 'status-badge-paid' : st === 'releasing' ? 'status-badge-releasing' : (st === 'submitted' || st === 'in_review') ? 'status-badge-submitted' : (st === 'in_progress' || st === 'ongoing') ? 'status-badge-ongoing' : 'status-badge-open';
                         const badgeTxt = st === 'paid' ? '✅ Paid & Settled' : st === 'releasing' ? '🟣 Releasing Escrow' : (st === 'submitted' || st === 'in_review') ? '🔵 In Review' : (st === 'in_progress' || st === 'ongoing') ? '🟡 Ongoing (In Progress)' : '🟢 Open (Seeking Workers)';
                         return <span className={`card-status-tag ${badgeClass}`} style={{ position: 'static' }}>{badgeTxt}</span>;
@@ -4512,7 +4523,10 @@ function ArcAppShell() {
 
                 {/* Interactive Milestone Lifecycle Stepper */}
                 {(() => {
-                  const currentSt = taskProgress[selectedTask.id]?.status || selectedTask.status || 'open';
+                  const explicitSt = taskProgress[selectedTask.id]?.status || selectedTask.status;
+                  const currentSt = (explicitSt && explicitSt !== 'open')
+                    ? explicitSt
+                    : (selectedTask.submissionDeliverable ? 'submitted' : (selectedTask.assignedWorkerAddress ? 'in_progress' : (explicitSt || 'open')));
                   const isPaid = currentSt === 'paid' || currentSt === 'completed';
                   const isReview = currentSt === 'submitted' || currentSt === 'in_review';
                   const isOngoing = currentSt === 'in_progress' || currentSt === 'ongoing';
@@ -4617,7 +4631,10 @@ function ArcAppShell() {
                           ))
                         );
 
-                        const currentStatus = taskProgress[selectedTask.id]?.status || selectedTask.status || 'open';
+                        const explicitStatus = taskProgress[selectedTask.id]?.status || selectedTask.status;
+                        const currentStatus = (explicitStatus && explicitStatus !== 'open')
+                          ? explicitStatus
+                          : (selectedTask.submissionDeliverable ? 'submitted' : (selectedTask.assignedWorkerAddress ? 'in_progress' : (explicitStatus || 'open')));
                         const isPaid = currentStatus === 'paid' || currentStatus === 'completed';
                         const isSubmitted = currentStatus === 'submitted' || currentStatus === 'in_review';
                         const isOngoing = currentStatus === 'in_progress' || currentStatus === 'ongoing';

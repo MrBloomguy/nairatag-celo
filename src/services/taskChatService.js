@@ -125,14 +125,17 @@ export async function getTaskChatMessages(taskId, task, currentWallet = '') {
           timestamp: new Date(r.created_at).getTime(),
         }));
 
-        mapped.typingUser = typingUser;
+        const baseEvents = getDefaultMilestoneEvents(task);
+        const hasEscrowEvent = mapped.some((m) => m.senderTag === 'ESCROW');
+        const finalMessages = hasEscrowEvent ? mapped : [...baseEvents, ...mapped];
+        finalMessages.typingUser = typingUser;
 
         if (typeof window !== 'undefined' && window.localStorage) {
           try {
-            window.localStorage.setItem(key, JSON.stringify(mapped));
+            window.localStorage.setItem(key, JSON.stringify(finalMessages));
           } catch {}
         }
-        return mapped;
+        return finalMessages;
       }
     }
   } catch (err) {
@@ -232,7 +235,8 @@ export async function sendTaskChatMessage(taskId, { sender, senderTag, role, tex
       updated = [newMsg];
     }
   } else {
-    updated = [newMsg];
+    const baseEvents = getDefaultMilestoneEvents(task);
+    updated = [...baseEvents, newMsg];
   }
 
   // 2. Persist to Supabase in background

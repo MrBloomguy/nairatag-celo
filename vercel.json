@@ -3,6 +3,10 @@
   "outputDirectory": "dist",
   "routes": [
     {
+      "src": "^/api/concordium-agent-card/nairatag$",
+      "dest": "/nairatag-agent-card.json"
+    },
+    {
       "src": "^/agent/([^/]+)$",
       "dest": "/api/agent?handle=$1"
     },

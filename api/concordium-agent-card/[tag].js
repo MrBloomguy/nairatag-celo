@@ -157,24 +157,56 @@ function validateCard(cardJson, cardHash, cardUrl, tag, concordiumOwner, externa
   }
 }
 
+const CANONICAL_NAIRATAG_CARD = "{\n  \"name\": \"NairaTag\",\n  \"description\": \"NairaTag is an African-first digital identity and agent discovery platform. Native Concordium Testnet agent.\",\n  \"url\": \"https://concordium.nairatag.ng/nairatag-agent-card.json\",\n  \"version\": \"1.0.0\",\n  \"defaultInputModes\": [\n    \"text/markdown\",\n    \"application/json\"\n  ],\n  \"defaultOutputModes\": [\n    \"text/markdown\",\n    \"application/json\"\n  ],\n  \"authentication\": {\n    \"schemes\": []\n  },\n  \"skills\": [],\n  \"capabilities\": {\n    \"streaming\": false,\n    \"pushNotifications\": false,\n    \"extensions\": [\n      {\n        \"uri\": \"https://docs.concordium.com/a2a-extensions/concordium-badge/v1\",\n        \"description\": \"Verified by Concordium badge — on-chain agent identity in a CIS-8004 registry\",\n        \"required\": false,\n        \"params\": {\n          \"tokenAddress\": \"ccd:4221332d34e1694168c2a0c0b3fd0f27/cis-2:JyP9XWZtoBN28s8bCdkiy\",\n          \"owner\": {\n            \"account\": \"ccd:4221332d34e1694168c2a0c0b3fd0f27:4WBJM9RyoYQiwtjB1YxdqJAF1SMVyUao7KjA6fMbQKAUKarpkk\"\n          },\n          \"agentWallet\": \"ccd:4221332d34e1694168c2a0c0b3fd0f27:4WBJM9RyoYQiwtjB1YxdqJAF1SMVyUao7KjA6fMbQKAUKarpkk\",\n          \"contracts\": {\n            \"cis8004\": \"ccd:4221332d34e1694168c2a0c0b3fd0f27:12802.0\",\n            \"cis8\": \"ccd:4221332d34e1694168c2a0c0b3fd0f27:12801.0\"\n          },\n          \"verify\": \"Resolve tokenAddress via CIS-8004 agent_of; confirm owner + status=Active + card SHA-256 == metadata_hash.\",\n          \"verification\": {\n            \"service\": \"Concordium Agent Registry\",\n            \"verifyUrl\": \"https://agent-registry-mcp.concordium.com/v1/badge-check/JyP9XWZtoBN28s8bCdkiy\",\n            \"mcp\": \"https://agent-registry-mcp.concordium.com/mcp\",\n            \"docs\": \"https://docs.concordium.com/en/mainnet/technical-reference/agent-registry/concordium-badge.html\"\n          }\n        }\n      }\n    ]\n  },\n  \"registrations\": [\n    {\n      \"agentId\": 1472,\n      \"agentRegistry\": \"ccd:4221332d34e1694168c2a0c0b3fd0f27:12802.0\"\n    }\n  ]\n}";
+const CANONICAL_NAIRATAG_CARD_HASH = '262a1b0b1eb7808a3b287f9ccc4f4d26d9e8738d68c127efa211267d76d4d1e2';
+
 export default async function handler(req, res) {
   try {
     const tag = normalizeTag(Array.isArray(req.query?.tag) ? req.query.tag[0] : req.query?.tag);
-    const origin = requestOrigin(req);
+    let origin;
+    try {
+      origin = requestOrigin(req);
+    } catch {
+      origin = 'https://concordium.nairatag.ng';
+    }
     const cardUrl = `${origin}/api/concordium-agent-card/${encodeURIComponent(tag)}`;
     const filter = `?select=tag,card_json,card_hash,evm_owner,concordium_owner,version,updated_at&tag=eq.${encodeURIComponent(tag)}&limit=1`;
 
     if (req.method === 'GET') {
-      const rows = await supabaseRequest(filter);
-      if (!rows?.length) return sendJson(res, 404, { error: 'No Concordium Agent Card is published for this tag.' });
-      res.setHeader('ETag', `"${rows[0].card_hash}"`);
-      res.setHeader('X-Card-Version', String(rows[0].version));
-      res.setHeader('X-Card-Hash', rows[0].card_hash);
-      res.setHeader('X-NairaTag-Owner', rows[0].evm_owner);
-      res.setHeader('X-Concordium-Owner', rows[0].concordium_owner);
+      let cardJson = null;
+      let cardHash = null;
+      let version = 1;
+      let evmOwner = '';
+      let concordiumOwner = '4WBJM9RyoYQiwtjB1YxdqJAF1SMVyUao7KjA6fMbQKAUKarpkk';
+
+      try {
+        const rows = await supabaseRequest(filter);
+        if (rows?.length) {
+          cardJson = rows[0].card_json;
+          cardHash = rows[0].card_hash;
+          version = rows[0].version;
+          evmOwner = rows[0].evm_owner;
+          concordiumOwner = rows[0].concordium_owner;
+        }
+      } catch {
+        // Fall back to canonical card if Supabase is unavailable
+      }
+
+      if (!cardJson && tag === 'nairatag') {
+        cardJson = CANONICAL_NAIRATAG_CARD;
+        cardHash = CANONICAL_NAIRATAG_CARD_HASH;
+      }
+
+      if (!cardJson) return sendJson(res, 404, { error: 'No Concordium Agent Card is published for this tag.' });
+
+      res.setHeader('ETag', `"${cardHash}"`);
+      res.setHeader('X-Card-Version', String(version));
+      res.setHeader('X-Card-Hash', cardHash);
+      if (evmOwner) res.setHeader('X-NairaTag-Owner', evmOwner);
+      res.setHeader('X-Concordium-Owner', concordiumOwner);
       res.setHeader('Content-Type', 'application/json; charset=utf-8');
-      res.setHeader('Cache-Control', 'no-store');
-      return res.status(200).send(rows[0].card_json);
+      res.setHeader('Cache-Control', 'public, max-age=60, s-maxage=300');
+      return res.status(200).send(cardJson);
     }
     if (req.method !== 'POST') {
       res.setHeader('Allow', 'GET, POST');

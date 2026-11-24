@@ -736,3 +736,75 @@ export async function verifyConcordiumCis8Binding(binding, { signal } = {}) {
   };
 }
 
+/** Generates a cryptographically random hex challenge string for ZK ID proofs. */
+export function generateRandomChallengeHex(byteLength = 32) {
+  const bytes = new Uint8Array(byteLength);
+  if (typeof globalThis !== 'undefined' && globalThis.crypto?.getRandomValues) {
+    globalThis.crypto.getRandomValues(bytes);
+  } else {
+    for (let i = 0; i < byteLength; i++) {
+      bytes[i] = Math.floor(Math.random() * 256);
+    }
+  }
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+/**
+ * Builds a Concordium Zero-Knowledge ID statement to prove age of majority (18+)
+ * and verified human identity backing without revealing birthdate or PII.
+ */
+export async function buildConcordiumIdStatement({ minAge = 18 } = {}) {
+  const { IdStatementBuilder } = await import('@concordium/web-sdk');
+  const builder = new IdStatementBuilder();
+  builder.addMinimumAge(minAge);
+  return builder.getStatement();
+}
+
+/**
+ * Requests a Zero-Knowledge Identity Proof from the Concordium Browser Wallet.
+ * Proves the human operator has passed Concordium KYC/identity verification
+ * and meets the age requirement without leaking or storing any personal data.
+ */
+export async function requestConcordiumHumanProof(connection, account, { minAge = 18, challenge } = {}) {
+  if (!connection) {
+    throw new Error('Connect your Concordium Browser Wallet before requesting human proof.');
+  }
+  const client = connection.client || connection;
+  if (!client?.requestIdProof) {
+    throw new Error('The connected Concordium wallet does not support Zero-Knowledge identity proofs.');
+  }
+  if (!account || typeof account !== 'string' || !account.trim()) {
+    throw new Error('A valid Concordium account address is required to prove human backing.');
+  }
+
+  const statement = await buildConcordiumIdStatement({ minAge });
+  const challengeHex = challenge || generateRandomChallengeHex(32);
+
+  let proofOutput;
+  try {
+    proofOutput = await client.requestIdProof(account.trim(), statement, challengeHex);
+  } catch (error) {
+    if (error?.message?.includes('User rejected') || error?.message?.includes('rejected')) {
+      throw new Error('Human verification was rejected or cancelled in Concordium Wallet.');
+    }
+    throw error;
+  }
+
+  if (!proofOutput || !proofOutput.proof) {
+    throw new Error('Concordium Browser Wallet returned an incomplete identity proof.');
+  }
+
+  return {
+    account: account.trim(),
+    credential: proofOutput.credential || null,
+    statement,
+    challenge: challengeHex,
+    proof: proofOutput.proof,
+    minAge,
+    network: CONCORDIUM_TESTNET.network,
+    verifiedAt: new Date().toISOString(),
+    valid: true,
+  };
+}
+
+

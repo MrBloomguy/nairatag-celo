@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Check, Copy, ExternalLink, ShieldCheck, Wallet } from 'lucide-react';
-import { buildConcordiumAgentCard, buildConcordiumAgentRegistration, buildConcordiumCis8Binding, buildConcordiumSetAgentUri, CONCORDIUM_TESTNET, findConcordiumAgentByCis8Binding, publishConcordiumAgentCard, submitConcordiumAgentRegistration, submitConcordiumCis8Binding, submitConcordiumSetAgentUri, verifyConcordiumBadge, verifyConcordiumCis8Binding, verifyHostedConcordiumAgentCard } from '../services/concordiumAgentRegistry.js';
+import { buildConcordiumAgentCard, buildConcordiumAgentRegistration, buildConcordiumCis8Binding, buildConcordiumSetAgentUri, CONCORDIUM_TESTNET, findConcordiumAgentByCis8Binding, publishConcordiumAgentCard, requestConcordiumHumanProof, submitConcordiumAgentRegistration, submitConcordiumCis8Binding, submitConcordiumSetAgentUri, verifyConcordiumBadge, verifyConcordiumCis8Binding, verifyHostedConcordiumAgentCard } from '../services/concordiumAgentRegistry.js';
 import { connectConcordiumTestnetWallet } from '../services/concordiumWallet.js';
 
 const panelStyle = {
@@ -41,6 +41,9 @@ export default function ConcordiumAgentIdentityPanel({ agent, activeEvmAddress, 
   const [setUriLoading, setSetUriLoading] = useState(false);
   const [setUriError, setSetUriError] = useState('');
   const [setUriTx, setSetUriTx] = useState('');
+  const [humanProof, setHumanProof] = useState(null);
+  const [humanProofLoading, setHumanProofLoading] = useState(false);
+  const [humanProofError, setHumanProofError] = useState('');
 
   useEffect(() => () => {
     wallet?.connection?.disconnect?.();
@@ -66,6 +69,8 @@ export default function ConcordiumAgentIdentityPanel({ agent, activeEvmAddress, 
     setRegistrationError('');
     setRegistrationTx('');
     setRegisteredAgent(null);
+    setHumanProof(null);
+    setHumanProofError('');
 
     if (badge) {
       setLoading(true);
@@ -85,6 +90,8 @@ export default function ConcordiumAgentIdentityPanel({ agent, activeEvmAddress, 
     setRegistrationError('');
     setRegistrationTx('');
     setRegisteredAgent(null);
+    setHumanProof(null);
+    setHumanProofError('');
   }, [activeEvmAddress, profileOwnerAddress]);
 
   const checkBadge = async (event) => {
@@ -117,6 +124,8 @@ export default function ConcordiumAgentIdentityPanel({ agent, activeEvmAddress, 
           setRegistrationError('');
           setRegistrationTx('');
           setRegisteredAgent(null);
+          setHumanProof(null);
+          setHumanProofError('');
           setWallet((current) => current ? { ...current, account } : current);
         },
         onChainChanged: (genesisHash) => {
@@ -130,6 +139,8 @@ export default function ConcordiumAgentIdentityPanel({ agent, activeEvmAddress, 
           setRegistrationError('');
           setRegistrationTx('');
           setRegisteredAgent(null);
+          setHumanProof(null);
+          setHumanProofError('');
           if (genesisHash?.toLowerCase() !== CONCORDIUM_TESTNET.genesisHash) {
             setWalletError(`Wallet network changed. Switch back to ${CONCORDIUM_TESTNET.name} to continue.`);
           } else {
@@ -157,6 +168,25 @@ export default function ConcordiumAgentIdentityPanel({ agent, activeEvmAddress, 
     setRegistration(null);
     setRegistrationTx('');
     setRegisteredAgent(null);
+    setHumanProof(null);
+    setHumanProofError('');
+  };
+
+  const verifyHumanOperator = async () => {
+    if (!wallet?.connection || !wallet?.account) {
+      setHumanProofError('Connect your Concordium Browser Wallet first.');
+      return;
+    }
+    setHumanProofLoading(true);
+    setHumanProofError('');
+    try {
+      const proofResult = await requestConcordiumHumanProof(wallet.connection, wallet.account);
+      setHumanProof(proofResult);
+    } catch (err) {
+      setHumanProofError(err?.message || 'Could not verify human operator with Concordium ID.');
+    } finally {
+      setHumanProofLoading(false);
+    }
   };
 
   const prepareCard = async (event) => {
@@ -444,6 +474,69 @@ export default function ConcordiumAgentIdentityPanel({ agent, activeEvmAddress, 
           <a href="https://docs.concordium.com/en/mainnet/docs/browser-wallet/setup-browser-wallet.html" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--text-link, #2563eb)', fontWeight: 650 }}>Wallet setup <ExternalLink size={11} style={{ verticalAlign: 'middle' }} /></a>
         </div>
       </aside>
+
+      <div style={{ margin: '8px 0 12px', padding: 10, borderRadius: 8, background: 'var(--surface-1, #fff)', fontSize: 11, lineHeight: 1.5 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <strong>Concordium ID · Zero-Knowledge Human Proof (Verify &amp; Access)</strong>
+          {humanProof && (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: '#15803d', fontWeight: 600 }}>
+              <Check size={12} /> ZK-Verified Human
+            </span>
+          )}
+        </div>
+        <p style={{ margin: '5px 0', color: 'var(--text-secondary, #64748b)' }}>
+          Proves a real, KYC-verified human operator stands behind this agent using Concordium Zero-Knowledge ID proof without leaking personal identity or storing personal data.
+        </p>
+
+        {!wallet?.account ? (
+          <div style={{ color: '#b45309' }}>Connect your Concordium wallet above to verify human operator backing.</div>
+        ) : (
+          <div>
+            <button
+              type="button"
+              className="agent-tool-chip"
+              onClick={verifyHumanOperator}
+              disabled={humanProofLoading || Boolean(walletError)}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                marginTop: 4,
+                background: humanProof ? '#f0fdf4' : undefined,
+                borderColor: humanProof ? '#86efac' : undefined,
+                color: humanProof ? '#166534' : undefined,
+                opacity: humanProofLoading || Boolean(walletError) ? 0.6 : 1,
+              }}
+            >
+              <ShieldCheck size={13} />
+              {humanProofLoading
+                ? 'Waiting for Concordium Wallet ID Proof…'
+                : humanProof
+                  ? 'Re-verify Human Operator (Concordium ID)'
+                  : 'Verify Human Operator (Concordium ID)'}
+            </button>
+
+            {humanProof && (
+              <div role="status" style={{ marginTop: 8, padding: 8, borderRadius: 8, background: '#f0fdf4', border: '1px solid #bbf7d0', color: '#166534' }}>
+                <div style={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <ShieldCheck size={14} color="#15803d" />
+                  Verified Human-Backed Operator (Age 18+ KYC via Concordium ID)
+                </div>
+                <div style={{ marginTop: 4, fontSize: 10.5, lineHeight: 1.6, color: '#14532d' }}>
+                  <div>Network: <b>{humanProof.network}</b></div>
+                  <div>Operator Account: <span style={{ overflowWrap: 'anywhere' }}>{humanProof.account}</span></div>
+                  {humanProof.credential && <div>Credential ID: <span style={{ overflowWrap: 'anywhere' }}>{humanProof.credential}</span></div>}
+                  <div>Challenge Nonce: <span style={{ overflowWrap: 'anywhere' }}>{humanProof.challenge?.slice(0, 16)}…</span></div>
+                  <div>ZK Statement: <b>Age ≥ 18</b> (atomic date-of-birth range proof)</div>
+                  <div>Privacy Guarantee: <b>Zero PII retained</b> (no name, passport, or birthdate stored)</div>
+                  <div>Verified At: {humanProof.verifiedAt}</div>
+                </div>
+              </div>
+            )}
+            {humanProofError && <p role="alert" style={{ margin: '6px 0 0', color: '#b91c1c' }}>{humanProofError}</p>}
+          </div>
+        )}
+      </div>
 
       <div style={{ margin: '8px 0 12px', padding: 9, borderRadius: 8, background: 'var(--surface-1, #fff)', fontSize: 11, lineHeight: 1.5 }}>
         <strong>Link this tag owner with CIS-8</strong>

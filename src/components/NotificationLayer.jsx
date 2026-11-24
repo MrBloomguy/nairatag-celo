@@ -152,22 +152,42 @@ export default function NotificationLayer({ onNavigateTab, onOpenRewards, accoun
   }, []);
 
   // Once per day, remind signed-in users about unclaimed rewards before the
-  // local reset. The inbox keeps the reminder if the floating card is missed.
+  // local reset. Strictly throttled to once per calendar day in localStorage so it never pops every login or hourly.
   useEffect(() => {
     const walletKey = String(accountKey || '').trim().toLowerCase();
     if (!walletKey || hasBlockingModal) return;
     let active = true;
+
+    const today = localDayKey();
+    const reminderKey = `nairatag_reward_nudge:${walletKey}:${today}`;
+
+    // Strictly check localStorage: if already shown today, do not pop again on re-login or refresh
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        if (window.localStorage.getItem(reminderKey)) {
+          return;
+        }
+      }
+    } catch {}
+
+    if (shownRewardNudges.has(reminderKey)) return;
+
     getArcRewardState(walletKey).then((state) => {
       if (!active) return;
-      const today = localDayKey();
-      const reminderKey = `nairatag_reward_nudge:${walletKey}:${today}`;
-      if (shownRewardNudges.has(reminderKey)) return;
-      const streakAvailable = !state.streak.claimedToday;
-      if (state.spins.available <= 0 && !streakAvailable) return;
+      const streakAvailable = !state?.streak?.claimedToday;
+      if (state?.spins?.available <= 0 && !streakAvailable) return;
+
       shownRewardNudges.add(reminderKey);
+      try {
+        if (typeof window !== 'undefined' && window.localStorage) {
+          window.localStorage.setItem(reminderKey, String(Date.now()));
+        }
+      } catch {}
+
       const reminders = [];
       if (streakAvailable) reminders.push('Claim today’s streak points');
-      if (state.spins.available > 0) reminders.push('use your free spin');
+      if (state.spins?.available > 0) reminders.push('use your free spin');
+
       sendNotificationAlert({
         title: 'Your daily Celo rewards are waiting',
         body: `${reminders.join(' and ')} before midnight. One confirmed Celo payment can unlock a second spin today.`,

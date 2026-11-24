@@ -81,10 +81,13 @@ export function getDefaultMilestoneEvents(task) {
 
 /**
  * Loads all chat messages for a specific task from Supabase, falling back to localStorage.
+ * Detects real-time typing heartbeats from the other collaborator.
  */
-export async function getTaskChatMessages(taskId, task) {
+export async function getTaskChatMessages(taskId, task, currentWallet = '') {
   if (!taskId) return [];
   const key = `${STORAGE_PREFIX}${taskId}`;
+  const now = Date.now();
+  let typingUser = null;
 
   // 1. Query Supabase for shared multi-user chat
   try {
@@ -99,7 +102,20 @@ export async function getTaskChatMessages(taskId, task) {
     if (res && res.ok) {
       const rows = await res.json().catch(() => []);
       if (Array.isArray(rows) && rows.length > 0) {
-        const mapped = rows.map((r) => ({
+        // Check for active typing heartbeats from other party
+        for (const r of rows) {
+          if (r.role === 'typing') {
+            const timeDiff = now - new Date(r.created_at).getTime();
+            const isNotMe = !currentWallet || (r.sender && r.sender.toLowerCase() !== currentWallet.toLowerCase());
+            if (timeDiff < 5500 && isNotMe) {
+              typingUser = r.sender_tag || 'Collaborator';
+            }
+          }
+        }
+
+        // Filter out typing heartbeats from regular message list
+        const realRows = rows.filter((r) => r.role !== 'typing');
+        const mapped = realRows.map((r) => ({
           id: r.id,
           type: r.role === 'system' ? 'system' : r.role === 'agent' ? 'agent' : 'user',
           sender: r.sender,
@@ -108,6 +124,8 @@ export async function getTaskChatMessages(taskId, task) {
           text: r.text,
           timestamp: new Date(r.created_at).getTime(),
         }));
+
+        mapped.typingUser = typingUser;
 
         if (typeof window !== 'undefined' && window.localStorage) {
           try {
@@ -128,6 +146,7 @@ export async function getTaskChatMessages(taskId, task) {
       if (raw) {
         const parsed = JSON.parse(raw);
         if (Array.isArray(parsed) && parsed.length > 0) {
+          parsed.typingUser = typingUser;
           return parsed;
         }
       }
@@ -136,37 +155,47 @@ export async function getTaskChatMessages(taskId, task) {
 
   // 3. Fallback to default chronological milestone events
   const initial = getDefaultMilestoneEvents(task);
+  initial.typingUser = typingUser;
   if (typeof window !== 'undefined' && window.localStorage) {
     try {
       window.localStorage.setItem(key, JSON.stringify(initial));
     } catch {}
   }
 
-  // Seed default milestone event to Supabase in background
-  if (initial.length > 0) {
-    for (const evt of initial) {
-      fetch(SUPABASE_REST_URL, {
-        method: 'POST',
-        headers: {
-          apikey: SUPABASE_ANON_KEY,
-          Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-          'Content-Type': 'application/json',
-          Prefer: 'resolution=ignore-duplicates',
-        },
-        body: JSON.stringify({
-          id: evt.id,
-          task_id: taskId,
-          sender: evt.sender,
-          sender_tag: evt.senderTag,
-          role: evt.role || 'system',
-          text: evt.text,
-          created_at: new Date(evt.timestamp).toISOString(),
-        }),
-      }).catch(() => null);
-    }
-  }
-
   return initial;
+}
+
+let lastTypingTime = 0;
+/**
+ * Broadcasts an ephemeral typing heartbeat to Supabase so the other user sees "Typing...".
+ */
+export async function sendTaskTypingHeartbeat(taskId, { sender, senderTag, role }) {
+  if (!taskId || !sender) return;
+  const now = Date.now();
+  if (now - lastTypingTime < 2000) return; // Debounce 2 seconds
+  lastTypingTime = now;
+
+  const id = `typing_${taskId}_${sender.toLowerCase().slice(0, 10)}`;
+  try {
+    fetch(SUPABASE_REST_URL, {
+      method: 'POST',
+      headers: {
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+        'Content-Type': 'application/json',
+        Prefer: 'resolution=merge-duplicates',
+      },
+      body: JSON.stringify({
+        id,
+        task_id: taskId,
+        sender,
+        sender_tag: senderTag || (sender ? `₦${sender.slice(0, 6)}...${sender.slice(-4)}` : 'User'),
+        role: 'typing',
+        text: 'typing...',
+        created_at: new Date(now).toISOString(),
+      }),
+    }).catch(() => null);
+  } catch {}
 }
 
 /**
@@ -179,12 +208,13 @@ export async function sendTaskChatMessage(taskId, { sender, senderTag, role, tex
   const messageId = `msg_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
   const messageRole = role || (isAgent ? 'agent' : 'user');
   const timestamp = Date.now();
+  const safeTag = senderTag || (sender ? `₦${sender.slice(0, 6)}...${sender.slice(-4)}` : 'User');
 
   const newMsg = {
     id: messageId,
     type: messageRole === 'system' ? 'system' : isAgent ? 'agent' : 'user',
     sender: sender || 'user',
-    senderTag: senderTag || '₦YOU',
+    senderTag: safeTag,
     role: messageRole,
     text: text.trim(),
     timestamp,
@@ -218,7 +248,7 @@ export async function sendTaskChatMessage(taskId, { sender, senderTag, role, tex
         id: messageId,
         task_id: taskId,
         sender: sender || 'user',
-        sender_tag: senderTag || '₦YOU',
+        sender_tag: safeTag,
         role: messageRole,
         text: text.trim(),
         created_at: new Date(timestamp).toISOString(),

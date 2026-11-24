@@ -17,6 +17,11 @@ function getTasksUrl() {
 }
 
 function mapTask(row) {
+  const creatorAddress = row.creator_address || row.creatorAddress || row.creator_wallet || null;
+  const creatorTag = row.creator_tag || row.creatorTag || (creatorAddress ? `₦${creatorAddress.slice(0, 6)}...${creatorAddress.slice(-4)}` : '₦CLIENT');
+  const workerAddress = row.assigned_worker_address || row.assignedWorkerAddress || null;
+  const workerTag = row.assigned_worker_tag || row.assignedWorkerTag || (workerAddress ? `₦${workerAddress.slice(0, 6)}...${workerAddress.slice(-4)}` : null);
+
   return {
     id: row.id,
     chainId: Number(row.chain_id || row.chainId || CELO_CHAIN_ID),
@@ -24,7 +29,8 @@ function mapTask(row) {
     description: row.description,
     category: row.category,
     categoryLabel: row.category_label || row.categoryLabel,
-    creatorTag: row.creator_tag || row.creatorTag,
+    creatorTag,
+    creatorAddress,
     deliverable: row.deliverable,
     rewardAmount: Number(row.rewardAmount || row.reward_amount || row.rewardUSDC || row.reward_usdc || 0),
     rewardToken: row.rewardToken || row.reward_token || 'USDT',
@@ -36,8 +42,8 @@ function mapTask(row) {
     escrowStatus: row.escrow_status || row.escrowStatus || '🔒 Funded in Escrow',
     escrowContract: row.escrow_contract || null,
     escrowTxHash: row.escrow_tx_hash || row.escrowTxHash || null,
-    assignedWorkerTag: row.assigned_worker_tag || row.assignedWorkerTag || null,
-    assignedWorkerAddress: row.assigned_worker_address || row.assignedWorkerAddress || null,
+    assignedWorkerTag: workerTag,
+    assignedWorkerAddress: workerAddress,
     submissionDeliverable: row.submission_deliverable || row.submissionDeliverable || null,
     payoutHash: row.payout_hash || row.payoutHash || null,
     payoutDelivered: row.payout_delivered || row.payoutDelivered || null,

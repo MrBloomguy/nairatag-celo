@@ -52,7 +52,7 @@ export default async function handler(req, res) {
         description: raw.description || '',
         category: raw.category || 'dev',
         category_label: raw.categoryLabel || raw.category_label || '⚡ Engineering',
-        creator_tag: raw.creatorTag || raw.creator_tag || '₦YOU',
+        creator_tag: raw.creatorTag || raw.creator_tag || (raw.creatorAddress ? `₦${raw.creatorAddress.slice(0, 6)}...${raw.creatorAddress.slice(-4)}` : '₦CLIENT'),
         creator_address: raw.creatorAddress || raw.creator_wallet || raw.creator_address || null,
         deliverable: raw.deliverable || '',
         reward_amount: Number(raw.rewardAmount || raw.reward_amount || raw.rewardUSDC || 0),

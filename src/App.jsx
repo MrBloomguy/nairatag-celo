@@ -130,6 +130,7 @@ import {
 import {
   getTaskChatMessages,
   sendTaskChatMessage,
+  sendTaskTypingHeartbeat,
   generateAgentTaskReply,
 } from './services/taskChatService.js';
 import {
@@ -1342,11 +1343,15 @@ function ArcAppShell() {
   const [balanceLoading, setBalanceLoading] = useState(false);
   const [copiedKey, setCopiedKey] = useState(null);
   const [myTag, setMyTag] = useState(null);
-  const displayUserTag = myTag?.tag ? `₦${String(myTag.tag).replace(/^[$₦]/, '').toUpperCase()}` : null;
+  const displayUserTag = myTag?.tag
+    ? `₦${String(myTag.tag).replace(/^[$₦]/, '').toUpperCase()}`
+    : (walletAddress ? `₦${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}` : null);
   const [accountEmail, setAccountEmail] = useState('');
   const accountUsername = accountEmail.includes('@') ? accountEmail.slice(0, accountEmail.indexOf('@')) : accountEmail;
-  const displayAccountName = displayUserTag || (accountUsername ? `₦${accountUsername.toUpperCase()}` : null);
-  const userTag = myTag?.tag ? String(myTag.tag).replace(/^[$₦]/, '').toLowerCase() : (accountUsername || 'nairatag');
+  const displayAccountName = displayUserTag || (walletAddress ? `₦${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}` : (accountUsername ? `₦${accountUsername.toUpperCase()}` : 'Wallet'));
+  const userTag = myTag?.tag
+    ? String(myTag.tag).replace(/^[$₦]/, '').toLowerCase()
+    : (walletAddress ? `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}` : (accountUsername || 'wallet'));
 
   // Circle Programmable Wallet State
   const [authProvider, setAuthProvider] = useState(null); // 'circle' | 'injected'
@@ -1594,7 +1599,7 @@ function ArcAppShell() {
         return;
       }
       try {
-        const msgs = await getTaskChatMessages(selectedTask.id, selectedTask);
+        const msgs = await getTaskChatMessages(selectedTask.id, selectedTask, walletAddress);
         if (!isCancelled && Array.isArray(msgs)) {
           setTaskChatList(msgs);
         }
@@ -1614,7 +1619,7 @@ function ArcAppShell() {
       isCancelled = true;
       if (pollInterval) clearInterval(pollInterval);
     };
-  }, [selectedTask?.id, selectedTask?.status]);
+  }, [selectedTask?.id, selectedTask?.status, walletAddress]);
 
   // Pay / Send Terminal State
   const [recipientInput, setRecipientInput] = useState('');
@@ -2238,7 +2243,7 @@ function ArcAppShell() {
       return;
     }
     try {
-      const workerTag = myTag?.tag || displayUserTag || '₦FREELANCER';
+      const workerTag = myTag?.tag || displayUserTag || (walletAddress ? `₦${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}` : '₦WORKER');
       const progress = await startArcTask({
         taskId: task.id,
         walletAddress,
@@ -2302,7 +2307,7 @@ function ArcAppShell() {
         points: task.points
       });
 
-      const workerTag = task.assignedWorkerTag || myTag?.tag || displayUserTag || '₦FREELANCER';
+      const workerTag = task.assignedWorkerTag || myTag?.tag || displayUserTag || (walletAddress ? `₦${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}` : '₦WORKER');
 
       // Update durable store and Supabase
       updateTaskState(task.id, {
@@ -2362,7 +2367,10 @@ function ArcAppShell() {
     setIsSendingTaskChat(true);
 
     const isCreator = Boolean(
-      (walletAddress && selectedTask.creatorAddress && walletAddress.toLowerCase() === selectedTask.creatorAddress.toLowerCase()) ||
+      (walletAddress && (
+        (selectedTask.creatorAddress && walletAddress.toLowerCase() === selectedTask.creatorAddress.toLowerCase()) ||
+        (selectedTask.creator_address && walletAddress.toLowerCase() === selectedTask.creator_address.toLowerCase())
+      )) ||
       (myTag?.tag && selectedTask.creatorTag && (
         myTag.tag.toLowerCase().replace(/^₦/, '') === selectedTask.creatorTag.toLowerCase().replace(/^₦/, '')
       )) ||
@@ -2372,7 +2380,8 @@ function ArcAppShell() {
     );
 
     const senderTag = isCreator
-      ? (selectedTask.creatorTag || displayUserTag || '₦CLIENT')
+      ? (selectedTask.creatorTag || displayUserTag || (walletAddress ? `₦${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}` : '₦CLIENT'))
+      : (myTag?.tag || selectedTask.assignedWorkerTag || displayUserTag || (walletAddress ? `₦${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}` : '₦WORKER'));
       : (myTag?.tag || selectedTask.assignedWorkerTag || displayUserTag || '₦FREELANCER');
 
     const userMsgRes = await sendTaskChatMessage(
@@ -2741,7 +2750,7 @@ function ArcAppShell() {
         points,
         deadline: postTaskForm.deadline || '3 days left',
         applicants: 0,
-        creatorTag: displayUserTag || '₦YOU',
+        creatorTag: displayUserTag || (walletAddress ? `₦${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}` : '₦CLIENT'),
         creatorAddress: walletAddress || '0x653f773C9062e71A6554b42a9525fcD47fCC1693',
         escrowStatus: '🔒 Funded in Escrow',
         escrowTxHash: escrowHash,
@@ -3656,7 +3665,7 @@ function ArcAppShell() {
               aria-label="Open your profile dashboard"
             >
               <ProfileAvatar tag={myTag?.tag} email={accountEmail} size={26} />
-              <span className="wallet-connected-handle">{displayAccountName || 'NairaTag user'}</span>
+              <span className="wallet-connected-handle">{displayAccountName || (walletAddress ? `₦${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}` : 'Wallet')}</span>
               <span className="wallet-connected-sep desktop-only">|</span>
               <span className="wallet-connected-bal desktop-only">{usdcBalance.formatted} USDC</span>
             </button>
@@ -4569,7 +4578,10 @@ function ArcAppShell() {
 
                       {(() => {
                         const isCreator = Boolean(
-                          (walletAddress && selectedTask.creatorAddress && walletAddress.toLowerCase() === selectedTask.creatorAddress.toLowerCase()) ||
+                          (walletAddress && (
+                            (selectedTask.creatorAddress && walletAddress.toLowerCase() === selectedTask.creatorAddress.toLowerCase()) ||
+                            (selectedTask.creator_address && walletAddress.toLowerCase() === selectedTask.creator_address.toLowerCase())
+                          )) ||
                           (myTag?.tag && selectedTask.creatorTag && (
                             myTag.tag.toLowerCase().replace(/^₦/, '') === selectedTask.creatorTag.toLowerCase().replace(/^₦/, '')
                           )) ||
@@ -4885,7 +4897,10 @@ function ArcAppShell() {
                       {/* ── Embedded Project Workspace & Task Chat ── */}
                       {(() => {
                         const isCreator = Boolean(
-                          (walletAddress && selectedTask.creatorAddress && walletAddress.toLowerCase() === selectedTask.creatorAddress.toLowerCase()) ||
+                          (walletAddress && (
+                            (selectedTask.creatorAddress && walletAddress.toLowerCase() === selectedTask.creatorAddress.toLowerCase()) ||
+                            (selectedTask.creator_address && walletAddress.toLowerCase() === selectedTask.creator_address.toLowerCase())
+                          )) ||
                           (myTag?.tag && selectedTask.creatorTag && (
                             myTag.tag.toLowerCase().replace(/^₦/, '') === selectedTask.creatorTag.toLowerCase().replace(/^₦/, '')
                           )) ||
@@ -4996,9 +5011,10 @@ function ArcAppShell() {
                                   );
                                 })
                               )}
-                              {isSendingTaskChat && (
+                              {(taskChatList?.typingUser || isSendingTaskChat) && (
                                 <div style={{ fontSize: '11px', color: '#10B981', display: 'flex', alignItems: 'center', gap: '6px', fontStyle: 'italic', paddingLeft: '4px' }}>
-                                  <span>Typing response...</span>
+                                  <span style={{ display: 'inline-block', width: '6px', height: '6px', borderRadius: '50%', background: '#10B981' }} />
+                                  <span>{taskChatList?.typingUser ? `${taskChatList.typingUser} is typing...` : 'Sending message...'}</span>
                                 </div>
                               )}
                             </div>
@@ -5011,7 +5027,16 @@ function ArcAppShell() {
                                 className="token-amount-field"
                                 placeholder={isCreator ? `Message @${selectedTask.assignedWorkerTag?.replace(/^₦/, '') || 'Freelancer'} about deliverables or revisions...` : `Message @${selectedTask.creatorTag?.replace(/^₦/, '')} about deliverables, progress, or escrow...`}
                                 value={taskChatDraft}
-                                onChange={(e) => setTaskChatDraft(e.target.value)}
+                                onChange={(e) => {
+                                  setTaskChatDraft(e.target.value);
+                                  if (e.target.value.trim().length > 0 && walletAddress) {
+                                    sendTaskTypingHeartbeat(selectedTask.id, {
+                                      sender: walletAddress,
+                                      senderTag: isCreator ? (selectedTask.creatorTag || displayUserTag || `₦${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}`) : (selectedTask.assignedWorkerTag || displayUserTag || `₦${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}`),
+                                      role: isCreator ? 'client' : 'worker',
+                                    });
+                                  }
+                                }}
                                 style={{ flex: 1, padding: '9px 12px', fontSize: '12.5px' }}
                                 disabled={isSendingTaskChat}
                               />

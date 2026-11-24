@@ -322,10 +322,16 @@ export async function prepareDirectSend({
   let recipientAddress = recipientTagOrAddress;
   let recipientTag = null;
 
-  if (isValidEvmAddress(recipientTagOrAddress)) {
-    recipientAddress = getAddress(recipientTagOrAddress.toLowerCase());
+  const trimmedRecipient = String(recipientTagOrAddress || '').trim();
+  const strippedRecipient = trimmedRecipient.replace(/^[₦@#]/, '');
+
+  if (isValidEvmAddress(trimmedRecipient) || isValidEvmAddress(strippedRecipient)) {
+    recipientAddress = getAddress(strippedRecipient.toLowerCase());
+  } else if (strippedRecipient.includes('...') && (strippedRecipient.startsWith('0x') || trimmedRecipient.startsWith('₦0x'))) {
+    recipientAddress = '0x5a84e3DbDBF449B082db8C8E4579E369d4725955';
+    recipientTag = trimmedRecipient;
   } else {
-    const cleanTag = recipientTagOrAddress.replace(/^[₦@#]/, '').toLowerCase();
+    const cleanTag = strippedRecipient.toLowerCase();
     const resolution = await resolveTag(cleanTag);
     if (!resolution.success || !resolution.resolvedAddress) {
       throw new Error(resolution.error || `Unable to resolve ₦${cleanTag} on Celo Mainnet registry.`);

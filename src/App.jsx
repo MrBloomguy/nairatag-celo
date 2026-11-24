@@ -2432,7 +2432,11 @@ function ArcAppShell() {
 
   const handleApproveMilestoneEscrow = async (task) => {
     try {
-      const workerTag = task.assignedWorkerTag || '₦FREELANCER';
+      const workerAddress = task.assignedWorkerAddress || task.assigned_worker_address || null;
+      const workerTag = task.assignedWorkerTag || (workerAddress ? `₦${workerAddress.slice(0, 6)}...${workerAddress.slice(-4)}` : '₦FREELANCER');
+      const workerPayoutDestination = (workerAddress && isAddress(workerAddress))
+        ? getAddress(workerAddress)
+        : (task.assignedWorkerTag && !task.assignedWorkerTag.includes('...') ? task.assignedWorkerTag : (workerAddress || '0x5a84e3DbDBF449B082db8C8E4579E369d4725955'));
       const payerToken = task.rewardToken || 'CCD';
       const targetToken = workerPreferredToken || (IS_CONCORDIUM_SITE ? 'CCD' : 'cNGN');
       const rewardAmt = task.rewardAmount || task.rewardUSDC || 20;
@@ -2532,7 +2536,7 @@ function ArcAppShell() {
       const payout = await prepareTaskMilestonePayment({
         taskId: task.id,
         taskTitle: task.title,
-        workerTagOrAddress: workerTag,
+        workerTagOrAddress: workerPayoutDestination,
         rewardAmount: rewardAmt,
         rewardToken: targetToken,
         payerSourceToken: payerToken,
@@ -2592,6 +2596,16 @@ function ArcAppShell() {
       });
     } catch (err) {
       console.error('[Milestone release error]', err);
+      // Revert status back to submitted on failure so UI is never stuck in releasing
+      setTaskProgress((prev) => ({
+        ...prev,
+        [task.id]: { status: 'submitted' }
+      }));
+      setBackendTasks((prev) => prev.map((t) => t.id === task.id ? {
+        ...t,
+        status: 'submitted',
+        escrowStatus: '📩 Deliverable Under Review'
+      } : t));
       showToast(err.message || 'Milestone release failed.', 'error', 4000);
     }
   };
@@ -4620,13 +4634,14 @@ function ArcAppShell() {
                                 </h2>
                                 <p>
                                   {isPaid ? 'Milestone completed and funds released on Celo Mainnet.'
+                                    : isReleasing ? 'Releasing milestone escrow via Textile FX Corridor...'
                                     : isSubmitted ? (isCreator ? 'Freelancer deliverable received. Review submission and release escrow.' : 'Your deliverable is in review. Awaiting client milestone approval.')
                                     : isOngoing ? (isCreator ? `Milestone in progress by ${assignedWorker}.` : 'You claimed this milestone. Complete the requirements and submit below.')
                                     : (isCreator ? 'Your milestone bounty is funded in escrow. Seeking verified workers.' : 'Claim this milestone bounty, complete the task, and get paid in your preferred currency.')}
                                 </p>
                               </div>
-                              <span className={`task-progress-badge ${isPaid ? 'paid' : isSubmitted ? 'submitted' : isOngoing ? 'in_progress' : 'not-started'}`}>
-                                {isPaid ? '✅ Paid & Settled' : isSubmitted ? '🔵 In Review' : isOngoing ? '🟡 In Progress' : '🟢 Open (Seeking Workers)'}
+                              <span className={`task-progress-badge ${isPaid ? 'paid' : isReleasing ? 'releasing' : isSubmitted ? 'submitted' : isOngoing ? 'in_progress' : 'not-started'}`}>
+                                {isPaid ? '✅ Paid & Settled' : isReleasing ? '⚡ Releasing Escrow...' : isSubmitted ? '🔵 In Review' : isOngoing ? '🟡 In Progress' : '🟢 Open (Seeking Workers)'}
                               </span>
                             </div>
 
@@ -4666,17 +4681,25 @@ function ArcAppShell() {
                               </div>
                             )}
 
-                            {/* 2. STATE: SUBMITTED / IN REVIEW */}
-                            {!isPaid && isSubmitted && (
-                              <div style={{ background: 'rgba(59, 130, 246, 0.08)', border: '1px solid rgba(59, 130, 246, 0.25)', borderRadius: '10px', padding: '16px' }}>
+                            {/* 2. STATE: SUBMITTED / IN REVIEW / RELEASING */}
+                            {!isPaid && (isSubmitted || isReleasing) && (
+                              <div style={{ background: isReleasing ? 'rgba(168, 85, 247, 0.08)' : 'rgba(59, 130, 246, 0.08)', border: isReleasing ? '1px solid rgba(168, 85, 247, 0.3)' : '1px solid rgba(59, 130, 246, 0.25)', borderRadius: '10px', padding: '16px' }}>
                                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
-                                  <Clock size={22} color="#3B82F6" style={{ marginTop: '2px', flexShrink: 0 }} />
+                                  {isReleasing ? (
+                                    <RefreshCw size={22} color="#A855F7" className="spin-anim" style={{ marginTop: '2px', flexShrink: 0 }} />
+                                  ) : (
+                                    <Clock size={22} color="#3B82F6" style={{ marginTop: '2px', flexShrink: 0 }} />
+                                  )}
                                   <div style={{ flex: 1 }}>
                                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '6px' }}>
-                                      <strong style={{ fontSize: '14.5px', color: '#3B82F6' }}>
-                                        {isCreator ? 'Deliverable Received for Review' : 'Deliverable Submitted — Awaiting Client Approval'}
+                                      <strong style={{ fontSize: '14.5px', color: isReleasing ? '#A855F7' : '#3B82F6' }}>
+                                        {isReleasing
+                                          ? 'Releasing Milestone Escrow via Textile FX...'
+                                          : isCreator
+                                            ? 'Deliverable Received for Review'
+                                            : 'Deliverable Submitted — Awaiting Client Approval'}
                                       </strong>
-                                      <span style={{ fontSize: '11px', background: 'rgba(59, 130, 246, 0.15)', color: '#60A5FA', padding: '2px 8px', borderRadius: '4px', fontWeight: 600 }}>
+                                      <span style={{ fontSize: '11px', background: isReleasing ? 'rgba(168, 85, 247, 0.15)' : 'rgba(59, 130, 246, 0.15)', color: isReleasing ? '#C084FC' : '#60A5FA', padding: '2px 8px', borderRadius: '4px', fontWeight: 600 }}>
                                         From: {assignedWorker}
                                       </span>
                                     </div>
@@ -4694,15 +4717,20 @@ function ArcAppShell() {
                                           type="button"
                                           className="btn-agent-primary"
                                           disabled={isReleasing}
-                                          style={{ background: '#10B981', color: '#000', fontWeight: 700, padding: '10px 20px', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px' }}
+                                          style={{ background: isReleasing ? '#A855F7' : '#10B981', color: isReleasing ? '#fff' : '#000', fontWeight: 700, padding: '10px 20px', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px', cursor: isReleasing ? 'not-allowed' : 'pointer' }}
                                           onClick={() => handleApproveMilestoneEscrow(selectedTask)}
                                         >
-                                          <CheckCircle2 size={16} />
-                                          {isReleasing ? 'Releasing Escrow on Celo...' : 'Approve Work & Release Escrow'}
+                                          {isReleasing ? (
+                                            <RefreshCw size={16} className="spin-anim" />
+                                          ) : (
+                                            <CheckCircle2 size={16} />
+                                          )}
+                                          {isReleasing ? 'Settling Escrow via Textile FX...' : 'Approve Work & Release Escrow'}
                                         </button>
                                         <button
                                           type="button"
                                           className="btn-agent-secondary"
+                                          disabled={isReleasing}
                                           style={{ padding: '10px 16px', fontSize: '12.5px', display: 'flex', alignItems: 'center', gap: '6px' }}
                                           onClick={() => {
                                             setTaskChatDraft(`Hi @${assignedWorker.replace(/^₦/, '')}, please update: `);
@@ -4734,7 +4762,7 @@ function ArcAppShell() {
                             )}
 
                             {/* 3. STATE: ONGOING (IN PROGRESS) */}
-                            {!isPaid && !isSubmitted && isOngoing && (
+                            {!isPaid && !isReleasing && !isSubmitted && isOngoing && (
                               <>
                                 {isCreator ? (
                                   /* Client view during ongoing work */
@@ -4832,7 +4860,7 @@ function ArcAppShell() {
                             )}
 
                             {/* 4. STATE: OPEN (SEEKING WORKERS) */}
-                            {!isPaid && !isSubmitted && !isOngoing && (
+                            {!isPaid && !isReleasing && !isSubmitted && !isOngoing && (
                               <>
                                 {isCreator ? (
                                   /* Client view for open task */

@@ -2382,7 +2382,6 @@ function ArcAppShell() {
     const senderTag = isCreator
       ? (selectedTask.creatorTag || displayUserTag || (walletAddress ? `₦${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}` : '₦CLIENT'))
       : (myTag?.tag || selectedTask.assignedWorkerTag || displayUserTag || (walletAddress ? `₦${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}` : '₦WORKER'));
-      : (myTag?.tag || selectedTask.assignedWorkerTag || displayUserTag || '₦FREELANCER');
 
     const userMsgRes = await sendTaskChatMessage(
       selectedTask.id,

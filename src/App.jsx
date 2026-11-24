@@ -1483,12 +1483,16 @@ function ArcAppShell() {
     };
 
     loadTasks();
+    // Poll every 5s for multi-user synchronization across browsers and devices
+    const pollInterval = setInterval(loadTasks, 5000);
+
     const handleTasksUpdated = () => {
       if (active) loadTasks();
     };
     window.addEventListener('nairatag-tasks-updated', handleTasksUpdated);
     return () => {
       active = false;
+      if (pollInterval) clearInterval(pollInterval);
       window.removeEventListener('nairatag-tasks-updated', handleTasksUpdated);
     };
   }, [walletAddress, tasksRefreshKey]);
@@ -1579,14 +1583,37 @@ function ArcAppShell() {
     ? inHouseVouchers.find((voucher) => voucher.taskId === selectedTask.voucherTask.id)
     : null;
 
-  // Sync Task Project Chat with durable message events when selected task changes
+  // Sync Task Project Chat with durable message events when selected task changes (with real-time polling)
   useEffect(() => {
-    if (selectedTask?.id) {
-      const msgs = getTaskChatMessages(selectedTask.id, selectedTask);
-      setTaskChatList(msgs);
-    } else {
-      setTaskChatList([]);
+    let isCancelled = false;
+    let pollInterval = null;
+
+    async function fetchTaskChat() {
+      if (!selectedTask?.id) {
+        setTaskChatList([]);
+        return;
+      }
+      try {
+        const msgs = await getTaskChatMessages(selectedTask.id, selectedTask);
+        if (!isCancelled && Array.isArray(msgs)) {
+          setTaskChatList(msgs);
+        }
+      } catch (err) {
+        console.debug('[TaskChat] Polling error:', err);
+      }
     }
+
+    fetchTaskChat();
+
+    // Poll every 3.5 seconds while task modal is open for live multi-user collaboration
+    if (selectedTask?.id) {
+      pollInterval = setInterval(fetchTaskChat, 3500);
+    }
+
+    return () => {
+      isCancelled = true;
+      if (pollInterval) clearInterval(pollInterval);
+    };
   }, [selectedTask?.id, selectedTask?.status]);
 
   // Pay / Send Terminal State
@@ -2211,7 +2238,7 @@ function ArcAppShell() {
       return;
     }
     try {
-      const workerTag = myTag?.tag || displayUserTag || '₦YOU';
+      const workerTag = myTag?.tag || displayUserTag || '₦FREELANCER';
       const progress = await startArcTask({
         taskId: task.id,
         walletAddress,
@@ -2220,6 +2247,15 @@ function ArcAppShell() {
         rewardUSDC: task.rewardUSDC,
         points: task.points
       });
+
+      // Update durable store and Supabase
+      updateTaskState(task.id, {
+        status: 'in_progress',
+        assignedWorkerTag: workerTag,
+        assignedWorkerAddress: walletAddress,
+        startedAt: Date.now(),
+      });
+
       setTaskProgress((previous) => ({ ...previous, [task.id]: progress }));
       setBackendTasks((prev) => prev.map((t) => t.id === task.id ? {
         ...t,
@@ -2228,7 +2264,23 @@ function ArcAppShell() {
         assignedWorkerAddress: walletAddress,
         startedAt: Date.now(),
       } : t));
-      showToast(`You started: "${task.title}". Status is now Ongoing!`, 'success');
+
+      // Append protocol event to chat
+      sendTaskChatMessage(
+        task.id,
+        {
+          sender: walletAddress,
+          senderTag: workerTag,
+          role: 'worker',
+          text: `⚡ Work Started: I claimed this milestone bounty and began implementation.`,
+          isAgent: false,
+        },
+        task
+      ).then((res) => {
+        if (res?.allMessages) setTaskChatList(res.allMessages);
+      });
+
+      showToast(`You started: "${task.title}". Status is now In Progress!`, 'success');
     } catch (error) {
       showToast(error.message || 'Could not start this task.', 'error', 4000);
     }
@@ -2236,7 +2288,7 @@ function ArcAppShell() {
 
   const handleSubmitTask = async (task) => {
     const submission = taskSubmissionDraft.trim();
-    if (submission.length < 8) {
+    if (submission.length < 5) {
       showToast('Add a submission link or a short description of your completed work.', 'error');
       return;
     }
@@ -2249,29 +2301,45 @@ function ArcAppShell() {
         rewardUSDC: task.rewardUSDC,
         points: task.points
       });
+
+      const workerTag = task.assignedWorkerTag || myTag?.tag || displayUserTag || '₦FREELANCER';
+
+      // Update durable store and Supabase
+      updateTaskState(task.id, {
+        status: 'submitted',
+        submissionDeliverable: submission,
+        submittedAt: Date.now(),
+        assignedWorkerTag: workerTag,
+        assignedWorkerAddress: walletAddress,
+      });
+
       setTaskProgress((previous) => ({ ...previous, [task.id]: progress }));
       setBackendTasks((prev) => prev.map((t) => t.id === task.id ? {
         ...t,
         status: 'submitted',
         submissionDeliverable: submission,
         submittedAt: Date.now(),
+        assignedWorkerTag: workerTag,
+        assignedWorkerAddress: walletAddress,
       } : t));
       setTaskSubmissionDraft('');
-      showToast('Deliverable submitted! Status is now In Review for milestone approval.', 'success');
 
-      // Append deliverable submission to Project Workspace Chat
+      // Post submission event directly into Workspace Chat
       sendTaskChatMessage(
         task.id,
         {
           sender: walletAddress || '0x653f773C9062e71A6554b42a9525fcD47fCC1693',
-          senderTag: displayUserTag || '₦YOU',
-          text: `📩 Deliverable Submitted: "${submission}"`,
+          senderTag: workerTag,
+          role: 'worker',
+          text: `📩 Deliverable Submitted for Review:\n"${submission}"`,
           isAgent: false,
         },
         task
       ).then((res) => {
         if (res?.allMessages) setTaskChatList(res.allMessages);
       });
+
+      showToast('Deliverable submitted! Status is now In Review for client milestone approval.', 'success');
     } catch (error) {
       showToast(error.message || 'Could not submit this task.', 'error', 4000);
     }
@@ -2293,11 +2361,26 @@ function ArcAppShell() {
     setTaskChatDraft('');
     setIsSendingTaskChat(true);
 
+    const isCreator = Boolean(
+      (walletAddress && selectedTask.creatorAddress && walletAddress.toLowerCase() === selectedTask.creatorAddress.toLowerCase()) ||
+      (myTag?.tag && selectedTask.creatorTag && (
+        myTag.tag.toLowerCase().replace(/^₦/, '') === selectedTask.creatorTag.toLowerCase().replace(/^₦/, '')
+      )) ||
+      (displayUserTag && selectedTask.creatorTag && (
+        displayUserTag.toLowerCase().replace(/^₦/, '') === selectedTask.creatorTag.toLowerCase().replace(/^₦/, '')
+      ))
+    );
+
+    const senderTag = isCreator
+      ? (selectedTask.creatorTag || displayUserTag || '₦CLIENT')
+      : (myTag?.tag || selectedTask.assignedWorkerTag || displayUserTag || '₦FREELANCER');
+
     const userMsgRes = await sendTaskChatMessage(
       selectedTask.id,
       {
         sender: walletAddress || '0x653f773C9062e71A6554b42a9525fcD47fCC1693',
-        senderTag: displayUserTag || '₦YOU',
+        senderTag,
+        role: isCreator ? 'client' : 'worker',
         text,
         isAgent: false,
       },
@@ -2308,28 +2391,34 @@ function ArcAppShell() {
       setTaskChatList(userMsgRes.allMessages);
     }
 
-    setTimeout(async () => {
-      const reply = generateAgentTaskReply(selectedTask, text);
-      const agentRes = await sendTaskChatMessage(
-        selectedTask.id,
-        {
-          sender: selectedTask.creatorAddress || '0x4444444444444444444444444444444444444444',
-          senderTag: selectedTask.creatorTag || '₦NAIRATAG',
-          text: reply,
-          isAgent: true,
-        },
-        selectedTask
-      );
-      if (agentRes?.allMessages) {
-        setTaskChatList(agentRes.allMessages);
-      }
+    // Only generate automated reply if creator is an autonomous AI agent AND user is NOT the creator
+    const reply = !isCreator ? generateAgentTaskReply(selectedTask, text) : null;
+    if (reply) {
+      setTimeout(async () => {
+        const agentRes = await sendTaskChatMessage(
+          selectedTask.id,
+          {
+            sender: selectedTask.creatorAddress || '0x4444444444444444444444444444444444444444',
+            senderTag: selectedTask.creatorTag || '₦NAIRATAG',
+            role: 'client',
+            text: reply,
+            isAgent: true,
+          },
+          selectedTask
+        );
+        if (agentRes?.allMessages) {
+          setTaskChatList(agentRes.allMessages);
+        }
+        setIsSendingTaskChat(false);
+      }, 700);
+    } else {
       setIsSendingTaskChat(false);
-    }, 700);
+    }
   };
 
   const handleApproveMilestoneEscrow = async (task) => {
     try {
-      const workerTag = task.assignedWorkerTag || myTag?.tag || walletAddress || '₦WORKER';
+      const workerTag = task.assignedWorkerTag || '₦FREELANCER';
       const payerToken = task.rewardToken || 'CCD';
       const targetToken = workerPreferredToken || (IS_CONCORDIUM_SITE ? 'CCD' : 'cNGN');
       const rewardAmt = task.rewardAmount || task.rewardUSDC || 20;
@@ -4478,264 +4567,467 @@ function ArcAppShell() {
                         )}
                       </article>
 
-                      <article className="task-detail-panel task-submit-panel">
-                        <div className="task-detail-panel-heading">
-                          <div>
-                            <h2>Work & submission</h2>
-                            <p>{taskProgress[selectedTask.id]?.status === 'submitted' ? 'Your work has been submitted for review.' : 'Start the task, then submit a link or describe your completed work.'}</p>
-                          </div>
-                          <span className={`task-progress-badge ${taskProgress[selectedTask.id]?.status || 'not-started'}`}>
-                            {taskProgress[selectedTask.id]?.status === 'paid' ? 'Reward paid' : taskProgress[selectedTask.id]?.status === 'submitted' ? 'In review' : taskProgress[selectedTask.id]?.status === 'in_progress' ? 'In progress' : 'Not started'}
-                          </span>
-                        </div>
-                        {((taskProgress[selectedTask.id]?.status === 'paid') || selectedTask.status === 'paid') ? (
-                          <div className="task-submission-saved" style={{ background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.25)', borderRadius: '10px', padding: '16px' }}>
-                            <CheckCircle2 size={24} color="#10B981" />
-                            <div style={{ flex: 1 }}>
-                              <strong style={{ fontSize: '15px', color: '#10B981', display: 'block', marginBottom: '4px' }}>
-                                Milestone Escrow Released & Paid
-                              </strong>
-                              <div style={{ fontSize: '12px', color: 'var(--privy-color-foreground-2)', marginBottom: '8px' }}>
-                                Settled <strong>{selectedTask.payoutDelivered || `${selectedTask.rewardAmount || selectedTask.rewardUSDC} ${selectedTask.rewardToken || (IS_CONCORDIUM_SITE ? 'CCD' : 'USDT')}`}</strong> to <strong>{selectedTask.assignedWorkerTag || 'Worker'}</strong>{selectedTask.payoutToken === 'CCD' ? ' on Concordium Testnet.' : ' via Textile FX Corridor.'}
+                      {(() => {
+                        const isCreator = Boolean(
+                          (walletAddress && selectedTask.creatorAddress && walletAddress.toLowerCase() === selectedTask.creatorAddress.toLowerCase()) ||
+                          (myTag?.tag && selectedTask.creatorTag && (
+                            myTag.tag.toLowerCase().replace(/^₦/, '') === selectedTask.creatorTag.toLowerCase().replace(/^₦/, '')
+                          )) ||
+                          (displayUserTag && selectedTask.creatorTag && (
+                            displayUserTag.toLowerCase().replace(/^₦/, '') === selectedTask.creatorTag.toLowerCase().replace(/^₦/, '')
+                          ))
+                        );
+
+                        const currentStatus = taskProgress[selectedTask.id]?.status || selectedTask.status || 'open';
+                        const isPaid = currentStatus === 'paid' || currentStatus === 'completed';
+                        const isSubmitted = currentStatus === 'submitted' || currentStatus === 'in_review';
+                        const isOngoing = currentStatus === 'in_progress' || currentStatus === 'ongoing';
+                        const isReleasing = currentStatus === 'releasing';
+
+                        const assignedWorker = selectedTask.assignedWorkerTag || '₦FREELANCER';
+
+                        return (
+                          <article className="task-detail-panel task-submit-panel">
+                            <div className="task-detail-panel-heading">
+                              <div>
+                                <h2>
+                                  {isCreator ? 'Milestone Escrow Management' : 'Work & Milestone Submission'}
+                                </h2>
+                                <p>
+                                  {isPaid ? 'Milestone completed and funds released on Celo Mainnet.'
+                                    : isSubmitted ? (isCreator ? 'Freelancer deliverable received. Review submission and release escrow.' : 'Your deliverable is in review. Awaiting client milestone approval.')
+                                    : isOngoing ? (isCreator ? `Milestone in progress by ${assignedWorker}.` : 'You claimed this milestone. Complete the requirements and submit below.')
+                                    : (isCreator ? 'Your milestone bounty is funded in escrow. Seeking verified workers.' : 'Claim this milestone bounty, complete the task, and get paid in your preferred currency.')}
+                                </p>
                               </div>
-                              {selectedTask.payoutHash && (
-                                <div style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', marginBottom: '10px', wordBreak: 'break-all' }}>
-                                  Tx Hash: {selectedTask.payoutToken === 'CCD' ? (
-                                    <a href={`https://testnet.ccdscan.io/transaction/${selectedTask.payoutHash}`} target="_blank" rel="noopener noreferrer" style={{ color: '#0d9488', textDecoration: 'underline', fontWeight: 600 }}>
-                                      {selectedTask.payoutHash} (Concordium Testnet · EU AI Act Art. 12)
-                                    </a>
-                                  ) : (
-                                    <a href={`https://celoscan.io/tx/${selectedTask.payoutHash}`} target="_blank" rel="noopener noreferrer" style={{ color: '#0052FF', textDecoration: 'underline' }}>
-                                      {selectedTask.payoutHash}
-                                    </a>
+                              <span className={`task-progress-badge ${isPaid ? 'paid' : isSubmitted ? 'submitted' : isOngoing ? 'in_progress' : 'not-started'}`}>
+                                {isPaid ? '✅ Paid & Settled' : isSubmitted ? '🔵 In Review' : isOngoing ? '🟡 In Progress' : '🟢 Open (Seeking Workers)'}
+                              </span>
+                            </div>
+
+                            {/* 1. STATE: PAID */}
+                            {isPaid && (
+                              <div className="task-submission-saved" style={{ background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.25)', borderRadius: '10px', padding: '16px' }}>
+                                <CheckCircle2 size={24} color="#10B981" />
+                                <div style={{ flex: 1 }}>
+                                  <strong style={{ fontSize: '15px', color: '#10B981', display: 'block', marginBottom: '4px' }}>
+                                    Milestone Escrow Released & Paid
+                                  </strong>
+                                  <div style={{ fontSize: '12px', color: 'var(--privy-color-foreground-2)', marginBottom: '8px' }}>
+                                    Settled <strong>{selectedTask.payoutDelivered || `${selectedTask.rewardAmount || selectedTask.rewardUSDC} ${selectedTask.rewardToken || (IS_CONCORDIUM_SITE ? 'CCD' : 'USDT')}`}</strong> to <strong>{assignedWorker}</strong>{selectedTask.payoutToken === 'CCD' ? ' on Concordium Testnet.' : ' via Textile FX Corridor.'}
+                                  </div>
+                                  {selectedTask.payoutHash && (
+                                    <div style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', marginBottom: '10px', wordBreak: 'break-all' }}>
+                                      Tx Hash: {selectedTask.payoutToken === 'CCD' ? (
+                                        <a href={`https://testnet.ccdscan.io/transaction/${selectedTask.payoutHash}`} target="_blank" rel="noopener noreferrer" style={{ color: '#0d9488', textDecoration: 'underline', fontWeight: 600 }}>
+                                          {selectedTask.payoutHash} (Concordium Testnet · EU AI Act Art. 12)
+                                        </a>
+                                      ) : (
+                                        <a href={`https://celoscan.io/tx/${selectedTask.payoutHash}`} target="_blank" rel="noopener noreferrer" style={{ color: '#0052FF', textDecoration: 'underline' }}>
+                                          {selectedTask.payoutHash}
+                                        </a>
+                                      )}
+                                    </div>
                                   )}
+                                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '10.5px', background: 'rgba(255,255,255,0.06)', padding: '3px 8px', borderRadius: '4px' }}>
+                                    <span>Attribution:</span>
+                                    <code style={{ color: '#10B981' }}>celo_9f7deabd99a6</code>
+                                  </div>
+                                  <div className="task-share-actions" style={{ marginTop: '12px' }}>
+                                    <a href={getTwitterTaskShareUrl({ title: selectedTask.title, rewardUSDC: selectedTask.rewardUSDC, points: selectedTask.points, userTag: myTag?.tag })} target="_blank" rel="noopener noreferrer">Share on X</a>
+                                    <a href={getTelegramShareIntentUrl({ text: `I completed "${selectedTask.title}" and received its task reward on NairaTag.`, url: myTag?.tag ? getTagShareUrl(myTag.tag) : 'https://celo.nairatag.ng/#tasks' })} target="_blank" rel="noopener noreferrer">Share on Telegram</a>
+                                  </div>
                                 </div>
-                              )}
-                              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '10.5px', background: 'rgba(255,255,255,0.06)', padding: '3px 8px', borderRadius: '4px' }}>
-                                <span>Attribution:</span>
-                                <code style={{ color: '#10B981' }}>celo_9f7deabd99a6</code>
                               </div>
-                              <div className="task-share-actions" style={{ marginTop: '12px' }}>
-                                <a href={getTwitterTaskShareUrl({ title: selectedTask.title, rewardUSDC: selectedTask.rewardUSDC, points: selectedTask.points, userTag: myTag?.tag })} target="_blank" rel="noopener noreferrer">Share on X</a>
-                                <a href={getTelegramShareIntentUrl({ text: `I completed "${selectedTask.title}" and received its task reward on NairaTag.`, url: myTag?.tag ? getTagShareUrl(myTag.tag) : 'https://celo.nairatag.ng/#tasks' })} target="_blank" rel="noopener noreferrer">Share on Telegram</a>
-                              </div>
-                            </div>
-                          </div>
-                        ) : ((taskProgress[selectedTask.id]?.status === 'submitted') || selectedTask.status === 'submitted') ? (
-                          <div className="task-submission-saved" style={{ background: 'rgba(59, 130, 246, 0.08)', border: '1px solid rgba(59, 130, 246, 0.25)', borderRadius: '10px', padding: '16px' }}>
-                            <CheckCircle2 size={22} color="#3B82F6" />
-                            <div style={{ flex: 1 }}>
-                              <strong style={{ fontSize: '14px', color: '#3B82F6', display: 'block', marginBottom: '4px' }}>
-                                Deliverable Submitted for Review
-                              </strong>
-                              <div style={{ fontSize: '12px', background: 'rgba(255,255,255,0.04)', padding: '10px 12px', borderRadius: '6px', margin: '8px 0', wordBreak: 'break-word', border: '1px solid rgba(255,255,255,0.08)' }}>
-                                {selectedTask.submissionDeliverable || 'Submission deliverable and proof of completion recorded.'}
-                              </div>
-                              <div style={{ marginTop: '12px' }}>
-                                <button
-                                  type="button"
-                                  className="btn-agent-primary"
-                                  style={{ background: '#10B981', color: '#000', fontWeight: 700, padding: '9px 18px', fontSize: '12.5px', display: 'flex', alignItems: 'center', gap: '6px' }}
-                                  onClick={() => handleApproveMilestoneEscrow(selectedTask)}
-                                >
-                                  <CheckCircle2 size={15} /> Approve & Release Milestone Escrow
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-                        ) : (
-                          <>
-                            {taskProgress[selectedTask.id]?.status !== 'in_progress' && selectedTask.status !== 'in_progress' && (
-                              <button type="button" className="btn-agent-primary" onClick={() => handleStartTask(selectedTask)}>
-                                Start this task <ChevronRight size={15} />
-                              </button>
                             )}
 
-                            {/* Worker Preferred Payout Currency (Track 1 Textile Corridor) */}
-                            <div style={{ marginTop: '10px', marginBottom: '10px', padding: '10px 12px', background: 'rgba(255, 255, 255, 0.03)', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
-                              <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--privy-color-foreground-2)', textTransform: 'uppercase', marginBottom: '6px' }}>
-                                Your Preferred Payout Currency:
-                              </div>
-                              <div style={{ display: 'flex', gap: '6px' }}>
-                                {[
-                                  { id: 'CCD', label: 'CCD (Concordium)', icon: '/concordium-logo.png' },
-                                  { id: 'cNGN', label: 'cNGN (Naira)', icon: '/tokens/cngn.png' },
-                                  { id: 'USDT', label: 'USD₮ (Tether)', icon: '/tokens/usdt.svg' },
-                                  { id: 'CELO', label: 'CELO', icon: '/tokens/celo.svg' },
-                                ].map((tok) => (
-                                  <button
-                                    key={tok.id}
-                                    type="button"
-                                    onClick={() => setWorkerPreferredToken(tok.id)}
-                                    style={{
-                                      flex: 1,
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      justifyContent: 'center',
-                                      gap: '5px',
-                                      padding: '6px 8px',
-                                      fontSize: '11px',
-                                      fontWeight: 600,
-                                      borderRadius: '6px',
-                                      border: workerPreferredToken === tok.id ? '1.5px solid #10B981' : '1px solid rgba(255, 255, 255, 0.1)',
-                                      background: workerPreferredToken === tok.id ? 'rgba(16, 185, 129, 0.15)' : 'rgba(255, 255, 255, 0.03)',
-                                      color: workerPreferredToken === tok.id ? '#10B981' : 'inherit',
-                                      cursor: 'pointer',
-                                    }}
-                                  >
-                                    <img src={tok.icon} alt={tok.id} style={{ width: '13px', height: '13px', borderRadius: '50%' }} />
-                                    <span>{tok.label}</span>
-                                  </button>
-                                ))}
-                              </div>
-                              {workerPreferredToken === 'CCD' ? (
-                                <div style={{ fontSize: '10px', color: '#0d9488', marginTop: '6px', lineHeight: 1.4, background: 'rgba(13, 148, 136, 0.08)', padding: '6px 10px', borderRadius: '6px' }}>
-                                  🛡️ <strong>Concordium CCD Payment Rail:</strong> Milestone escrow will release directly on Concordium Testnet into the worker's verified Concordium account, generating an on-chain receipt for EU AI Act Article 12 compliance.
-                                </div>
-                              ) : workerPreferredToken !== (selectedTask.rewardToken || 'USDT') ? (
-                                <div style={{ fontSize: '10px', color: '#10B981', marginTop: '6px', lineHeight: 1.4 }}>
-                                  ⚡ <strong>Textile FX Corridor:</strong> You will be paid in {workerPreferredToken}, automatically converted from creator's locked {selectedTask.rewardToken === 'USDT' ? 'USD₮' : (selectedTask.rewardToken || 'USD₮')} upon milestone approval.
-                                </div>
-                              ) : null}
-                            </div>
+                            {/* 2. STATE: SUBMITTED / IN REVIEW */}
+                            {!isPaid && isSubmitted && (
+                              <div style={{ background: 'rgba(59, 130, 246, 0.08)', border: '1px solid rgba(59, 130, 246, 0.25)', borderRadius: '10px', padding: '16px' }}>
+                                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+                                  <Clock size={22} color="#3B82F6" style={{ marginTop: '2px', flexShrink: 0 }} />
+                                  <div style={{ flex: 1 }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '6px' }}>
+                                      <strong style={{ fontSize: '14.5px', color: '#3B82F6' }}>
+                                        {isCreator ? 'Deliverable Received for Review' : 'Deliverable Submitted — Awaiting Client Approval'}
+                                      </strong>
+                                      <span style={{ fontSize: '11px', background: 'rgba(59, 130, 246, 0.15)', color: '#60A5FA', padding: '2px 8px', borderRadius: '4px', fontWeight: 600 }}>
+                                        From: {assignedWorker}
+                                      </span>
+                                    </div>
+                                    <div style={{ fontSize: '12.5px', background: 'rgba(0, 0, 0, 0.25)', padding: '12px 14px', borderRadius: '8px', margin: '10px 0', wordBreak: 'break-word', border: '1px solid rgba(255,255,255,0.08)', lineHeight: 1.5 }}>
+                                      <div style={{ fontSize: '11px', color: 'var(--privy-color-foreground-2)', marginBottom: '4px', textTransform: 'uppercase', fontWeight: 700 }}>
+                                        Deliverable Submission:
+                                      </div>
+                                      {selectedTask.submissionDeliverable || 'Submission deliverable and proof of completion recorded.'}
+                                    </div>
 
-                            <textarea
-                              className="token-amount-field task-submission-input"
-                              rows={4}
-                              placeholder="Paste your deliverable link or describe the work you completed..."
-                              value={taskSubmissionDraft}
-                              onChange={(event) => setTaskSubmissionDraft(event.target.value)}
-                              disabled={taskProgress[selectedTask.id]?.status !== 'in_progress' && selectedTask.status !== 'in_progress'}
-                            />
-                            <button
-                              type="button"
-                              className="btn-agent-primary"
-                              onClick={() => handleSubmitTask(selectedTask)}
-                              disabled={taskProgress[selectedTask.id]?.status !== 'in_progress' && selectedTask.status !== 'in_progress'}
-                            >
-                              <Send size={14} /> Submit work for review
-                            </button>
-                          </>
-                        )}
-                        <div className="task-detail-local-note">Task progress and submissions are stored in the shared Celo task service. Escrow payouts settle directly through Celo smart contracts.</div>
-                      </article>
+                                    {/* CLIENT CONTROLS: Approve & Release OR Request Changes */}
+                                    {isCreator ? (
+                                      <div style={{ marginTop: '14px', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                                        <button
+                                          type="button"
+                                          className="btn-agent-primary"
+                                          disabled={isReleasing}
+                                          style={{ background: '#10B981', color: '#000', fontWeight: 700, padding: '10px 20px', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px' }}
+                                          onClick={() => handleApproveMilestoneEscrow(selectedTask)}
+                                        >
+                                          <CheckCircle2 size={16} />
+                                          {isReleasing ? 'Releasing Escrow on Celo...' : 'Approve Work & Release Escrow'}
+                                        </button>
+                                        <button
+                                          type="button"
+                                          className="btn-agent-secondary"
+                                          style={{ padding: '10px 16px', fontSize: '12.5px', display: 'flex', alignItems: 'center', gap: '6px' }}
+                                          onClick={() => {
+                                            setTaskChatDraft(`Hi @${assignedWorker.replace(/^₦/, '')}, please update: `);
+                                            taskChatInputRef.current?.focus();
+                                          }}
+                                        >
+                                          <MessageSquare size={14} /> Request Revisions in Chat
+                                        </button>
+                                      </div>
+                                    ) : (
+                                      /* FREELANCER VIEW: Informational only, no approve button! */
+                                      <div style={{ marginTop: '10px', fontSize: '12px', color: 'var(--privy-color-foreground-2)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+                                        <span>Your work is safely queued. The client will review and authorize release of the escrowed funds.</span>
+                                        <button
+                                          type="button"
+                                          className="btn-agent-secondary"
+                                          style={{ padding: '6px 12px', fontSize: '11.5px', display: 'flex', alignItems: 'center', gap: '5px' }}
+                                          onClick={() => {
+                                            taskChatInputRef.current?.focus();
+                                          }}
+                                        >
+                                          <MessageSquare size={13} /> Chat with Client
+                                        </button>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* 3. STATE: ONGOING (IN PROGRESS) */}
+                            {!isPaid && !isSubmitted && isOngoing && (
+                              <>
+                                {isCreator ? (
+                                  /* Client view during ongoing work */
+                                  <div style={{ background: 'rgba(234, 179, 8, 0.08)', border: '1px solid rgba(234, 179, 8, 0.25)', borderRadius: '10px', padding: '16px' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+                                      <Clock size={20} color="#EAB308" />
+                                      <strong style={{ fontSize: '14px', color: '#EAB308' }}>
+                                        Milestone in Progress by {assignedWorker}
+                                      </strong>
+                                    </div>
+                                    <p style={{ fontSize: '12.5px', color: 'var(--privy-color-foreground-2)', margin: 0, lineHeight: 1.5 }}>
+                                      The freelancer is currently working on this milestone. As soon as they complete the work and submit deliverables, you will be able to inspect proof and release the locked escrow payment here.
+                                    </p>
+                                    <div style={{ marginTop: '12px' }}>
+                                      <button
+                                        type="button"
+                                        className="btn-agent-secondary"
+                                        style={{ padding: '7px 14px', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}
+                                        onClick={() => taskChatInputRef.current?.focus()}
+                                      >
+                                        <MessageSquare size={14} /> Coordinate in Workspace Chat
+                                      </button>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  /* Freelancer view during ongoing work */
+                                  <>
+                                    {/* Worker Preferred Payout Currency */}
+                                    <div style={{ marginBottom: '12px', padding: '10px 12px', background: 'rgba(255, 255, 255, 0.03)', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
+                                      <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--privy-color-foreground-2)', textTransform: 'uppercase', marginBottom: '6px' }}>
+                                        Your Preferred Payout Currency:
+                                      </div>
+                                      <div style={{ display: 'flex', gap: '6px' }}>
+                                        {[
+                                          { id: 'CCD', label: 'CCD (Concordium)', icon: '/concordium-logo.png' },
+                                          { id: 'cNGN', label: 'cNGN (Naira)', icon: '/tokens/cngn.png' },
+                                          { id: 'USDT', label: 'USD₮ (Tether)', icon: '/tokens/usdt.svg' },
+                                          { id: 'CELO', label: 'CELO', icon: '/tokens/celo.svg' },
+                                        ].map((tok) => (
+                                          <button
+                                            key={tok.id}
+                                            type="button"
+                                            onClick={() => setWorkerPreferredToken(tok.id)}
+                                            style={{
+                                              flex: 1,
+                                              display: 'flex',
+                                              alignItems: 'center',
+                                              justifyContent: 'center',
+                                              gap: '5px',
+                                              padding: '6px 8px',
+                                              fontSize: '11px',
+                                              fontWeight: 600,
+                                              borderRadius: '6px',
+                                              border: workerPreferredToken === tok.id ? '1.5px solid #10B981' : '1px solid rgba(255, 255, 255, 0.1)',
+                                              background: workerPreferredToken === tok.id ? 'rgba(16, 185, 129, 0.15)' : 'rgba(255, 255, 255, 0.03)',
+                                              color: workerPreferredToken === tok.id ? '#10B981' : 'inherit',
+                                              cursor: 'pointer',
+                                            }}
+                                          >
+                                            <img src={tok.icon} alt={tok.id} style={{ width: '13px', height: '13px', borderRadius: '50%' }} />
+                                            <span>{tok.label}</span>
+                                          </button>
+                                        ))}
+                                      </div>
+                                      {workerPreferredToken === 'CCD' ? (
+                                        <div style={{ fontSize: '10px', color: '#0d9488', marginTop: '6px', lineHeight: 1.4, background: 'rgba(13, 148, 136, 0.08)', padding: '6px 10px', borderRadius: '6px' }}>
+                                          🛡️ <strong>Concordium CCD Payment Rail:</strong> Milestone escrow will release directly on Concordium Testnet into your verified Concordium account with EU AI Act Art. 12 audit trail.
+                                        </div>
+                                      ) : workerPreferredToken !== (selectedTask.rewardToken || 'USDT') ? (
+                                        <div style={{ fontSize: '10px', color: '#10B981', marginTop: '6px', lineHeight: 1.4 }}>
+                                          ⚡ <strong>Textile FX Corridor:</strong> You will be paid in {workerPreferredToken}, automatically converted from creator's locked {selectedTask.rewardToken === 'USDT' ? 'USD₮' : (selectedTask.rewardToken || 'USD₮')} upon milestone approval.
+                                        </div>
+                                      ) : null}
+                                    </div>
+
+                                    <textarea
+                                      className="token-amount-field task-submission-input"
+                                      rows={4}
+                                      placeholder="Paste your completed work: GitHub PR link, public demo URL, or summary of deliverables..."
+                                      value={taskSubmissionDraft}
+                                      onChange={(event) => setTaskSubmissionDraft(event.target.value)}
+                                    />
+                                    <button
+                                      type="button"
+                                      className="btn-agent-primary"
+                                      onClick={() => handleSubmitTask(selectedTask)}
+                                      disabled={!taskSubmissionDraft.trim()}
+                                      style={{ width: '100%', justifyContent: 'center', marginTop: '8px' }}
+                                    >
+                                      <Send size={14} /> Submit Completed Work for Review
+                                    </button>
+                                  </>
+                                )}
+                              </>
+                            )}
+
+                            {/* 4. STATE: OPEN (SEEKING WORKERS) */}
+                            {!isPaid && !isSubmitted && !isOngoing && (
+                              <>
+                                {isCreator ? (
+                                  /* Client view for open task */
+                                  <div style={{ background: 'rgba(16, 185, 129, 0.06)', border: '1px solid rgba(16, 185, 129, 0.2)', borderRadius: '10px', padding: '16px' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                                      <ShieldCheck size={18} color="#10B981" />
+                                      <strong style={{ fontSize: '14px', color: '#10B981' }}>Escrow Active · Seeking Verified Workers</strong>
+                                    </div>
+                                    <p style={{ fontSize: '12px', color: 'var(--privy-color-foreground-2)', margin: 0, lineHeight: 1.5 }}>
+                                      Your milestone bounty is secured in the Celo Mainnet smart escrow contract (<code>0x9f3d...BB76</code>). Freelancers and autonomous agents across the network can view and claim this milestone.
+                                    </p>
+                                  </div>
+                                ) : (
+                                  /* Freelancer view for open task */
+                                  <>
+                                    {/* Worker Preferred Payout Currency */}
+                                    <div style={{ marginBottom: '12px', padding: '10px 12px', background: 'rgba(255, 255, 255, 0.03)', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
+                                      <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--privy-color-foreground-2)', textTransform: 'uppercase', marginBottom: '6px' }}>
+                                        Your Preferred Payout Currency:
+                                      </div>
+                                      <div style={{ display: 'flex', gap: '6px' }}>
+                                        {[
+                                          { id: 'CCD', label: 'CCD (Concordium)', icon: '/concordium-logo.png' },
+                                          { id: 'cNGN', label: 'cNGN (Naira)', icon: '/tokens/cngn.png' },
+                                          { id: 'USDT', label: 'USD₮ (Tether)', icon: '/tokens/usdt.svg' },
+                                          { id: 'CELO', label: 'CELO', icon: '/tokens/celo.svg' },
+                                        ].map((tok) => (
+                                          <button
+                                            key={tok.id}
+                                            type="button"
+                                            onClick={() => setWorkerPreferredToken(tok.id)}
+                                            style={{
+                                              flex: 1,
+                                              display: 'flex',
+                                              alignItems: 'center',
+                                              justifyContent: 'center',
+                                              gap: '5px',
+                                              padding: '6px 8px',
+                                              fontSize: '11px',
+                                              fontWeight: 600,
+                                              borderRadius: '6px',
+                                              border: workerPreferredToken === tok.id ? '1.5px solid #10B981' : '1px solid rgba(255, 255, 255, 0.1)',
+                                              background: workerPreferredToken === tok.id ? 'rgba(16, 185, 129, 0.15)' : 'rgba(255, 255, 255, 0.03)',
+                                              color: workerPreferredToken === tok.id ? '#10B981' : 'inherit',
+                                              cursor: 'pointer',
+                                            }}
+                                          >
+                                            <img src={tok.icon} alt={tok.id} style={{ width: '13px', height: '13px', borderRadius: '50%' }} />
+                                            <span>{tok.label}</span>
+                                          </button>
+                                        ))}
+                                      </div>
+                                    </div>
+
+                                    <button
+                                      type="button"
+                                      className="btn-agent-primary"
+                                      onClick={() => handleStartTask(selectedTask)}
+                                      style={{ width: '100%', justifyContent: 'center', padding: '12px' }}
+                                    >
+                                      Start this task <ChevronRight size={15} />
+                                    </button>
+                                  </>
+                                )}
+                              </>
+                            )}
+
+                            <div className="task-detail-local-note" style={{ marginTop: '12px' }}>
+                              Task progress and submissions are stored in the shared Celo task service. Escrow payouts settle directly through Celo smart contracts.
+                            </div>
+                          </article>
+                        );
+                      })()}
 
                       {/* ── Embedded Project Workspace & Task Chat ── */}
-                      <article ref={taskChatRef} className="task-detail-panel task-chat-panel" style={{ marginTop: '16px' }}>
-                        <div className="task-detail-panel-heading" style={{ borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '10px', marginBottom: '12px' }}>
-                          <div>
-                            <h2 style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: 0, fontSize: '15px' }}>
-                              <MessageSquare size={16} color="#10B981" />
-                              <span>Project Workspace & Escrow Chat</span>
-                            </h2>
-                            <p style={{ margin: '3px 0 0', fontSize: '12px', color: 'var(--privy-color-foreground-2)' }}>
-                              Milestone discussions with {selectedTask.creatorTag} · Real-time escrow audit log
-                            </p>
-                          </div>
-                          <span style={{ fontSize: '10.5px', background: 'rgba(16, 185, 129, 0.12)', color: '#10B981', padding: '3px 9px', borderRadius: '12px', fontWeight: 600, border: '1px solid rgba(16, 185, 129, 0.25)' }}>
-                            Live Workspace
-                          </span>
-                        </div>
+                      {(() => {
+                        const isCreator = Boolean(
+                          (walletAddress && selectedTask.creatorAddress && walletAddress.toLowerCase() === selectedTask.creatorAddress.toLowerCase()) ||
+                          (myTag?.tag && selectedTask.creatorTag && (
+                            myTag.tag.toLowerCase().replace(/^₦/, '') === selectedTask.creatorTag.toLowerCase().replace(/^₦/, '')
+                          )) ||
+                          (displayUserTag && selectedTask.creatorTag && (
+                            displayUserTag.toLowerCase().replace(/^₦/, '') === selectedTask.creatorTag.toLowerCase().replace(/^₦/, '')
+                          ))
+                        );
 
-                        {/* Message Stream */}
-                        <div style={{
-                          display: 'flex',
-                          flexDirection: 'column',
-                          gap: '10px',
-                          maxHeight: '280px',
-                          overflowY: 'auto',
-                          padding: '10px 4px',
-                          marginBottom: '12px'
-                        }}>
-                          {taskChatList.length === 0 ? (
-                            <div style={{ textAlign: 'center', color: 'var(--privy-color-foreground-2)', fontSize: '12px', padding: '20px 0' }}>
-                              No messages yet. Send a message to start milestone coordination.
+                        const otherPartyTag = isCreator
+                          ? (selectedTask.assignedWorkerTag || 'Worker')
+                          : (selectedTask.creatorTag || 'Client');
+
+                        return (
+                          <article ref={taskChatRef} className="task-detail-panel task-chat-panel" style={{ marginTop: '16px' }}>
+                            <div className="task-detail-panel-heading" style={{ borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '10px', marginBottom: '12px' }}>
+                              <div>
+                                <h2 style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: 0, fontSize: '15px' }}>
+                                  <MessageSquare size={16} color="#10B981" />
+                                  <span>Project Workspace & Escrow Chat</span>
+                                </h2>
+                                <p style={{ margin: '3px 0 0', fontSize: '12px', color: 'var(--privy-color-foreground-2)' }}>
+                                  Direct milestone collaboration with {otherPartyTag} · Real-time escrow audit log
+                                </p>
+                              </div>
+                              <span style={{ fontSize: '10.5px', background: 'rgba(16, 185, 129, 0.12)', color: '#10B981', padding: '3px 9px', borderRadius: '12px', fontWeight: 600, border: '1px solid rgba(16, 185, 129, 0.25)' }}>
+                                Live Workspace
+                              </span>
                             </div>
-                          ) : (
-                            taskChatList.map((msg) => {
-                              if (msg.type === 'system') {
-                                return (
-                                  <div key={msg.id} style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '8px',
-                                    padding: '7px 12px',
-                                    background: 'rgba(255,255,255,0.04)',
-                                    borderRadius: '8px',
-                                    fontSize: '11.5px',
-                                    border: '1px solid rgba(255,255,255,0.06)',
-                                    color: 'var(--privy-color-foreground-2)',
-                                  }}>
-                                    <span style={{ fontWeight: 700, color: '#10B981', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                                      [{msg.senderTag}]
-                                    </span>
-                                    <span style={{ flex: 1 }}>{msg.text}</span>
-                                    <span style={{ fontSize: '10px', opacity: 0.6 }}>
-                                      {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                    </span>
-                                  </div>
-                                );
-                              }
 
-                              const isMe = msg.type === 'user';
-                              return (
-                                <div key={msg.id} style={{
-                                  display: 'flex',
-                                  flexDirection: 'column',
-                                  alignItems: isMe ? 'flex-end' : 'flex-start',
-                                  gap: '2px',
-                                }}>
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '10.5px', color: 'var(--privy-color-foreground-2)', padding: '0 4px' }}>
-                                    <span style={{ fontWeight: 600, color: isMe ? '#3B82F6' : '#10B981' }}>{msg.senderTag}</span>
-                                    <span>· {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                                  </div>
-                                  <div style={{
-                                    maxWidth: '85%',
-                                    padding: '9px 13px',
-                                    borderRadius: isMe ? '12px 12px 2px 12px' : '12px 12px 12px 2px',
-                                    background: isMe ? '#2563EB' : 'rgba(255,255,255,0.07)',
-                                    color: isMe ? '#fff' : 'inherit',
-                                    fontSize: '12.5px',
-                                    lineHeight: 1.45,
-                                    border: isMe ? 'none' : '1px solid rgba(255,255,255,0.1)',
-                                    wordBreak: 'break-word',
-                                  }}>
-                                    {msg.text}
-                                  </div>
+                            {/* Message Stream */}
+                            <div style={{
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '10px',
+                              maxHeight: '300px',
+                              overflowY: 'auto',
+                              padding: '10px 4px',
+                              marginBottom: '12px'
+                            }}>
+                              {taskChatList.length === 0 ? (
+                                <div style={{ textAlign: 'center', color: 'var(--privy-color-foreground-2)', fontSize: '12px', padding: '20px 0' }}>
+                                  No messages yet. Send a message to start milestone coordination.
                                 </div>
-                              );
-                            })
-                          )}
-                          {isSendingTaskChat && (
-                            <div style={{ fontSize: '11px', color: '#10B981', display: 'flex', alignItems: 'center', gap: '6px', fontStyle: 'italic', paddingLeft: '4px' }}>
-                              <span>{selectedTask.creatorTag} is typing a response...</span>
-                            </div>
-                          )}
-                        </div>
+                              ) : (
+                                taskChatList.map((msg) => {
+                                  if (msg.role === 'system' || msg.type === 'system') {
+                                    return (
+                                      <div key={msg.id} style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '8px',
+                                        padding: '7px 12px',
+                                        background: 'rgba(255,255,255,0.04)',
+                                        borderRadius: '8px',
+                                        fontSize: '11.5px',
+                                        border: '1px solid rgba(255,255,255,0.06)',
+                                        color: 'var(--privy-color-foreground-2)',
+                                      }}>
+                                        <span style={{ fontWeight: 700, color: '#10B981', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                                          [{msg.senderTag || 'ESCROW'}]
+                                        </span>
+                                        <span style={{ flex: 1 }}>{msg.text}</span>
+                                        <span style={{ fontSize: '10px', opacity: 0.6 }}>
+                                          {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                        </span>
+                                      </div>
+                                    );
+                                  }
 
-                        {/* Input Form */}
-                        <form onSubmit={handleSendTaskChatMessage} style={{ display: 'flex', gap: '8px' }}>
-                          <input
-                            ref={taskChatInputRef}
-                            type="text"
-                            className="token-amount-field"
-                            placeholder={`Message @${selectedTask.creatorTag?.replace(/^₦/, '')} about deliverables, progress, or escrow...`}
-                            value={taskChatDraft}
-                            onChange={(e) => setTaskChatDraft(e.target.value)}
-                            style={{ flex: 1, padding: '9px 12px', fontSize: '12.5px' }}
-                            disabled={isSendingTaskChat}
-                          />
-                          <button
-                            type="submit"
-                            className="btn-agent-primary"
-                            disabled={!taskChatDraft.trim() || isSendingTaskChat}
-                            style={{ padding: '0 14px', display: 'flex', alignItems: 'center', gap: '5px', fontSize: '12px' }}
-                          >
-                            <Send size={13} />
-                            <span>Send</span>
-                          </button>
-                        </form>
-                      </article>
+                                  const isSenderMe = Boolean(
+                                    (walletAddress && msg.sender && walletAddress.toLowerCase() === msg.sender.toLowerCase()) ||
+                                    (myTag?.tag && msg.senderTag && myTag.tag.toLowerCase().replace(/^₦/, '') === msg.senderTag.toLowerCase().replace(/^₦/, '')) ||
+                                    (displayUserTag && msg.senderTag && displayUserTag.toLowerCase().replace(/^₦/, '') === msg.senderTag.toLowerCase().replace(/^₦/, '')) ||
+                                    (isCreator && (msg.role === 'client' || msg.senderTag === selectedTask.creatorTag)) ||
+                                    (!isCreator && msg.role === 'worker')
+                                  );
+
+                                  const isMsgClient = msg.role === 'client' || msg.senderTag === selectedTask.creatorTag;
+
+                                  return (
+                                    <div key={msg.id} style={{
+                                      display: 'flex',
+                                      flexDirection: 'column',
+                                      alignItems: isSenderMe ? 'flex-end' : 'flex-start',
+                                      gap: '2px',
+                                    }}>
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '10.5px', color: 'var(--privy-color-foreground-2)', padding: '0 4px' }}>
+                                        <span style={{ fontWeight: 600, color: isMsgClient ? '#38BDF8' : '#10B981' }}>
+                                          {isMsgClient ? '👑 Client' : '💼 Freelancer'} ({msg.senderTag})
+                                        </span>
+                                        <span>· {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                      </div>
+                                      <div style={{
+                                        maxWidth: '85%',
+                                        padding: '9px 13px',
+                                        borderRadius: isSenderMe ? '12px 12px 2px 12px' : '12px 12px 12px 2px',
+                                        background: isSenderMe ? '#2563EB' : 'rgba(255,255,255,0.07)',
+                                        color: '#fff',
+                                        fontSize: '12.5px',
+                                        lineHeight: 1.45,
+                                        border: isSenderMe ? 'none' : '1px solid rgba(255,255,255,0.1)',
+                                        wordBreak: 'break-word',
+                                        whiteSpace: 'pre-wrap',
+                                      }}>
+                                        {msg.text}
+                                      </div>
+                                    </div>
+                                  );
+                                })
+                              )}
+                              {isSendingTaskChat && (
+                                <div style={{ fontSize: '11px', color: '#10B981', display: 'flex', alignItems: 'center', gap: '6px', fontStyle: 'italic', paddingLeft: '4px' }}>
+                                  <span>Typing response...</span>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Input Form */}
+                            <form onSubmit={handleSendTaskChatMessage} style={{ display: 'flex', gap: '8px' }}>
+                              <input
+                                ref={taskChatInputRef}
+                                type="text"
+                                className="token-amount-field"
+                                placeholder={isCreator ? `Message @${selectedTask.assignedWorkerTag?.replace(/^₦/, '') || 'Freelancer'} about deliverables or revisions...` : `Message @${selectedTask.creatorTag?.replace(/^₦/, '')} about deliverables, progress, or escrow...`}
+                                value={taskChatDraft}
+                                onChange={(e) => setTaskChatDraft(e.target.value)}
+                                style={{ flex: 1, padding: '9px 12px', fontSize: '12.5px' }}
+                                disabled={isSendingTaskChat}
+                              />
+                              <button
+                                type="submit"
+                                className="btn-agent-primary"
+                                disabled={!taskChatDraft.trim() || isSendingTaskChat}
+                                style={{ padding: '0 14px', display: 'flex', alignItems: 'center', gap: '5px', fontSize: '12px' }}
+                              >
+                                <Send size={13} />
+                                <span>Send</span>
+                              </button>
+                            </form>
+                          </article>
+                        );
+                      })()}
                     </div>
 
                     <aside className="task-detail-sidebar">

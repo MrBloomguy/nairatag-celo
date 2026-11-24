@@ -41,7 +41,7 @@ export default defineConfig(({ mode }) => {
       include: ['react', 'react-dom/client', 'lucide-react', 'canvas-confetti', 'viem'],
     },
     build: {
-      minify: 'esbuild',
+      minify: false,
       chunkSizeWarningLimit: 2000,
     },
     server: {

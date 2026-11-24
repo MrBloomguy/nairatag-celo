@@ -16,19 +16,27 @@ function getTasksUrl() {
   return CELO_TASKS_API;
 }
 
-function mapTask(row) {
+export function mapTask(row) {
   const creatorAddress = row.creator_address || row.creatorAddress || row.creator_wallet || null;
   const creatorTag = row.creator_tag || row.creatorTag || (creatorAddress ? `₦${creatorAddress.slice(0, 6)}...${creatorAddress.slice(-4)}` : '₦CLIENT');
   const workerAddress = row.assigned_worker_address || row.assignedWorkerAddress || null;
   const workerTag = row.assigned_worker_tag || row.assignedWorkerTag || (workerAddress ? `₦${workerAddress.slice(0, 6)}...${workerAddress.slice(-4)}` : null);
+  const cat = row.category || 'dev';
+  const categoryLabel = row.category_label || row.categoryLabel || (
+    cat === 'dev' ? '⚡ Engineering' :
+    cat === 'design' ? '🎨 Design' :
+    cat === 'data' ? '📊 Data & AI' :
+    cat === 'content' ? '✍️ Content' :
+    cat === 'test' ? '🧪 Testing' : '📱 Community'
+  );
 
   return {
     id: row.id,
     chainId: Number(row.chain_id || row.chainId || CELO_CHAIN_ID),
     title: row.title,
     description: row.description,
-    category: row.category,
-    categoryLabel: row.category_label || row.categoryLabel,
+    category: cat,
+    categoryLabel,
     creatorTag,
     creatorAddress,
     deliverable: row.deliverable,
@@ -71,11 +79,12 @@ export async function listCeloTasks(walletAddress = '') {
 
     // Try primary serverless /api/tasks endpoint
     try {
-      const url = getTasksUrl();
+      const url = `${getTasksUrl()}?_t=${Date.now()}`;
       const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
       const timeoutId = controller ? setTimeout(() => controller.abort(), 3500) : null;
       const res = await fetch(url, {
         headers: { Accept: 'application/json' },
+        cache: 'no-store',
         signal: controller?.signal,
       }).catch(() => null);
       if (timeoutId) clearTimeout(timeoutId);
@@ -92,12 +101,14 @@ export async function listCeloTasks(walletAddress = '') {
 
     // Direct Supabase REST fallback
     if (!remoteRows) {
-      const res = await fetch(SUPABASE_REST_URL, {
+      const fallbackUrl = `${SUPABASE_REST_URL}&_t=${Date.now()}`;
+      const res = await fetch(fallbackUrl, {
         headers: {
           apikey: SUPABASE_ANON_KEY,
           Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
           Accept: 'application/json',
         },
+        cache: 'no-store',
       }).catch(() => null);
 
       if (res && res.ok) {

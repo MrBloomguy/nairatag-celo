@@ -235,8 +235,8 @@ import { CONCORDIUM_TESTNET, sendConcordiumCcdPayment } from './services/concord
 import { connectConcordiumTestnetWallet, getActiveConcordiumWallet } from './services/concordiumWallet.js';
 import { recordConfirmedPaymentSpin } from './services/wheelRewards.js';
 import { getArcRewardState, markArcNotificationsRead, submitArcRewardAction } from './services/celoRewards.js';
-import { getArcAgentCompletedTaskCount, listArcTasks, startArcTask, submitArcTask } from './services/celoTasks.js';
-import { saveDurableTask, updateTaskState, getDurableTasks } from './services/durableTaskStore.js';
+import { getArcAgentCompletedTaskCount, listArcTasks, mapTask, startArcTask, submitArcTask } from './services/celoTasks.js';
+import { saveDurableTask, updateTaskState, getDurableTasks, syncTaskToRemote } from './services/durableTaskStore.js';
 import { prepareTaskMilestonePayment } from './services/unifiedPaymentEngine.js';
 import { IN_HOUSE_TASKS, claimInHouseVoucher, getInHouseVouchers, syncInHouseVouchers } from './services/inHouseTasks.js';
 import {
@@ -1394,8 +1394,14 @@ function ArcAppShell() {
   const [isPostTaskOpen, setIsPostTaskOpen] = useState(false);
   const [selectedTaskId, setSelectedTaskId] = useState(null);
   const [taskProgress, setTaskProgress] = useState({});
-  const [backendTasks, setBackendTasks] = useState([]);
-  const [tasksLoading, setTasksLoading] = useState(true);
+  const [backendTasks, setBackendTasks] = useState(() => {
+    try {
+      return getDurableTasks().map(mapTask);
+    } catch {
+      return [];
+    }
+  });
+  const [tasksLoading, setTasksLoading] = useState(false);
   const [tasksError, setTasksError] = useState('');
   const [tasksRefreshKey, setTasksRefreshKey] = useState(0);
   const [inHouseVouchers, setInHouseVouchers] = useState([]);
@@ -2759,11 +2765,19 @@ function ArcAppShell() {
       };
 
       saveDurableTask(newTask);
+      try {
+        await syncTaskToRemote(newTask);
+      } catch (syncErr) {
+        console.warn('[handleCreateTask] Remote sync warning:', syncErr?.message);
+      }
       setBackendTasks((prev) => [newTask, ...prev.filter((t) => t.id !== taskId)]);
       setTaskProgress((prev) => ({
         ...prev,
         [taskId]: { status: 'open', startedAt: null, submittedAt: null, reviewedAt: null },
       }));
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('nairatag-tasks-updated', { detail: { task: newTask } }));
+      }
 
       setEscrowStepText('3/3: Milestone Escrow Confirmed & Published!');
       await new Promise((r) => setTimeout(r, 500));
@@ -5181,6 +5195,16 @@ function ArcAppShell() {
 
                 {(tasksTabSection === 'services' || tasksTabSection === 'bookings') ? (
                   <div style={{ marginTop: '10px' }}>
+                    <div style={{ marginBottom: '12px' }}>
+                      <button
+                        type="button"
+                        className="btn-agent-secondary"
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '12px', padding: '6px 14px', cursor: 'pointer' }}
+                        onClick={() => { setTasksTabSection('tasks'); setTasksFilter('all'); }}
+                      >
+                        <ArrowLeft size={14} /> Back to Tasks & Bounties
+                      </button>
+                    </div>
                     <BookingMarketplace
                       walletAddress={walletAddress}
                       activeAgentTag={myTag?.tag}
@@ -5303,6 +5327,7 @@ function ArcAppShell() {
                             if (cat.id === 'services') {
                               setTasksTabSection('services');
                             } else {
+                              setTasksTabSection('tasks');
                               setTasksFilter(cat.id);
                             }
                           }}

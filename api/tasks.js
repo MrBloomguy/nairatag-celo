@@ -23,6 +23,10 @@ export default async function handler(req, res) {
 
   try {
     if (req.method === 'GET') {
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+
       const response = await fetch(`${endpoint}?select=*&order=created_at.desc`, {
         headers: {
           apikey: SUPABASE_KEY,

@@ -19,6 +19,55 @@ export const CELO_VERIFIED_ESCROW_TX = '0x5dea3fcc2e575a5a90c7812e36152eaa0d4123
 
 export const SEED_TASKS = [
   {
+    id: 'task_user_live_001',
+    chainId: 42220,
+    title: 'Deploy & Test Multi-Currency Escrow Settlement',
+    category: 'dev',
+    categoryLabel: '⚡ Engineering',
+    status: 'submitted',
+    rewardAmount: 0.0003,
+    rewardToken: 'USDT',
+    rewardUSDC: 0.0003,
+    rewardNGN: '≈ ₦0.43 cNGN',
+    points: 10,
+    deadline: '3 days left',
+    applicants: 1,
+    creatorTag: '₦0xc519...3C95',
+    creatorAddress: '0xc519729BF6D15e5984702BBa2C553f1c74A73C95',
+    assignedWorkerTag: '₦0x5a84...5955',
+    assignedWorkerAddress: '0x5a84e3DbDBF449B082db8C8E4579E369d4725955',
+    submissionDeliverable: 'i, am done with the task, hope you like it',
+    escrowStatus: '🔒 Funded in Escrow',
+    escrowContract: '0x9f3de805eAa94516d216d6f1add78860B291BB76',
+    escrowTxHash: '0xd0e920ec7a28bf3957fe31b023befb85c9f9b3a41fa1fd59fa7b7c7ccbb48060',
+    description: 'On-chain verification milestone for sovereign escrow settlement with ERC-8021 metadata attribution on Celo Mainnet.',
+    deliverable: 'Verify on-chain escrow funding on CeloScan and complete milestone submission.',
+    createdAt: Date.now() - 3600000 * 2,
+  },
+  {
+    id: 'task_user_live_002',
+    chainId: 42220,
+    title: 'Test 20374',
+    category: 'content',
+    categoryLabel: '✍️ Content',
+    status: 'open',
+    rewardAmount: 0.0005,
+    rewardToken: 'USDT',
+    rewardUSDC: 0.0005,
+    rewardNGN: '≈ ₦0.724 cNGN',
+    points: 0,
+    deadline: '3 days left',
+    applicants: 0,
+    creatorTag: '₦0xc519...3C95',
+    creatorAddress: '0xc519729BF6D15e5984702BBa2C553f1c74A73C95',
+    escrowStatus: '🔒 Funded in Escrow',
+    escrowContract: '0x9f3de805eAa94516d216d6f1add78860B291BB76',
+    escrowTxHash: '0x885cfc29fd0521021c4354b1af61cdd58d410abb79ef01f395c393b1d5c39221',
+    description: 'Community bounty on Celo Mainnet with automated milestone escrow settlement.',
+    deliverable: 'Public verification link, GitHub PR, or live demo.',
+    createdAt: Date.now() - 3600000 * 1,
+  },
+  {
     id: 'celo_task_1',
     chainId: 42220,
     title: 'Build Webhook Listener for Celo Mainnet',
@@ -273,7 +322,7 @@ export function updateTaskState(taskId, updates = {}) {
 const SUPABASE_REST_URL = 'https://bbpdupijsgdghemfpijr.supabase.co/rest/v1/celo_tasks';
 const SUPABASE_ANON_KEY = 'sb_publishable_3mRhhwX9BhnJyobyCX7uWw_h2-idCPf';
 
-async function syncTaskToRemote(task) {
+export async function syncTaskToRemote(task) {
   try {
     const apiRes = await fetch('/api/tasks', {
       method: 'POST',
@@ -281,10 +330,10 @@ async function syncTaskToRemote(task) {
       body: JSON.stringify(task),
     }).catch(() => null);
 
-    if (apiRes && apiRes.ok) return;
+    if (apiRes && apiRes.ok) return true;
 
     // Direct Supabase REST fallback
-    await fetch(SUPABASE_REST_URL, {
+    const res = await fetch(SUPABASE_REST_URL, {
       method: 'POST',
       headers: {
         apikey: SUPABASE_ANON_KEY,
@@ -322,12 +371,14 @@ async function syncTaskToRemote(task) {
         created_at: task.createdAt ? new Date(task.createdAt).toISOString() : new Date().toISOString(),
       }),
     }).catch(() => null);
+    return res && res.ok;
   } catch (err) {
     console.debug('[DurableTaskStore] Background sync ignored:', err?.message);
+    return false;
   }
 }
 
-async function syncTaskPatchToRemote(taskId, updates) {
+export async function syncTaskPatchToRemote(taskId, updates) {
   try {
     const apiRes = await fetch(`/api/tasks?id=${encodeURIComponent(taskId)}`, {
       method: 'PATCH',

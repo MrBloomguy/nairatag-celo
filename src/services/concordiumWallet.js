@@ -46,7 +46,8 @@ export async function connectConcordiumTestnetWallet({ onAccountChanged, onChain
       throw new Error('Install or unlock the Concordium Browser Wallet, then try again.');
     }
     if (error?.message?.toLowerCase()?.includes('not whitelisted') || error?.message?.toLowerCase()?.includes('whitelisted')) {
-      throw new Error('Open your Concordium Wallet extension in the browser toolbar and click "Connect" or "Whitelist" to authorize localhost:5173.');
+      const currentOrigin = typeof window !== 'undefined' ? window.location.origin : 'this site';
+      throw new Error(`Open the Concordium Wallet extension icon in your browser toolbar, unlock it, and click "Connect" or "Whitelist" to authorize ${currentOrigin}.`);
     }
     throw error;
   }

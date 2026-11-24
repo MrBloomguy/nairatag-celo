@@ -4,6 +4,7 @@ import {
   generateRandomChallengeHex,
   buildConcordiumIdStatement,
   requestConcordiumHumanProof,
+  sendConcordiumCcdPayment,
   CONCORDIUM_TESTNET,
 } from '../src/services/concordiumAgentRegistry.js';
 
@@ -110,3 +111,67 @@ test('6. requestConcordiumHumanProof succeeds and returns structured zero-PII pr
   assert.ok(result.proof);
   assert.ok(result.verifiedAt);
 });
+
+test('7. sendConcordiumCcdPayment validates connection, sender, and amount', async () => {
+  await assert.rejects(
+    () => sendConcordiumCcdPayment(null, 'sender', 'recipient', 50),
+    /Connect your Concordium Browser Wallet/i
+  );
+
+  await assert.rejects(
+    () => sendConcordiumCcdPayment({}, '', 'recipient', 50),
+    /A connected Concordium sender account is required/i
+  );
+
+  await assert.rejects(
+    () => sendConcordiumCcdPayment({}, 'sender', 'recipient', 0),
+    /Enter a valid CCD payment amount/i
+  );
+});
+
+test('8. sendConcordiumCcdPayment successfully submits transfer and generates EU AI Act Art. 12 receipt', async () => {
+  let capturedSender;
+  let capturedType;
+  let capturedPayload;
+
+  const mockConnection = {
+    signAndSendTransaction: async (sender, type, payload) => {
+      capturedSender = sender;
+      capturedType = type;
+      capturedPayload = payload;
+      return 'f9a8b7c6d5e4f3a2b1c09876543210abcdef9876543210abcdef9876543210ab';
+    },
+  };
+
+  const sender = '4WBJM9RyoYQiwtjB1YxdqJAF1SMVyUao7KjA6fMbQKAUKarpkk';
+  const recipient = '4WBJM9RyoYQiwtjB1YxdqJAF1SMVyUao7KjA6fMbQKAUKarpkk';
+  const amount = 75;
+
+  const receipt = await sendConcordiumCcdPayment(
+    mockConnection,
+    sender,
+    recipient,
+    amount,
+    {
+      tag: 'MUSIC',
+      taskId: 'task-101',
+      memo: 'Consultation milestone',
+    }
+  );
+
+  assert.equal(capturedSender, sender);
+  assert.equal(capturedType, 3); // AccountTransactionType.Transfer
+  assert.ok(capturedPayload.to);
+  assert.equal(capturedPayload.to.address, recipient);
+  assert.equal(capturedPayload.amount.microCcdAmount, 75000000n);
+
+  assert.equal(receipt.txHash, 'f9a8b7c6d5e4f3a2b1c09876543210abcdef9876543210abcdef9876543210ab');
+  assert.equal(receipt.network, CONCORDIUM_TESTNET.network);
+  assert.equal(receipt.amountCcd, 75);
+  assert.equal(receipt.sender, sender);
+  assert.equal(receipt.recipient, recipient);
+  assert.equal(receipt.article12Compliant, true);
+  assert.ok(receipt.explorerUrl.includes('f9a8b7c6d5e4f3a2b1c09876543210abcdef9876543210abcdef9876543210ab'));
+  assert.ok(receipt.timestamp);
+});
+

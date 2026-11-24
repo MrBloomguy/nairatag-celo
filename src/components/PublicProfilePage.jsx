@@ -646,7 +646,7 @@ export default function PublicProfilePage({ rawHandle, type = 'agent' }) {
         </div>
 
         {/* Sleek Minimal Verification Strip */}
-        {type === 'agent' && !IS_CONCORDIUM_SITE && (
+        {type === 'agent' && false && (
           <div style={{
             width: '100%',
             maxWidth: '580px',

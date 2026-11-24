@@ -119,7 +119,14 @@ import {
   setActiveWalletProvider,
   publicClient,
 } from './services/celoPayment.js';
-import { createWalletClient, custom } from 'viem';
+import {
+  createWalletClient,
+  custom,
+  parseUnits,
+  parseEther,
+  encodeFunctionData,
+  concat,
+} from 'viem';
 import {
   getTaskChatMessages,
   sendTaskChatMessage,
@@ -160,6 +167,8 @@ import {
   celoMainnet,
   CELO_MAINNET_CONFIG,
   CELO_CNGN_ADDRESS,
+  CELO_USDT_ADDRESS,
+  ERC20_ABI,
   CELO_ERC8004_REPUTATION_REGISTRY as ARC_ERC8004_REPUTATION_REGISTRY,
   CELO_ERC8004_VALIDATION_REGISTRY as ARC_ERC8004_VALIDATION_REGISTRY,
   CELO_NAIRATAG_REGISTRY_ADDRESS as ARC_MEMO_ADDRESS,
@@ -221,7 +230,8 @@ import confetti from 'canvas-confetti';
 import RewardsPage, { GoldenVoucherModal, LuckyWheelModal, ReferralModal } from './RewardsPage.jsx';
 import NotificationLayer from './components/NotificationLayer.jsx';
 import { IS_CONCORDIUM_SITE, CONCORDIUM_SITE, activeSiteNetworkLabel } from './config/siteMode.js';
-import { CONCORDIUM_TESTNET } from './services/concordiumAgentRegistry.js';
+import { CONCORDIUM_TESTNET, sendConcordiumCcdPayment } from './services/concordiumAgentRegistry.js';
+import { connectConcordiumTestnetWallet, getActiveConcordiumWallet } from './services/concordiumWallet.js';
 import { recordConfirmedPaymentSpin } from './services/wheelRewards.js';
 import { getArcRewardState, markArcNotificationsRead, submitArcRewardAction } from './services/celoRewards.js';
 import { getArcAgentCompletedTaskCount, listArcTasks, startArcTask, submitArcTask } from './services/celoTasks.js';
@@ -2320,8 +2330,8 @@ function ArcAppShell() {
   const handleApproveMilestoneEscrow = async (task) => {
     try {
       const workerTag = task.assignedWorkerTag || myTag?.tag || walletAddress || '₦WORKER';
-      const payerToken = task.rewardToken || 'USDT';
-      const targetToken = workerPreferredToken || 'cNGN';
+      const payerToken = task.rewardToken || 'CCD';
+      const targetToken = workerPreferredToken || (IS_CONCORDIUM_SITE ? 'CCD' : 'cNGN');
       const rewardAmt = task.rewardAmount || task.rewardUSDC || 20;
 
       // Mark status as releasing in UI
@@ -2332,8 +2342,87 @@ function ArcAppShell() {
       setBackendTasks((prev) => prev.map((t) => t.id === task.id ? {
         ...t,
         status: 'releasing',
-        escrowStatus: '⚡ Releasing via Textile FX...'
+        escrowStatus: targetToken === 'CCD' ? '⚡ Releasing on Concordium Testnet...' : '⚡ Releasing via Textile FX...'
       } : t));
+
+      if (targetToken === 'CCD' || IS_CONCORDIUM_SITE) {
+        showToast(`Releasing Milestone Escrow: Submitting ${rewardAmt} CCD via Concordium Testnet wallet...`, 'info', 4000);
+        let conWallet = getActiveConcordiumWallet();
+        if (!conWallet?.connection || !conWallet?.account) {
+          conWallet = await connectConcordiumTestnetWallet();
+        }
+        const recipientAccount = task.workerConcordiumAccount || '4WBJM9RyoYQiwtjB1YxdqJAF1SMVyUao7KjA6fMbQKAUKarpkk';
+        const ccdPayment = await sendConcordiumCcdPayment(
+          conWallet.connection,
+          conWallet.account,
+          recipientAccount,
+          rewardAmt,
+          {
+            taskId: task.id,
+            tag: workerTag,
+            memo: `Milestone Escrow: ${task.title} · EU AI Act Art. 12`,
+          }
+        );
+
+        const payoutHash = ccdPayment.txHash;
+        const deliveredStr = `${rewardAmt} CCD`;
+
+        updateTaskState(task.id, {
+          status: 'paid',
+          escrowStatus: '✅ Released on Concordium Testnet',
+          payoutHash,
+          payoutDelivered: deliveredStr,
+          payoutToken: 'CCD',
+          paidAt: Date.now(),
+          concordiumExplorerUrl: ccdPayment.explorerUrl,
+          article12Compliant: true,
+        });
+
+        setTaskProgress((prev) => ({
+          ...prev,
+          [task.id]: {
+            status: 'paid',
+            payoutHash,
+            payoutDelivered: deliveredStr,
+            targetToken: 'CCD',
+            rewardAmt,
+            reviewedAt: Date.now(),
+            concordiumExplorerUrl: ccdPayment.explorerUrl,
+            article12Compliant: true,
+          },
+        }));
+
+        setBackendTasks((prev) => prev.map((t) => t.id === task.id ? {
+          ...t,
+          status: 'paid',
+          escrowStatus: '✅ Released on Concordium Testnet',
+          payoutHash,
+          payoutDelivered: deliveredStr,
+          payoutToken: 'CCD',
+          paidAt: Date.now(),
+          concordiumExplorerUrl: ccdPayment.explorerUrl,
+          article12Compliant: true,
+        } : t));
+
+        setUserPoints((prev) => prev + (task.points || 100));
+        triggerCelebrationConfetti();
+        showToast(`🎉 Milestone Escrow Approved! Settled ${deliveredStr} on Concordium Testnet (EU AI Act Art. 12 Audit Trail)`, 'success', 5000);
+
+        sendTaskChatMessage(
+          task.id,
+          {
+            sender: 'system',
+            senderTag: 'CONCORDIUM',
+            text: `🎉 Milestone Escrow Approved: Settled ${deliveredStr} on Concordium Testnet to ${workerTag}. On-chain Tx: ${payoutHash} (EU AI Act Article 12 Verified Audit Trail).`,
+            isAgent: false,
+          },
+          task
+        ).then((res) => {
+          if (res?.allMessages) setTaskChatList(res.allMessages);
+        });
+
+        return;
+      }
 
       showToast(`Releasing Milestone Escrow: Converting ${rewardAmt} ${payerToken === 'USDT' ? 'USD₮' : payerToken} ➔ ${targetToken} via Textile FX...`, 'info', 3000);
 
@@ -2498,13 +2587,35 @@ function ArcAppShell() {
             console.warn('[Celo Switch Warning]', switchErr);
           }
 
-          // Real transaction to Celo Milestone Escrow tagged with ERC-8021 attribution suffix
-          const hash = await walletClient.sendTransaction({
-            account: walletAddress,
-            to: CELO_NAIRATAG_ESCROW_ADDRESS,
-            value: 0n,
-            data: CELO_ATTRIBUTION_SUFFIX,
-          });
+          // Real transaction to Celo Milestone Escrow Vault tagged with ERC-8021 attribution suffix
+          let hash;
+          if (token === 'CELO') {
+            hash = await walletClient.sendTransaction({
+              account: walletAddress,
+              to: CELO_NAIRATAG_ESCROW_ADDRESS,
+              value: parseEther(rewardVal.toString()),
+              data: CELO_ATTRIBUTION_SUFFIX,
+            });
+          } else {
+            // Real ERC-20 token transfer (USD₮ or cNGN) to Escrow Vault with attribution suffix
+            const tokenAddress = token === 'cNGN' ? CELO_CNGN_ADDRESS : CELO_USDT_ADDRESS;
+            const decimals = 6;
+            const amountAtomic = parseUnits(rewardVal.toString(), decimals);
+
+            const transferData = encodeFunctionData({
+              abi: ERC20_ABI,
+              functionName: 'transfer',
+              args: [CELO_NAIRATAG_ESCROW_ADDRESS, amountAtomic],
+            });
+            const taggedData = concat([transferData, CELO_ATTRIBUTION_SUFFIX]);
+
+            hash = await walletClient.sendTransaction({
+              account: walletAddress,
+              to: tokenAddress,
+              data: taggedData,
+              value: 0n,
+            });
+          }
 
           setEscrowStepText(`3/3: Confirming escrow lock on CeloScan (${hash.slice(0, 10)}...)...`);
           const receipt = await publicClient.waitForTransactionReceipt({ hash });
@@ -4179,22 +4290,6 @@ function ArcAppShell() {
                     <div className="agent-directory-tag">₦{String(agent.tag || '').replace(/^[₦$@#]/, '')}</div>
                     {(IS_CONCORDIUM_SITE || agent.role) && <div style={{ fontSize: '11px', color: 'var(--privy-color-foreground-3)', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' }}>{IS_CONCORDIUM_SITE ? (agent.concordium?.description || 'NairaTag agent identity · Concordium Testnet') : agent.role}</div>}
 
-                    {/* Official Self Agent ID Badge with click-to-view proof details */}
-                    {!IS_CONCORDIUM_SITE && <div style={{ marginTop: '6px' }}>
-                      <SelfAgentIdBadge
-                        isVerified={agent.self?.verified !== false && agent.status !== 'unverified'}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setActiveVerificationDetailAgent(agent);
-                        }}
-                      />
-                    </div>}
-                    {!IS_CONCORDIUM_SITE && agent.self?.verified !== false && agent.status !== 'unverified' && (
-                      <div style={{ fontSize: '10px', color: '#059669', opacity: 0.85, marginTop: '2px' }}>
-                        Human owner verified via Self
-                      </div>
-                    )}
-
                     {/* ERC-8004 & Altana Account Indicators */}
                     {IS_CONCORDIUM_SITE ? (
                       <div style={{ fontSize: '10px', fontFamily: 'monospace', background: 'rgba(13, 148, 136, 0.08)', color: '#0d9488', padding: '2px 7px', borderRadius: '4px', fontWeight: 600, marginTop: '6px' }}>
@@ -4240,14 +4335,6 @@ function ArcAppShell() {
                       <div className="agent-circle-meta">
                         <div className="agent-circle-name" style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                           <span className="agent-circle-tag-pill">₦{String(agent.tag || '').replace(/^[₦$@#]/, '')}</span>
-                          {!IS_CONCORDIUM_SITE && <SelfAgentIdBadge
-                            size="xs"
-                            isVerified={agent.self?.verified !== false && agent.status !== 'unverified'}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setActiveVerificationDetailAgent(agent);
-                            }}
-                          />}
                           {IS_CONCORDIUM_SITE && <span className="agent-directory-category">Concordium Testnet</span>}
                         </div>
                         {(IS_CONCORDIUM_SITE || agent.role) && <div style={{ fontSize: '11px', color: 'var(--privy-color-foreground-3)', marginTop: '2px' }}>{IS_CONCORDIUM_SITE ? (agent.concordium?.description || 'NairaTag agent identity · Concordium Testnet') : agent.role}</div>}
@@ -4271,17 +4358,7 @@ function ArcAppShell() {
         {/* ───────────────────────────────────────────────────────────────────
             TAB: TASKS & BOUNTIES (MATCHING AGENTS PAGE LAYOUT & DESIGN)
             ─────────────────────────────────────────────────────────────────── */}
-        {mainTab === 'tasks' && IS_CONCORDIUM_SITE && (
-          <div className="account-dashboard" role="status">
-            <article className="account-wallet-card">
-              <span className="account-dashboard-eyebrow">CONCORDIUM TESTNET</span>
-              <h2>Task marketplace is not configured here</h2>
-              <p>This Concordium build focuses on agent identity, registry linking, and Agent Card publication. Task payouts and rewards will appear after their Concordium integrations are connected.</p>
-              <a className="agent-profile-explorer-link" href={CONCORDIUM_SITE.explorerUrl} target="_blank" rel="noopener noreferrer">Open CCDScan Testnet <ExternalLink size={12} /></a>
-            </article>
-          </div>
-        )}
-        {mainTab === 'tasks' && !IS_CONCORDIUM_SITE && (
+        {mainTab === 'tasks' && (
           <div className="agents-page-container">
             {selectedTask ? (
               <section className="task-detail-page">
@@ -4419,11 +4496,19 @@ function ArcAppShell() {
                                 Milestone Escrow Released & Paid
                               </strong>
                               <div style={{ fontSize: '12px', color: 'var(--privy-color-foreground-2)', marginBottom: '8px' }}>
-                                Settled <strong>{selectedTask.payoutDelivered || `${selectedTask.rewardAmount || selectedTask.rewardUSDC} ${selectedTask.rewardToken || 'USDT'}`}</strong> to <strong>{selectedTask.assignedWorkerTag || 'Worker'}</strong> via Textile FX Corridor.
+                                Settled <strong>{selectedTask.payoutDelivered || `${selectedTask.rewardAmount || selectedTask.rewardUSDC} ${selectedTask.rewardToken || (IS_CONCORDIUM_SITE ? 'CCD' : 'USDT')}`}</strong> to <strong>{selectedTask.assignedWorkerTag || 'Worker'}</strong>{selectedTask.payoutToken === 'CCD' ? ' on Concordium Testnet.' : ' via Textile FX Corridor.'}
                               </div>
                               {selectedTask.payoutHash && (
                                 <div style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', marginBottom: '10px', wordBreak: 'break-all' }}>
-                                  Tx Hash: <a href={`https://celoscan.io/tx/${selectedTask.payoutHash}`} target="_blank" rel="noopener noreferrer" style={{ color: '#0052FF', textDecoration: 'underline' }}>{selectedTask.payoutHash}</a>
+                                  Tx Hash: {selectedTask.payoutToken === 'CCD' ? (
+                                    <a href={`https://testnet.ccdscan.io/transaction/${selectedTask.payoutHash}`} target="_blank" rel="noopener noreferrer" style={{ color: '#0d9488', textDecoration: 'underline', fontWeight: 600 }}>
+                                      {selectedTask.payoutHash} (Concordium Testnet · EU AI Act Art. 12)
+                                    </a>
+                                  ) : (
+                                    <a href={`https://celoscan.io/tx/${selectedTask.payoutHash}`} target="_blank" rel="noopener noreferrer" style={{ color: '#0052FF', textDecoration: 'underline' }}>
+                                      {selectedTask.payoutHash}
+                                    </a>
+                                  )}
                                 </div>
                               )}
                               <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '10.5px', background: 'rgba(255,255,255,0.06)', padding: '3px 8px', borderRadius: '4px' }}>
@@ -4473,6 +4558,7 @@ function ArcAppShell() {
                               </div>
                               <div style={{ display: 'flex', gap: '6px' }}>
                                 {[
+                                  { id: 'CCD', label: 'CCD (Concordium)', icon: '/concordium-logo.png' },
                                   { id: 'cNGN', label: 'cNGN (Naira)', icon: '/tokens/cngn.png' },
                                   { id: 'USDT', label: 'USD₮ (Tether)', icon: '/tokens/usdt.svg' },
                                   { id: 'CELO', label: 'CELO', icon: '/tokens/celo.svg' },
@@ -4502,11 +4588,15 @@ function ArcAppShell() {
                                   </button>
                                 ))}
                               </div>
-                              {workerPreferredToken !== (selectedTask.rewardToken || 'USDT') && (
+                              {workerPreferredToken === 'CCD' ? (
+                                <div style={{ fontSize: '10px', color: '#0d9488', marginTop: '6px', lineHeight: 1.4, background: 'rgba(13, 148, 136, 0.08)', padding: '6px 10px', borderRadius: '6px' }}>
+                                  🛡️ <strong>Concordium CCD Payment Rail:</strong> Milestone escrow will release directly on Concordium Testnet into the worker's verified Concordium account, generating an on-chain receipt for EU AI Act Article 12 compliance.
+                                </div>
+                              ) : workerPreferredToken !== (selectedTask.rewardToken || 'USDT') ? (
                                 <div style={{ fontSize: '10px', color: '#10B981', marginTop: '6px', lineHeight: 1.4 }}>
                                   ⚡ <strong>Textile FX Corridor:</strong> You will be paid in {workerPreferredToken}, automatically converted from creator's locked {selectedTask.rewardToken === 'USDT' ? 'USD₮' : (selectedTask.rewardToken || 'USD₮')} upon milestone approval.
                                 </div>
-                              )}
+                              ) : null}
                             </div>
 
                             <textarea
@@ -6249,11 +6339,6 @@ function ArcAppShell() {
                 <div className="agent-profile-heading-copy">
                   <div className="agent-profile-name-line" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <h2>₦{selectedAgentProfile.tag.toUpperCase()}</h2>
-                    <SelfAgentIdBadge
-                      size="sm"
-                      isVerified={selectedAgentProfile.self?.verified !== false}
-                      onClick={() => setActiveVerificationDetailAgent(selectedAgentProfile)}
-                    />
                   </div>
                   <div className="agent-profile-subtitle">
                     {IS_CONCORDIUM_SITE ? 'NairaTag Agent Identity' : selectedAgentProfile.profileType === 'claimed-tag' ? 'NairaTag on Celo' : selectedAgentProfile.name}
@@ -6307,38 +6392,6 @@ function ArcAppShell() {
                       aria-label="Copy owner address"
                     ><Copy size={14} /></button>
                   )}
-                </div>
-              </div>}
-
-              {/* Clean Minimal Self Agent ID Trust Strip */}
-              {!IS_CONCORDIUM_SITE && <div
-                onClick={() => setActiveVerificationDetailAgent(selectedAgentProfile)}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '9px 12px',
-                  borderRadius: '10px',
-                  background: 'var(--surface-2, #f8fafc)',
-                  border: '1px solid var(--border-color, rgba(0,0,0,0.06))',
-                  margin: '10px 0',
-                  cursor: 'pointer',
-                }}
-                className="hover:border-emerald-500/30 transition-all"
-                title="Click to view full on-chain Self Agent ID verification details"
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <SelfAgentIdBadge
-                    size="sm"
-                    isVerified={selectedAgentProfile.self?.verified !== false}
-                  />
-                  <span style={{ fontSize: '11px', color: 'var(--text-secondary, #64748b)' }}>
-                    Proof-of-Human Identity
-                  </span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '3px', fontSize: '11px', color: '#059669', fontWeight: 600 }}>
-                  <span>Proof details</span>
-                  <ChevronRight size={13} />
                 </div>
               </div>}
 

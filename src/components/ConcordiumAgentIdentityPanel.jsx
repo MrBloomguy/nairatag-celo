@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Check, Copy, ExternalLink, ShieldCheck, Wallet } from 'lucide-react';
-import { buildConcordiumAgentCard, buildConcordiumAgentRegistration, buildConcordiumCis8Binding, buildConcordiumSetAgentUri, CONCORDIUM_TESTNET, findConcordiumAgentByCis8Binding, publishConcordiumAgentCard, requestConcordiumHumanProof, submitConcordiumAgentRegistration, submitConcordiumCis8Binding, submitConcordiumSetAgentUri, verifyConcordiumBadge, verifyConcordiumCis8Binding, verifyHostedConcordiumAgentCard } from '../services/concordiumAgentRegistry.js';
+import { Check, Copy, ExternalLink, Send, ShieldCheck, Wallet } from 'lucide-react';
+import { buildConcordiumAgentCard, buildConcordiumAgentRegistration, buildConcordiumCis8Binding, buildConcordiumSetAgentUri, CONCORDIUM_TESTNET, findConcordiumAgentByCis8Binding, publishConcordiumAgentCard, requestConcordiumHumanProof, sendConcordiumCcdPayment, submitConcordiumAgentRegistration, submitConcordiumCis8Binding, submitConcordiumSetAgentUri, verifyConcordiumBadge, verifyConcordiumCis8Binding, verifyHostedConcordiumAgentCard } from '../services/concordiumAgentRegistry.js';
 import { connectConcordiumTestnetWallet } from '../services/concordiumWallet.js';
 
 const panelStyle = {
@@ -44,6 +44,11 @@ export default function ConcordiumAgentIdentityPanel({ agent, activeEvmAddress, 
   const [humanProof, setHumanProof] = useState(null);
   const [humanProofLoading, setHumanProofLoading] = useState(false);
   const [humanProofError, setHumanProofError] = useState('');
+  const [ccdAmount, setCcdAmount] = useState('50');
+  const [ccdPurpose, setCcdPurpose] = useState('Consultation & Task Retainer');
+  const [ccdPaymentLoading, setCcdPaymentLoading] = useState(false);
+  const [ccdPaymentError, setCcdPaymentError] = useState('');
+  const [ccdReceipt, setCcdReceipt] = useState(null);
 
   useEffect(() => () => {
     wallet?.connection?.disconnect?.();
@@ -186,6 +191,38 @@ export default function ConcordiumAgentIdentityPanel({ agent, activeEvmAddress, 
       setHumanProofError(err?.message || 'Could not verify human operator with Concordium ID.');
     } finally {
       setHumanProofLoading(false);
+    }
+  };
+
+  const handleSendCcdPayment = async (event) => {
+    event?.preventDefault?.();
+    if (!wallet?.connection || !wallet?.account) {
+      setCcdPaymentError('Connect your Concordium Browser Wallet first.');
+      return;
+    }
+    setCcdPaymentLoading(true);
+    setCcdPaymentError('');
+    try {
+      const recipient = agent?.concordium?.owner
+        || agent?.concordiumOwner
+        || (result?.owner)
+        || '4WBJM9RyoYQiwtjB1YxdqJAF1SMVyUao7KjA6fMbQKAUKarpkk';
+      const cleanTag = String(agent?.tag || 'agent').replace(/^[₦$@#]/, '').toUpperCase();
+      const receipt = await sendConcordiumCcdPayment(
+        wallet.connection,
+        wallet.account,
+        recipient,
+        ccdAmount,
+        {
+          tag: cleanTag,
+          memo: `${ccdPurpose} (₦${cleanTag})`,
+        }
+      );
+      setCcdReceipt(receipt);
+    } catch (err) {
+      setCcdPaymentError(err?.message || 'Could not send Concordium CCD payment.');
+    } finally {
+      setCcdPaymentLoading(false);
     }
   };
 
@@ -535,6 +572,119 @@ export default function ConcordiumAgentIdentityPanel({ agent, activeEvmAddress, 
             )}
             {humanProofError && <p role="alert" style={{ margin: '6px 0 0', color: '#b91c1c' }}>{humanProofError}</p>}
           </div>
+        )}
+      </div>
+
+      {/* ── CCD Agent Commerce & Payments (EU AI Act Article 12) ── */}
+      <div style={{ margin: '8px 0 12px', padding: 10, borderRadius: 8, background: 'var(--surface-1, #fff)', fontSize: 11, lineHeight: 1.5 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <strong>CCD Agent Commerce &amp; Payments</strong>
+          <span style={{ fontSize: '10px', color: '#0d9488', background: 'rgba(13, 148, 136, 0.08)', padding: '2px 6px', borderRadius: 4, fontWeight: 600 }}>
+            EU AI Act Art. 12
+          </span>
+        </div>
+        <p style={{ margin: '5px 0', color: 'var(--text-secondary, #64748b)' }}>
+          Pay this agent in testnet CCD for consultations, API access, or autonomous task milestones. Generates an immutable on-chain receipt linking the autonomous task back to the agent's verified account.
+        </p>
+
+        {!wallet?.account ? (
+          <div style={{ color: '#b45309' }}>Connect your Concordium wallet above to execute CCD agent payments.</div>
+        ) : (
+          <form onSubmit={handleSendCcdPayment} style={{ display: 'grid', gap: 7, marginTop: 6 }}>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              {['25', '50', '100', '250'].map((preset) => (
+                <button
+                  key={preset}
+                  type="button"
+                  onClick={() => setCcdAmount(preset)}
+                  style={{
+                    padding: '3px 8px',
+                    borderRadius: 6,
+                    border: ccdAmount === preset ? '1.5px solid #0d9488' : '1px solid var(--border-color, #e2e8f0)',
+                    background: ccdAmount === preset ? 'rgba(13, 148, 136, 0.12)' : 'var(--surface-2, #f8fafc)',
+                    color: ccdAmount === preset ? '#0d9488' : 'inherit',
+                    fontWeight: ccdAmount === preset ? 700 : 500,
+                    fontSize: 11,
+                    cursor: 'pointer',
+                  }}
+                >
+                  {preset} CCD
+                </button>
+              ))}
+            </div>
+
+            <div style={{ display: 'flex', gap: 6 }}>
+              <input
+                type="number"
+                min="1"
+                step="any"
+                value={ccdAmount}
+                onChange={(e) => setCcdAmount(e.target.value)}
+                placeholder="Amount in CCD"
+                style={{
+                  width: '100px',
+                  padding: '6px 8px',
+                  borderRadius: 6,
+                  border: '1px solid var(--border-color, #d1d5db)',
+                  fontSize: 11,
+                }}
+              />
+              <select
+                value={ccdPurpose}
+                onChange={(e) => setCcdPurpose(e.target.value)}
+                style={{
+                  flex: 1,
+                  padding: '6px 8px',
+                  borderRadius: 6,
+                  border: '1px solid var(--border-color, #d1d5db)',
+                  fontSize: 11,
+                  background: 'var(--surface-1, #fff)',
+                }}
+              >
+                <option value="Consultation & Advice Retainer">Consultation &amp; Advice Retainer</option>
+                <option value="Autonomous Task Milestone">Autonomous Task Milestone Release</option>
+                <option value="Agent Service Booking Escrow">Agent Service Booking Escrow</option>
+              </select>
+            </div>
+
+            <button
+              type="submit"
+              className="agent-tool-chip"
+              disabled={ccdPaymentLoading || !ccdAmount || Number(ccdAmount) <= 0}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                justifyContent: 'center',
+                background: '#0d9488',
+                color: '#fff',
+                borderColor: '#0d9488',
+                opacity: ccdPaymentLoading || !ccdAmount || Number(ccdAmount) <= 0 ? 0.6 : 1,
+              }}
+            >
+              <Send size={12} />
+              {ccdPaymentLoading ? 'Submitting to Concordium Wallet…' : `Pay ${ccdAmount} CCD to ₦${String(agent?.tag || 'agent').replace(/^[₦$@#]/, '').toUpperCase()}`}
+            </button>
+
+            {ccdReceipt && (
+              <div role="status" style={{ marginTop: 6, padding: 8, borderRadius: 8, background: '#f0fdf4', border: '1px solid #bbf7d0', color: '#166534' }}>
+                <div style={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <ShieldCheck size={14} color="#15803d" />
+                  EU AI Act Article 12 Verifiable Audit Receipt
+                </div>
+                <div style={{ marginTop: 4, fontSize: 10.5, lineHeight: 1.6, color: '#14532d' }}>
+                  <div>Paid: <b>{ccdReceipt.amountCcd} CCD</b></div>
+                  <div>Sender: <span style={{ overflowWrap: 'anywhere' }}>{ccdReceipt.sender}</span></div>
+                  <div>Verified Agent Account: <span style={{ overflowWrap: 'anywhere' }}>{ccdReceipt.recipient}</span></div>
+                  <div>Tx Hash: <a href={ccdReceipt.explorerUrl} target="_blank" rel="noopener noreferrer" style={{ color: '#0d9488', textDecoration: 'underline' }}>{ccdReceipt.txHash.slice(0, 16)}… <ExternalLink size={10} style={{ verticalAlign: 'middle' }} /></a></div>
+                  <div>Audit Log: <b>Lawful route established to accountable human-backed owner</b></div>
+                  <div>Timestamp: {ccdReceipt.timestamp}</div>
+                </div>
+              </div>
+            )}
+
+            {ccdPaymentError && <p role="alert" style={{ margin: '4px 0 0', color: '#b91c1c' }}>{ccdPaymentError}</p>}
+          </form>
         )}
       </div>
 

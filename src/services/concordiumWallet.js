@@ -1,5 +1,12 @@
 import { CONCORDIUM_TESTNET } from './concordiumAgentRegistry.js';
 
+let activeWalletSession = null;
+
+/** Returns the active in-memory Concordium wallet session if connected. */
+export function getActiveConcordiumWallet() {
+  return activeWalletSession;
+}
+
 /**
  * Connects the official Concordium Browser Wallet and enforces the configured
  * Testnet before returning an account that can be used for later actions.
@@ -10,13 +17,23 @@ export async function connectConcordiumTestnetWallet({ onAccountChanged, onChain
   let selectedGenesisHash;
 
   const delegate = {
-    onAccountChanged: (_connection, account) => onAccountChanged?.(account || null),
+    onAccountChanged: (_connection, account) => {
+      if (activeWalletSession) activeWalletSession.account = account || null;
+      onAccountChanged?.(account || null);
+    },
     onChainChanged: (_connection, genesisHash) => {
       selectedGenesisHash = genesisHash;
+      if (activeWalletSession) activeWalletSession.genesisHash = genesisHash;
       onChainChanged?.(genesisHash);
     },
-    onConnected: (_connection, account) => onAccountChanged?.(account || null),
-    onDisconnected: () => onAccountChanged?.(null),
+    onConnected: (_connection, account) => {
+      if (activeWalletSession) activeWalletSession.account = account || null;
+      onAccountChanged?.(account || null);
+    },
+    onDisconnected: () => {
+      activeWalletSession = null;
+      onAccountChanged?.(null);
+    },
   };
 
   let connection;
@@ -37,11 +54,15 @@ export async function connectConcordiumTestnetWallet({ onAccountChanged, onChain
       throw new Error(`Switch the Concordium wallet to ${CONCORDIUM_TESTNET.name}, then connect again.`);
     }
 
+    const session = { connection, account, genesisHash: selectedGenesisHash };
+    activeWalletSession = session;
+
     onAccountChanged?.(account);
     onChainChanged?.(selectedGenesisHash);
-    return { connection, account, genesisHash: selectedGenesisHash };
+    return session;
   } catch (error) {
     if (connection) await connection.disconnect().catch(() => {});
+    activeWalletSession = null;
     if (error?.message?.includes('Browser Wallet extension not detected')) {
       throw new Error('Install or unlock the Concordium Browser Wallet, then try again.');
     }
@@ -52,3 +73,4 @@ export async function connectConcordiumTestnetWallet({ onAccountChanged, onChain
     throw error;
   }
 }
+

@@ -47,7 +47,7 @@ On NairaTag, **claiming a `₦TAG` (e.g. `₦BLOOM`) creates your sovereign AI a
 |---|---|
 | ![Claim Your Agent Tag](public/screenshots/claim-tag.png) | ![Agent Profile Card](public/screenshots/agent-profile-card.png) |
 
-| Agent Directory (`/agents`) | Tag-to-Tag Send (`/pay`) |
+| Agent Leaderboard (`/agents`) | Tag-to-Tag Send (`/pay`) |
 |---|---|
 | ![Agent Directory](public/screenshots/agent-directory.png) | ![Tag-to-Tag Send](public/screenshots/tag-to-tag-send.png) |
 

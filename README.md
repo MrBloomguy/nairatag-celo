@@ -106,5 +106,42 @@ cast send 0x8004A169FB4a3325136EB29fA0ceB6D2e539a432 "0xf2c298be0000000000000000
 
 ---
 
+## 🔍 For Judges: Reproduce the Self Agent ID + x402 Flow
+
+Self Agent ID (`SelfAgentRegistry`: `0xaC3DF9ABf80d0F5c020C06B04Cced27763355944` on Celo Mainnet `42220`) directly gates **Pay**, **Swap**, **Tasks**, **Altana Session Delegation**, and **x402 API execution**:
+
+### Key Enforcement Files & Lines
+- **Protected x402 Serverless Gate**: [`api/self-gated-service.js` (lines 69–143)](api/self-gated-service.js#L69-L143) — reads `getAgentVerificationStatus` from `SelfAgentRegistry`, returns `403 SCENARIO_A_ACCESS_DENIED` for unverified agents, issues `402 Payment Required` for verified unpaid agents, and releases execution after x402 settlement verification.
+- **Pay & Swap Self ID Gate**: [`src/components/TagToTagSendCard.jsx` (lines 160–199)](src/components/TagToTagSendCard.jsx#L160-L199) and [`src/components/CorridorSwapCard.jsx` (lines 177–188)](src/components/CorridorSwapCard.jsx#L177-L188) — enforce `checkSelfHumanGate` before sending or swapping.
+- **Tasks Participation Gate**: [`src/App.jsx` (`handleStartTask` / `handleSubmitTask`, lines 2304–2380)](src/App.jsx#L2304-L2380) — blocks unverified agents from starting or submitting tasks and opens the Self Agent ID verification flow.
+- **Shared Per-Human Sybil Quota**: [`src/services/selfAgentIdService.js` (`enforceSharedHumanRewardQuota`, lines 710–766)](src/services/selfAgentIdService.js#L710-L766) — binds all agents sharing a `humanNullifier` to one shared daily limit.
+- **Combined ERC-8004 + A2A Registration JSON (`agentURI`)**: [`api/agent-card.js`](api/agent-card.js) and [`setSelfAgentURI` (`src/services/selfAgentIdService.js`, lines 859–895)](src/services/selfAgentIdService.js#L859-L895).
+
+### Quick Reproduction Steps
+1. **Unverified Rejection (`403` / Blocked UI)**:
+   - Open [`https://celo.nairatag.ng/pay`](https://celo.nairatag.ng/pay) or [`https://celo.nairatag.ng/tasks`](https://celo.nairatag.ng/tasks) with an unverified wallet — the UI blocks sending/swapping/applying and prompts Self Agent ID verification.
+   - Or call the gated endpoint with an unverified address:
+     ```bash
+     curl -s -X POST https://celo.nairatag.ng/api/self-gated-service \
+       -H "Content-Type: application/json" \
+       -d '{"agentAddress":"0x000000000000000000000000000000000000dEaD","capability":"fx_quote"}'
+     # Returns 403 SCENARIO_A_ACCESS_DENIED (Self Human Proof Required)
+     ```
+2. **Verify an Agent on Celo Mainnet**:
+   - Claim a tag at [`https://celo.nairatag.ng/claim`](https://celo.nairatag.ng/claim) (provisions an Altana smart wallet), scan the Self App QR to mint an on-chain `agentId`, and check:
+     ```bash
+     curl -s https://agent-api.self.xyz/api/agent/info/42220/<agentId>
+     ```
+   - Inspect the agent's combined ERC-8004 + A2A card at:
+     ```bash
+     curl -s "https://celo.nairatag.ng/api/agent-card?tag=<tag>"
+     ```
+3. **Run Automated Self ID + x402 + Altana Tests Locally**:
+   ```bash
+   node --test test/self-agent-id.test.js test/agent-lifecycle.test.js
+   ```
+
+---
+
 ## 📄 License
 MIT © NairaTag Protocol

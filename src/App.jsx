@@ -202,7 +202,7 @@ import { getRecentArcTagActivity } from './services/celoRecentTagActivity.js';
 import { getArcAgentFollowState, setArcAgentFollow } from './services/celoAgentFollows.js';
 import { fetchArcAgentMetrics } from './services/celoAgentMetrics.js';
 import { discoverAgentsByCapability, isAgentDiscoveryRequest, resolveAgentMention, filterAgentsByVerification } from './services/agentDiscovery.js';
-import { SELF_REGISTRY_CELO_MAINNET, getVerificationStatusLabel, checkSelfHumanGate } from './services/selfAgentIdService.js';
+import { SELF_REGISTRY_CELO_MAINNET, getVerificationStatusLabel, checkSelfHumanGate, setSelfAgentURI } from './services/selfAgentIdService.js';
 import {
   recordReferralSignup,
   rememberReferralFromUrl,
@@ -4264,8 +4264,18 @@ function ArcAppShell() {
                             : 'Provisioned on claim'}
                         </span>
                         <span style={{ opacity: 0.72 }}>Self ID Owner Gate</span>
-                        <span style={{ fontWeight: 600, color: myAgentControlStatus?.selfVerified ? '#059669' : '#b45309' }}>
+                        <span style={{ fontWeight: 600, color: myAgentControlStatus?.selfVerified ? '#059669' : '#b45309', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
                           {myAgentControlStatus?.selfVerified ? 'Verified Human' : 'Verification Pending'}
+                          {myAgentControlStatus?.selfAgentId && (
+                            <a
+                              href={`https://agent-api.self.xyz/api/agent/info/42220/${myAgentControlStatus.selfAgentId}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              style={{ fontFamily: 'monospace', fontSize: '12px', textDecoration: 'underline', color: 'inherit' }}
+                            >
+                              #{myAgentControlStatus.selfAgentId} ↗
+                            </a>
+                          )}
                         </span>
                       </div>
 
@@ -4380,6 +4390,55 @@ function ArcAppShell() {
                             Revoke Agent Permissions
                           </button>
                         )}
+                      </div>
+
+                      <div style={{ marginTop: '12px', paddingTop: '10px', borderTop: '1px solid var(--border-color, rgba(15, 23, 42, 0.08))', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap', fontSize: '12px' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 }}>
+                          <span style={{ fontWeight: 700 }}>ERC-8004 / A2A Registration JSON (agentURI)</span>
+                          <a
+                            href={`/api/agent-card?tag=${encodeURIComponent(cleanOwnedTag)}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{ fontFamily: 'monospace', fontSize: '11px', opacity: 0.8, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                          >
+                            https://celo.nairatag.ng/api/agent-card?tag={cleanOwnedTag}
+                          </a>
+                        </div>
+                        <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
+                          <button
+                            type="button"
+                            className="quick-chip-btn"
+                            onClick={() => triggerCopy(`agent_uri_${cleanOwnedTag}`, `https://celo.nairatag.ng/api/agent-card?tag=${cleanOwnedTag}`)}
+                          >
+                            <Copy size={12} /> {copiedKey === `agent_uri_${cleanOwnedTag}` ? 'Copied' : 'Copy URI'}
+                          </button>
+                          {myAgentControlStatus?.selfVerified && (
+                            <button
+                              type="button"
+                              className="quick-chip-btn"
+                              disabled={isUpdatingAgentSession}
+                              onClick={async () => {
+                                const agentId = myAgentControlStatus?.selfAgentId || myTag?.agentId;
+                                if (!agentId) {
+                                  showToast('Link or mint your Self Agent ID first to set agentURI on-chain.', 'info');
+                                  return;
+                                }
+                                setIsUpdatingAgentSession(true);
+                                try {
+                                  const uri = `https://celo.nairatag.ng/api/agent-card?tag=${encodeURIComponent(cleanOwnedTag)}`;
+                                  const res = await setSelfAgentURI({ agentId, agentURI: uri, fromAddress: walletAddress });
+                                  showToast(`Published agentURI on Celo Mainnet (${shorten(res.txHash)})`, 'success', 4500);
+                                } catch (err) {
+                                  showToast(err?.message || 'Failed to set agentURI on-chain', 'error', 4500);
+                                } finally {
+                                  setIsUpdatingAgentSession(false);
+                                }
+                              }}
+                            >
+                              <ExternalLink size={12} /> Set agentURI On-Chain
+                            </button>
+                          )}
+                        </div>
                       </div>
                     </article>
                   );
@@ -7169,7 +7228,7 @@ function ArcAppShell() {
                   <img className="agent-profile-avatar" src={selectedAgentProfile.avatar} alt="" style={{ width: '50px', height: '50px', borderRadius: '50%', display: 'block' }} />
                   {!IS_CONCORDIUM_SITE && (agentControlStatus?.selfVerified ?? selectedAgentProfile.self?.verified) && (
                     <span
-                      title="Verified with Self Agent ID"
+                      title={`Verified with Self Agent ID${(agentControlStatus?.selfAgentId || selectedAgentProfile.self?.agentId || selectedAgentProfile.identity?.erc8004AgentId) ? ` #${agentControlStatus?.selfAgentId || selectedAgentProfile.self?.agentId || selectedAgentProfile.identity?.erc8004AgentId}` : ''}`}
                       style={{
                         position: 'absolute',
                         bottom: '-2px',
@@ -7207,6 +7266,29 @@ function ArcAppShell() {
                     >
                       {IS_CONCORDIUM_SITE ? 'NairaTag Agent' : (/^user\s*agent$/i.test(String(selectedAgentProfile.category || '').trim()) ? 'Personal' : (selectedAgentProfile.category || 'Personal'))}
                     </span>
+                    {!IS_CONCORDIUM_SITE && (agentControlStatus?.selfAgentId || selectedAgentProfile.self?.agentId || selectedAgentProfile.identity?.erc8004AgentId) && (
+                      <a
+                        href={`https://agent-api.self.xyz/api/agent/info/42220/${agentControlStatus?.selfAgentId || selectedAgentProfile.self?.agentId || selectedAgentProfile.identity?.erc8004AgentId}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title="Verify Self Agent ID via Self API"
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '3px',
+                          padding: '2px 7px',
+                          borderRadius: '999px',
+                          fontSize: '10.5px',
+                          fontWeight: 700,
+                          fontFamily: 'monospace',
+                          background: 'rgba(16, 185, 129, 0.12)',
+                          color: '#059669',
+                          textDecoration: 'none'
+                        }}
+                      >
+                        Self #{agentControlStatus?.selfAgentId || selectedAgentProfile.self?.agentId || selectedAgentProfile.identity?.erc8004AgentId} ↗
+                      </a>
+                    )}
                   </div>
                   <div className="agent-profile-subtitle" style={{ fontSize: '11px', opacity: 0.65, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                     {IS_CONCORDIUM_SITE ? 'NairaTag Agent Identity' : selectedAgentProfile.profileType === 'claimed-tag' ? 'NairaTag on Celo' : (selectedAgentProfile.role || selectedAgentProfile.name)}

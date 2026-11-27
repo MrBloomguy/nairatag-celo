@@ -21,10 +21,12 @@ import {
   getAddress,
   padHex,
   parseAbi,
+  encodeFunctionData,
   keccak256,
   stringToHex,
 } from 'viem';
-import { publicClient } from './celoPayment.js';
+import { generateRegistrationJSON } from '@selfxyz/agent-sdk';
+import { publicClient, getEthereumProvider } from './celoPayment.js';
 import {
   OFFICIAL_AGENT_WALLET,
   CELO_ERC8004_IDENTITY_REGISTRY,
@@ -55,6 +57,8 @@ export const SELF_REGISTRY_ABI = parseAbi([
   'function getAgentCountForHuman(uint256 nullifier) view returns (uint256)',
   'function selfProofProvider() view returns (address)',
   'function ownerOf(uint256 tokenId) view returns (address)',
+  'function tokenURI(uint256 agentId) view returns (string)',
+  'function setAgentURI(uint256 agentId, string agentURI) external',
 ]);
 
 /**
@@ -763,6 +767,132 @@ export function enforceSharedHumanRewardQuota({
     nullifier: normNullifier,
     agentsUsed: updatedAgents,
     reason: null,
+  };
+}
+
+/**
+ * Generates a Combined ERC-8004 + A2A Registration JSON document using `@selfxyz/agent-sdk`.
+ */
+export function buildCombinedAgentRegistration({
+  tag,
+  name,
+  description,
+  image,
+  agentId = null,
+  altanaWalletAddress = null,
+  keystoreAddress = '0x83b30935f36d6ccf9B1ec3b5E47F2866b97cd27c',
+  sessionStatus = 'unprovisioned',
+  active = false,
+  origin = 'https://celo.nairatag.ng',
+}) {
+  const cleanTag = String(tag || 'nairatag').trim().replace(/^[₦$@#]/, '').toLowerCase();
+  const baseOrigin = String(origin || 'https://celo.nairatag.ng').replace(/\/$/, '');
+  const a2aEndpoint = `${baseOrigin}/api/a2a?tag=${encodeURIComponent(cleanTag)}`;
+  const mcpEndpoint = `${baseOrigin}/api/mcp?tag=${encodeURIComponent(cleanTag)}`;
+  const webEndpoint = `${baseOrigin}/agent/${encodeURIComponent(cleanTag)}`;
+  const avatarUrl = image || `https://api.dicebear.com/11.x/adventurer-neutral/svg?seed=${encodeURIComponent(cleanTag)}`;
+
+  const baseDoc = generateRegistrationJSON({
+    name: name || `₦${cleanTag.toUpperCase()}`,
+    description: description || `Human-backed sovereign NairaTag agent (₦${cleanTag.toUpperCase()}) verified via Self Protocol with an Altana smart wallet on Celo Mainnet.`,
+    image: avatarUrl,
+    services: [
+      { name: 'A2A', endpoint: a2aEndpoint, version: '0.3.0' },
+      { name: 'MCP', endpoint: mcpEndpoint, version: '1.0' },
+      { name: 'web', endpoint: webEndpoint },
+    ],
+    a2a: {
+      version: '1.0.0',
+      url: a2aEndpoint,
+      provider: { name: 'NairaTag Protocol', url: baseOrigin },
+      capabilities: { streaming: false, pushNotifications: false },
+      securitySchemes: { bearer: { type: 'http', scheme: 'bearer' } },
+    },
+  });
+
+  return {
+    ...baseDoc,
+    active: Boolean(active),
+    security: [{ bearer: [] }],
+    defaultInputModes: ['text/plain', 'application/json'],
+    defaultOutputModes: ['text/plain', 'application/json'],
+    skills: [
+      {
+        id: 'nairatag-pay',
+        name: 'NairaTag Stablecoin Settlement',
+        description: 'Receive and send USD₮ / cNGN on Celo Mainnet via Altana session keys and Textile FX.',
+        tags: ['payments', 'celo', 'altana', 'usdt', 'cngn'],
+      },
+    ],
+    registrations: agentId != null
+      ? [{ agentId: Number(agentId) || agentId, agentRegistry: `eip155:${SELF_CELO_CHAIN_ID}:${SELF_REGISTRY_CELO_MAINNET}` }]
+      : [{ agentRegistry: `eip155:${SELF_CELO_CHAIN_ID}:${SELF_REGISTRY_CELO_MAINNET}` }],
+    supportedTrust: ['reputation', 'crypto-economic'],
+    altana: {
+      walletAddress: altanaWalletAddress,
+      keystoreAddress,
+      sessionStatus,
+    },
+  };
+}
+
+/**
+ * Reads the on-chain `agentURI` (`tokenURI`) for an agent ID in `SelfAgentRegistry`.
+ */
+export async function getSelfAgentURI({ agentId }) {
+  if (agentId == null) return '';
+  try {
+    const uri = await publicClient.readContract({
+      address: SELF_REGISTRY_CELO_MAINNET,
+      abi: SELF_REGISTRY_ABI,
+      functionName: 'tokenURI',
+      args: [BigInt(agentId)],
+    });
+    return String(uri || '');
+  } catch {
+    return '';
+  }
+}
+
+/**
+ * Calls `SelfAgentRegistry.setAgentURI(agentId, agentURI)` on Celo Mainnet (Chain ID 42220)
+ * so indexers (8004scan) and A2A clients can discover the agent's combined registration JSON.
+ */
+export async function setSelfAgentURI({ agentId, agentURI, fromAddress }) {
+  if (agentId == null) throw new Error('Self Agent ID is required to set agentURI.');
+  if (!agentURI || !/^https?:\/\//i.test(agentURI)) {
+    throw new Error('A valid HTTPS agentURI is required.');
+  }
+  const provider = getEthereumProvider?.() || (typeof window !== 'undefined' ? window.ethereum : null);
+  if (!provider?.request) {
+    throw new Error('Connect an EVM wallet to sign setAgentURI on Celo Mainnet.');
+  }
+  const accounts = await provider.request({ method: 'eth_accounts' });
+  const sender = fromAddress || accounts?.[0];
+  if (!sender || !isAddress(sender)) {
+    throw new Error('Connected owner wallet address is required.');
+  }
+
+  const data = encodeFunctionData({
+    abi: SELF_REGISTRY_ABI,
+    functionName: 'setAgentURI',
+    args: [BigInt(agentId), agentURI],
+  });
+
+  const txHash = await provider.request({
+    method: 'eth_sendTransaction',
+    params: [{
+      from: getAddress(sender),
+      to: SELF_REGISTRY_CELO_MAINNET,
+      data,
+    }],
+  });
+
+  return {
+    txHash,
+    agentId: Number(agentId) || agentId,
+    agentURI,
+    explorerUrl: `https://celoscan.io/tx/${txHash}`,
   };
 }
 

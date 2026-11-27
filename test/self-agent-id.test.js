@@ -986,3 +986,27 @@ test('33. Shared humanNullifier reward quota blocks second agent from same human
   assert.ok(dupCheck.agentsUsed.includes(agentA));
 });
 
+test('34. Combined ERC-8004 & A2A Registration JSON + setAgentURI ABI', async () => {
+  const { buildCombinedAgentRegistration, SELF_REGISTRY_ABI } = await import('../src/services/selfAgentIdService.js');
+  const doc = buildCombinedAgentRegistration({
+    tag: 'bloom',
+    name: '₦BLOOM',
+    description: 'Design, software engineering and smart contract auditing specialist.',
+    agentId: 42,
+    altanaWalletAddress: '0x7c264210D5C992b8ea3224eb6B39F477a493AF26',
+    sessionStatus: 'active',
+    active: true,
+  });
+
+  assert.equal(doc.type, 'https://eips.ethereum.org/EIPS/eip-8004#registration-v1');
+  assert.equal(doc.name, '₦BLOOM');
+  assert.equal(doc.active, true);
+  assert.equal(doc.url, 'https://celo.nairatag.ng/api/a2a?tag=bloom');
+  assert.ok(Array.isArray(doc.services) && doc.services.some((s) => s.name === 'A2A' && s.endpoint === doc.url));
+  assert.equal(doc.registrations[0].agentId, 42);
+  assert.equal(doc.registrations[0].agentRegistry, 'eip155:42220:0xaC3DF9ABf80d0F5c020C06B04Cced27763355944');
+  assert.equal(doc.altana.walletAddress, '0x7c264210D5C992b8ea3224eb6B39F477a493AF26');
+  assert.ok(SELF_REGISTRY_ABI.some((item) => item.type === 'function' && item.name === 'setAgentURI'));
+  assert.ok(SELF_REGISTRY_ABI.some((item) => item.type === 'function' && item.name === 'tokenURI'));
+});
+

@@ -329,6 +329,7 @@ export async function getAgentControlStatus(tagOrAddress) {
     keystoreAddress: ALTANA_CELO_KEYSTORE,
     selfVerified: Boolean(agent.self?.verified),
     selfStatus: agent.self?.status || VERIFICATION_STATUS.UNVERIFIED,
+    selfAgentId: agent.self?.agentId ?? agent.erc8004?.tokenId ?? null,
     hasActiveSession,
     sessionStatus,
     sessionExpiry: expiry,

@@ -3,6 +3,7 @@ import react from '@vitejs/plugin-react';
 import path from 'node:path';
 import circleHandler from './api/circle.js';
 import agentIdentitiesHandler from './api/agent-identities.js';
+import agentCardHandler from './api/agent-card.js';
 
 const circleApiPlugin = {
   name: 'circle-api-dev',
@@ -17,6 +18,21 @@ const circleApiPlugin = {
 function mountCircleHandler(server) {
   server.middlewares.use('/api/circle', (req, res, next) => {
     Promise.resolve(circleHandler(req, res)).catch(next);
+  });
+  server.middlewares.use('/api/agent-card', (req, res, next) => {
+    const url = new URL(req.url || '/', 'http://localhost');
+    req.query = Object.fromEntries(url.searchParams.entries());
+    if (typeof res.status !== 'function') {
+      res.status = (code) => { res.statusCode = code; return res; };
+    }
+    if (typeof res.json !== 'function') {
+      res.json = (data) => {
+        if (!res.headersSent) res.setHeader('Content-Type', 'application/json');
+        res.end(JSON.stringify(data));
+        return res;
+      };
+    }
+    Promise.resolve(agentCardHandler(req, res)).catch(next);
   });
   server.middlewares.use('/api/agent-identities', (req, res, next) => {
     const url = new URL(req.url || '/', 'http://localhost');

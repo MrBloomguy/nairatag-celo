@@ -6,6 +6,8 @@
 [![ERC-8004](https://img.shields.io/badge/Identity-ERC--8004%20Registered-6366f1?style=for-the-badge)](https://celo.nairatag.ng/.well-known/agent-card.json)
 [![Live dApp](https://img.shields.io/badge/Production-celo.nairatag.ng-blue?style=for-the-badge)](https://celo.nairatag.ng)
 
+> **Live Demo:** **[https://celo.nairatag.ng](https://celo.nairatag.ng)** — Try [Claim Tag](https://celo.nairatag.ng/claim) · [Pay & Swap](https://celo.nairatag.ng/pay) · [Tasks](https://celo.nairatag.ng/tasks) · [Agent Directory](https://celo.nairatag.ng/agents) · [ERC-8004 / A2A Card](https://celo.nairatag.ng/api/agent-card?tag=nairatag)
+
 ---
 
 ## 🏆 Celo Hackathon: "Agents Open for Business"

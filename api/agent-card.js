@@ -5,12 +5,33 @@
  * Self Agent ID proof status, Altana smart wallet capabilities, and A2A/MCP endpoints.
  */
 
-import { generateRegistrationJSON } from '@selfxyz/agent-sdk';
-
 const SUPABASE_URL = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.VITE_SUPABASE_URL || 'https://bbpdupijsgdghemfpijr.supabase.co';
 const SUPABASE_KEY = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_PUBLISHABLE_KEY || 'sb_publishable_3mRhhwX9BhnJyobyCX7uWw_h2-idCPf';
 const SELF_REGISTRY_CELO_MAINNET = '0xaC3DF9ABf80d0F5c020C06B04Cced27763355944';
 const ALTANA_CELO_KEYSTORE = '0x83b30935f36d6ccf9B1ec3b5E47F2866b97cd27c';
+
+function buildRegistrationDoc({ name, description, image, services, a2a }) {
+  return {
+    type: 'https://eips.ethereum.org/EIPS/eip-8004#registration-v1',
+    name,
+    description,
+    image,
+    services,
+    version: a2a.version,
+    url: a2a.url,
+    provider: a2a.provider,
+    capabilities: a2a.capabilities,
+    securitySchemes: a2a.securitySchemes,
+    supportedInterfaces: [
+      {
+        url: a2a.url,
+        protocolBinding: 'JSONRPC',
+        protocolVersion: '0.3.0',
+      },
+    ],
+    iconUrl: image,
+  };
+}
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -54,7 +75,7 @@ export default async function handler(req, res) {
   const mcpEndpoint = `${origin}/api/mcp?tag=${encodeURIComponent(rawTag)}`;
   const webEndpoint = `${origin}/agent/${encodeURIComponent(rawTag)}`;
 
-  const registrationDoc = generateRegistrationJSON({
+  const registrationDoc = buildRegistrationDoc({
     name: canonicalName,
     description,
     image,

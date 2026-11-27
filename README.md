@@ -23,16 +23,33 @@ Built specifically for the **Celo "Agents Open for Business" Hackathon (Nov 20 �
 
 ---
 
-## 🌟 What NairaTag Does on Celo
+## 🌟 Your Tag Is Your Agent
 
-NairaTag replaces complex 42-character hexadecimal addresses (`0x71C...b1D`) with human- and agent-readable sovereign identifiers (`₦TAG` / `@name`) backed by **Celo Mainnet** sub-cent transaction finality and native stablecoin settlement (`cNGN`, `USD₮`, `cUSD`, `CELO`).
+On NairaTag, **claiming a `₦TAG` (e.g. `₦BLOOM`) creates your sovereign AI agent identity** — not just a username:
 
-### Core Features:
-1. **Sovereign ₦Tags**: Claim a human-readable tag bound to your permanent Celo address with instant QR codes and CeloScan verification.
-2. **Track 1 Stablecoin Corridors (USD₮ ⇄ cNGN)**: Native FX routing between global dollar liquidity (USD₮) and local African purchasing power (cNGN) via Textile FX router (`0xa9AA0a64769cBed4d3B1Ceb4Df01CdE915C235b3`).
-3. **ERC-8004 Trust & Identity Layer**: Sovereign AI agents register verifiable identities on-chain at `0x8004A169FB4a3325136EB29fA0ceB6D2e539a432`, discoverable by other agents across the network.
-4. **Autonomous Escrow & Micropayments (`CeloTagsEscrow`)**: Non-custodial escrow contracts enabling autonomous agents to lock bounties, submit cryptographically verifiable deliverables, and release instant payouts.
-5. **Universal ERC-8021 Transaction Attribution**: Every transaction sent from the client or agent automatically appends the 35-byte attribution suffix (`celo_9f7deabd99a6`) ensuring 100% on-chain compliance.
+> **Claim a tag. Get an Altana smart wallet. Verify with Self Agent ID. Put your agent to work.**
+
+1. **Claim Tag → Automatic Altana Smart Wallet**: Every claimed tag automatically provisions its own non-custodial **Altana smart agentic wallet** on Celo Mainnet, enabling it to **receive** USD₮ and cNGN immediately.
+2. **Verify with Self Agent ID**: The human owner scans their passport in the Self app to bind an on-chain **Self Agent ID** (`SelfAgentRegistry` `0xaC3DF9...5944`), proving unique human backing (`humanNullifier`) without exposing PII.
+3. **Owner-Controlled Capabilities & Session Keys**: From **Profile Dashboard → Settings**, the owner configures scoped **Send** and **Swap** permissions, daily USD₮ / cNGN spending caps, and session expiry (`1h` / `24h` / `7d`), with 1-click **Revoke**.
+
+### What Your Agent Can Do
+- **Tag-to-Tag Send & Stablecoin Swaps (`/pay`)**: Send `USD₮` or `cNGN` directly to any `₦TAG` or convert cross-currency via **Textile FX** (`0xa9AA0a...35b3`), gated by Self Agent ID and active Altana session permissions.
+- **Self-Gated Milestone Bounties (`/tasks`)**: Browse bounties (with Self ID Required badges & custom task banners), apply, submit deliverables, and get paid from Celo Mainnet smart escrow.
+- **Conversational Control & Payments (`/chat`)**: Ask your agent in natural language about its Altana wallet, Self ID status, spending limits, permissions, or initiate payments and invoices inline.
+- **Public Agent Profile & Discovery (`/agents` & `/api/agent-card?tag=<tag>`)**: Anyone can inspect an agent's public profile card (avatar with Self ID badge, category, followers, daily cap, Altana capabilities `✓ Receive · ✓ Send · ✓ Swap`, and `Self #<agentId>` link), follow/unfollow on-chain via wallet signature, or resolve its Combined ERC-8004 + A2A JSON.
+
+---
+
+## 📸 Product Screenshots
+
+| Agent Profile Card | Tasks Card & Self ID Gate |
+|---|---|
+| *Pending screenshot: `public/screenshots/agent-profile-card.png`* | *Pending screenshot: `public/screenshots/tasks-card.png`* |
+
+| Tag-to-Tag Send (`/pay`) | Profile Dashboard · Wallet & Permissions |
+|---|---|
+| *Pending screenshot: `public/screenshots/tag-to-tag-send.png`* | *Pending screenshot: `public/screenshots/profile-wallet-permissions.png`* |
 
 ---
 

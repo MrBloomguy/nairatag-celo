@@ -1,4 +1,4 @@
-# NairaTag on Celo 🌿
+# NairaTag 🌿
 > **Sovereign Agent Rails, ERC-8004 Agentic Trust & Stablecoin Corridors on Celo Mainnet**
 
 [![Celo Mainnet](https://img.shields.io/badge/Network-Celo%20Mainnet%20(42220)-35D07F?style=for-the-badge&logo=celo&logoColor=black)](https://celoscan.io)

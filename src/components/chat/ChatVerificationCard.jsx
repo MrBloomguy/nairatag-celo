@@ -105,7 +105,7 @@ export default function ChatVerificationCard({
         <div className="flex items-center space-x-2.5">
           <div className="relative">
             <img
-              src={widget.avatar || `https://api.dicebear.com/7.x/identicon/svg?seed=${agentTag}`}
+              src={widget.avatar || `https://api.dicebear.com/11.x/adventurer-neutral/svg?seed=${agentTag}`}
               alt={agentTag}
               className="w-8 h-8 rounded-full border border-emerald-400/30 object-cover"
             />

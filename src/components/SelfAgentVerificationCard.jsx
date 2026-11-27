@@ -47,10 +47,20 @@ import {
   CELO_ATTRIBUTION_TAG,
 } from '../config/celo.js';
 
-export default function SelfAgentVerificationCard({ walletAddress, onConnectWallet }) {
+export default function SelfAgentVerificationCard({
+  walletAddress,
+  onConnectWallet,
+  initialAgentTag,
+  initialAgentAddress,
+}) {
   // ─── Target Agent Selection ───
-  const [selectedTag, setSelectedTag] = useState('₦nairatag');
-  const [agentAddress, setAgentAddress] = useState(OFFICIAL_AGENT_WALLET);
+  const [selectedTag, setSelectedTag] = useState(initialAgentTag || '₦nairatag');
+  const [agentAddress, setAgentAddress] = useState(initialAgentAddress || walletAddress || OFFICIAL_AGENT_WALLET);
+
+  useEffect(() => {
+    if (initialAgentTag) setSelectedTag(initialAgentTag);
+    if (initialAgentAddress) setAgentAddress(initialAgentAddress);
+  }, [initialAgentTag, initialAgentAddress]);
 
   // ─── Verification State ───
   const [verificationData, setVerificationData] = useState(null);

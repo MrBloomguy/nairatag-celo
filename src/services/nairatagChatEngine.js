@@ -21,7 +21,7 @@
 import { getAgentVerificationStatus, VERIFICATION_STATUS } from './selfAgentIdService.js';
 import { getAgentPoints, awardVerificationPoints, getPointsLeaderboard } from './agentPointsService.js';
 import { getAgentRecord, listAgentRecords } from './agentIdentityStore.js';
-import { getAgentLifecycleRecord } from './agentLifecycleService.js';
+import { getAgentLifecycleRecord, getAgentControlStatus } from './agentLifecycleService.js';
 import { OFFICIAL_AGENT_WALLET, CELO_ATTRIBUTION_TAG } from '../config/celo.js';
 import {
   prepareDirectSend,
@@ -39,7 +39,7 @@ export const OFFICIAL_PLATFORM_AGENT = {
   tag: 'nairatag',
   name: '₦NAIRATAG Master Protocol Agent',
   role: 'Master Protocol Orchestrator & Mother of Agents',
-  avatar: 'https://api.dicebear.com/7.x/identicon/svg?seed=nairatag-master',
+  avatar: 'https://api.dicebear.com/11.x/adventurer-neutral/svg?seed=nairatag-master',
   address: OFFICIAL_AGENT_WALLET,
   ownerAddress: OFFICIAL_AGENT_WALLET,
   erc8004TokenId: '10078',
@@ -86,7 +86,12 @@ export function isWalletQuery(prompt = '') {
     p.includes('my address') ||
     p.includes('agent address') ||
     p.includes('spending cap') ||
-    p.includes('spend limit')
+    p.includes('spend limit') ||
+    p.includes('permission') ||
+    p.includes('revoke') ||
+    p.includes('authorize') ||
+    p.includes('can my agent') ||
+    p.includes('send or swap')
   );
 }
 
@@ -252,7 +257,7 @@ export async function processNairaTagChatMessage({
 
     // Resolve target agent details
     const targetAgent = allAgents.find((a) => a.tag?.toLowerCase() === targetTag.toLowerCase()) ||
-      (targetTag === 'nairatag' ? OFFICIAL_PLATFORM_AGENT : { tag: targetTag, name: `₦${targetTag.toUpperCase()}`, avatar: `https://api.dicebear.com/7.x/identicon/svg?seed=${targetTag}` });
+      (targetTag === 'nairatag' ? OFFICIAL_PLATFORM_AGENT : { tag: targetTag, name: `₦${targetTag.toUpperCase()}`, avatar: `https://api.dicebear.com/11.x/adventurer-neutral/svg?seed=${targetTag}` });
 
     const agentAddress = targetAgent.address || targetAgent.ownerAddress || (targetTag === 'nairatag' ? OFFICIAL_AGENT_WALLET : walletAddress);
 
@@ -306,7 +311,7 @@ export async function processNairaTagChatMessage({
       badge: isTargetVerified ? 'Self Agent ID' : 'Unverified · Needs Proof',
       agentTag: targetTag,
       agentName: targetAgent.name || `₦${targetTag.toUpperCase()}`,
-      avatar: targetAgent.avatar || `https://api.dicebear.com/7.x/identicon/svg?seed=${targetTag}`,
+      avatar: targetAgent.avatar || `https://api.dicebear.com/11.x/adventurer-neutral/svg?seed=${targetTag}`,
       agentAddress,
       isVerified: isTargetVerified,
       status: verification.status,
@@ -349,6 +354,8 @@ export async function processNairaTagChatMessage({
       console.warn('[NairaTagChatEngine] Lifecycle record query fallback:', err.message);
     }
 
+    const controlStatus = (await getAgentControlStatus(targetTag)) || {};
+
     const KNOWN_ALTANA_WALLETS = {
       nairatag: OFFICIAL_AGENT_WALLET,
       bloom: '0x7c264210D5C992b8ea3224eb6B39F477a493AF26',
@@ -357,42 +364,65 @@ export async function processNairaTagChatMessage({
       coingecko: '0x1abfD1865F9a7Eb23C02aBEf113a07Fa8A690Ef8',
     };
 
-    const altanaWalletAddress = lifecycle?.altana?.walletAddress || KNOWN_ALTANA_WALLETS[targetTag] || null;
-
-    const sessionStatus = lifecycle?.altana?.sessionStatus || (altanaWalletAddress ? 'active' : 'unprovisioned');
-    const hasWallet = !!altanaWalletAddress;
+    const altanaWalletAddress = controlStatus.walletAddress || lifecycle?.altana?.walletAddress || KNOWN_ALTANA_WALLETS[targetTag] || null;
+    const sessionStatus = controlStatus.hasActiveSession
+      ? 'active'
+      : controlStatus.sessionStatus !== 'unprovisioned'
+        ? controlStatus.sessionStatus
+        : (KNOWN_ALTANA_WALLETS[targetTag] ? 'active' : 'unprovisioned');
+    const hasWallet = Boolean(altanaWalletAddress);
+    const isRevokeRequest = lowerPrompt.includes('revoke');
+    const isGrantRequest = lowerPrompt.includes('grant') || lowerPrompt.includes('authorize') || lowerPrompt.includes('give ') || lowerPrompt.includes('allow ');
 
     let replyText = '';
-    if (hasWallet) {
+    if (isRevokeRequest && hasWallet) {
+      replyText = `### Revoke Altana Session Permissions · ₦${targetTag.toUpperCase()}\n\n` +
+        `• **Altana Wallet**: \`${altanaWalletAddress}\`\n` +
+        `• **Current Session Status**: ${sessionStatus === 'active' ? '🟢 Active Session Key' : sessionStatus === 'revoked' ? '🔴 Already Revoked' : '🟡 Not Authorized'}\n\n` +
+        `Only the verified human owner can revoke an agent's session key. Open **₦${targetTag.toUpperCase()} → Wallet & Permissions (Altana)** and click **Revoke Agent Permissions** to confirm revocation immediately.`;
+    } else if (isGrantRequest && hasWallet) {
+      replyText = `### Proposed Altana Session Key · ₦${targetTag.toUpperCase()}\n\n` +
+        `I have prepared a scoped Altana session policy for owner approval:\n` +
+        `• **Max Per Transaction**: $${controlStatus.spendingLimits?.perTxUsd || '50'}\n` +
+        `• **Daily Caps**: ${controlStatus.spendingLimits?.dailyUsdt || '50'} USD₮ / ${controlStatus.spendingLimits?.dailyCngn || '100000'} cNGN\n` +
+        `• **Allowed Actions**: Send payments · Swap tokens · Approved protocols\n` +
+        `• **Unlimited Spending**: Not allowed\n` +
+        `• **Owner Self ID**: ${controlStatus.selfVerified ? '✅ Verified Human' : '⚠️ Verification Required First'}\n\n` +
+        `⚠️ **Owner Confirmation Required**: An agent cannot authorize its own spending. Open **₦${targetTag.toUpperCase()} → Wallet & Permissions (Altana)** to review and sign with your owner wallet.`;
+    } else if (hasWallet) {
+      const canSend = controlStatus.selfVerified && sessionStatus === 'active';
       replyText = `### Altana Smart Account for ₦${targetTag.toUpperCase()}\n\n` +
-        `🛡️ **Smart Agent Wallet**: \`${altanaWalletAddress}\`\n` +
-        `• **Network**: Celo Mainnet (Chain ID 42220)\n` +
+        `🛡️ **Smart Agent Wallet**: \`${altanaWalletAddress}\` (**Active**)\n` +
         `• **Architecture**: Non-Custodial Smart Account (EIP-7702 / ERC-4337)\n` +
-        `• **Root Authority**: Human Owner via WebAuthn Passkey (P256) / Privy MPC\n` +
-        `• **Delegated Session Status**: ${sessionStatus === 'active' ? '🟢 Active Session Key' : '🟡 Ready for Delegation'}\n` +
-        `• **Daily Spend Limit**: **50 USD₮ / 75,000 cNGN**\n` +
-        `• **Allowed Contracts**: Textile RFQ LimitOrderReactor, Escrow & ERC-8004\n` +
-        `• **Monotonic Revocation**: 1-click on-chain revocation by human owner\n\n` +
+        `• **Owner Self ID**: ${controlStatus.selfVerified ? '✅ Verified Human' : '⚠️ Pending Verification'}\n` +
+        `• **Session Key Status**: ${sessionStatus === 'active' ? '🟢 Active Session Key' : sessionStatus === 'revoked' ? '🔴 Revoked by Owner' : '🟡 Not Authorized'}\n` +
+        `• **Receive Capability**: ✅ Ready to receive USDC / USD₮ / cNGN\n` +
+        `• **Send & Swap Capability**: ${canSend ? '✅ Authorized within scoped limits' : !controlStatus.selfVerified ? '🔒 Blocked — Owner Self ID verification required' : '🔒 Blocked — Owner session key authorization required'}\n` +
+        `• **Spending Limits**: $${controlStatus.spendingLimits?.perTxUsd || '50'}/tx · ${controlStatus.spendingLimits?.dailyUsdt || '50'} USD₮/day · ${controlStatus.spendingLimits?.dailyCngn || '100000'} cNGN/day\n` +
+        `• **Allowed Actions**: Send · Swap · Approved protocols (Unlimited spending: Not allowed)\n\n` +
         `The agent holds only a time-bounded, permission-scoped session key. Your personal wallet remains secure as the root admin.`;
     } else {
       replyText = `### Altana Smart Account for ₦${targetTag.toUpperCase()}\n\n` +
         `⚠️ **Smart Wallet Not Yet Provisioned**\n\n` +
-        `To provision a non-custodial Altana Smart Agent Account on Celo Mainnet:\n` +
-        `1. **Verify with Self Agent ID**: Every agent must have verifiable human backing (earns **+500 Trust Points**).\n` +
-        `2. **Claim & Provision Altana Account**: Your browser initializes a hardware-backed WebAuthn Passkey as root admin, generating the counterfactual agent wallet.\n` +
-        `3. **Delegate Session Policy**: Grant your agent autonomous spend permissions (up to 50 USD₮/day).\n\n` +
+        `Claiming a NairaTag automatically provisions an Altana smart wallet for the agent:\n` +
+        `1. **Claim Tag & Provision Wallet**: Your agent immediately receives its own Altana wallet address.\n` +
+        `2. **Verify with Self Agent ID**: Confirm human ownership to unlock payments, swaps, and agent services (**+500 Trust Points**).\n` +
+        `3. **Grant Session Key**: Authorize scoped spending limits (up to 50 USD₮/day) with 1-click owner revocation.\n\n` +
         `You can start verification and claim your wallet using the card below:`;
     }
 
     const widget = {
       type: 'altana_wallet',
       title: `Altana Smart Wallet · ₦${targetTag.toUpperCase()}`,
-      badge: hasWallet ? (sessionStatus === 'active' ? 'Active Session' : 'Smart Wallet') : 'Provisioning Required',
+      badge: hasWallet ? (sessionStatus === 'active' ? 'Active Session' : sessionStatus === 'revoked' ? 'Session Revoked' : 'Wallet Active') : 'Provisioning Required',
       agentTag: targetTag,
       walletAddress: altanaWalletAddress || walletAddress,
-      ownerAddress: lifecycle?.ownerAddress || walletAddress,
+      ownerAddress: controlStatus.ownerAddress || lifecycle?.ownerAddress || walletAddress,
       sessionStatus,
-      spendLimit: '50 USD₮ / 75,000 cNGN daily',
+      selfVerified: controlStatus.selfVerified,
+      canReceive: hasWallet,
+      canSendOrSwap: hasWallet && controlStatus.selfVerified && sessionStatus === 'active',
+      spendLimit: `${controlStatus.spendingLimits?.dailyUsdt || '50'} USD₮ / ${controlStatus.spendingLimits?.dailyCngn || '100000'} cNGN daily`,
       chainId: 42220,
       hasWallet,
       explorerUrl: altanaWalletAddress ? `https://celoscan.io/address/${altanaWalletAddress}` : null,

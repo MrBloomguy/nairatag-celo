@@ -45,6 +45,9 @@ import {
 } from '../config/celo.js';
 import { resolveTag } from '../services/nairatagResolver.js';
 import { getEthereumProvider } from '../services/celoPayment.js';
+import { checkSelfHumanGate, enforceSharedHumanRewardQuota } from '../services/selfAgentIdService.js';
+import { getAgentControlStatus } from '../services/agentLifecycleService.js';
+import SelfAgentIdBadge, { SelfIcon } from './SelfAgentIdBadge.jsx';
 import './swap/SwapWidget.css';
 
 // ── Official Token SVG Icons & Assets ──
@@ -147,15 +150,44 @@ const TOKEN_LIST = [
 export default function TagToTagSendCard({
   walletAddress,
   onConnectWallet,
+  onOpenSelfVerification,
   initialRecipient = '',
   initialAmount = '20.00',
   onPaymentSuccess = () => {},
 }) {
+  const [selfGate, setSelfGate] = useState({ checking: false, allowed: true, reason: null, agentId: null });
+  const [recipientSelfGate, setRecipientSelfGate] = useState({ checking: false, allowed: false, agentId: null });
+  const [altanaGate, setAltanaGate] = useState({ hasWallet: false, hasActiveSession: true, sessionStatus: 'unprovisioned' });
+
+  useEffect(() => {
+    let active = true;
+    if (!walletAddress) {
+      setSelfGate({ checking: false, allowed: false, reason: 'Connect wallet first.', agentId: null });
+      setAltanaGate({ hasWallet: false, hasActiveSession: false, sessionStatus: 'unprovisioned' });
+      return () => { active = false; };
+    }
+    setSelfGate((prev) => ({ ...prev, checking: true }));
+    getAgentControlStatus(walletAddress)
+      .then((c) => { if (active && c) setAltanaGate(c); })
+      .catch(() => {});
+    checkSelfHumanGate({ agentAddress: walletAddress })
+      .then((res) => { if (active) setSelfGate({ checking: false, ...res }); })
+      .catch(() => { if (active) setSelfGate({ checking: false, allowed: false, reason: 'Self Agent ID check failed.', agentId: null }); });
+    return () => { active = false; };
+  }, [walletAddress]);
   // ── Form State ──
   const [recipientInput, setRecipientInput] = useState(initialRecipient);
+  useEffect(() => {
+    if (initialRecipient) {
+      setRecipientInput(initialRecipient);
+    }
+  }, [initialRecipient]);
   const [amountIn, setAmountIn] = useState(initialAmount);
   const [sourceToken, setSourceToken] = useState('USD₮');
-  const [targetToken, setTargetToken] = useState('cNGN');
+  const [targetToken, setTargetToken] = useState('USD₮');
+  useEffect(() => {
+    setTargetToken(sourceToken);
+  }, [sourceToken]);
   const [memoInput, setMemoInput] = useState('');
   const [showMemoField, setShowMemoField] = useState(false);
 
@@ -163,6 +195,19 @@ export default function TagToTagSendCard({
   const [resolvedRecipient, setResolvedRecipient] = useState(null);
   const [isResolving, setIsResolving] = useState(false);
   const [resolutionError, setResolutionError] = useState('');
+
+  useEffect(() => {
+    let active = true;
+    if (!resolvedRecipient?.address) {
+      setRecipientSelfGate({ checking: false, allowed: false, agentId: null });
+      return () => { active = false; };
+    }
+    setRecipientSelfGate((prev) => ({ ...prev, checking: true }));
+    checkSelfHumanGate({ agentAddress: resolvedRecipient.address })
+      .then((res) => { if (active) setRecipientSelfGate({ checking: false, allowed: Boolean(res.allowed), agentId: res.agentId ?? null }); })
+      .catch(() => { if (active) setRecipientSelfGate({ checking: false, allowed: false, agentId: null }); });
+    return () => { active = false; };
+  }, [resolvedRecipient?.address]);
 
   // ── Pricing & Balances ──
   const [rates, setRates] = useState({ rateUsdtToCngn: 1445.5, rateCngnToUsdt: 0.000692 });
@@ -269,10 +314,8 @@ export default function TagToTagSendCard({
               address: res.resolvedAddress,
               tag: `₦${cleanTag.toUpperCase()}`,
               displayName: `₦${cleanTag.toUpperCase()}`,
-              preferredToken: 'cNGN',
+              preferredToken: sourceToken,
             });
-            // Auto-align target token to recipient's local stablecoin
-            setTargetToken('cNGN');
           } else {
             setResolvedRecipient(null);
             setResolutionError(res.error || `₦${cleanTag} is not registered`);
@@ -481,6 +524,36 @@ export default function TagToTagSendCard({
       return;
     }
 
+    if (!selfGate.allowed) {
+      setError(selfGate.reason || 'Self Agent ID verification is required to send.');
+      return;
+    }
+
+    if (altanaGate.hasWallet && !altanaGate.hasActiveSession) {
+      setError(
+        altanaGate.sessionStatus === 'revoked'
+          ? 'Altana agent session key was revoked by the owner. Re-authorize in Wallet & Permissions to send.'
+          : 'Altana agent session key is not authorized. Grant a scoped session key in Wallet & Permissions to send.'
+      );
+      return;
+    }
+
+    if (!recipientSelfGate.allowed) {
+      setError('Recipient agent is unverified — Self Agent ID is required to receive payment.');
+      return;
+    }
+
+    const quota = enforceSharedHumanRewardQuota({
+      agentAddress: walletAddress,
+      nullifier: selfGate.nullifier,
+      action: 'send_swap',
+      dailyLimit: 20,
+    });
+    if (!quota.allowed) {
+      setError(quota.reason);
+      return;
+    }
+
     if (!resolvedRecipient) {
       setError('Please provide a valid recipient.');
       return;
@@ -592,9 +665,8 @@ export default function TagToTagSendCard({
         </div>
 
         <div className="swap-header-controls">
-          <span className="swap-route-badge" style={{ fontSize: '10px', padding: '3px 7px' }}>
-            <span className="swap-pulse-dot" />
-            <span>Celo</span>
+          <span className="swap-route-badge" style={{ padding: '4px 6px' }} title="Celo Mainnet">
+            <img src="/tokens/celo.svg" alt="Celo" style={{ width: 15, height: 15, borderRadius: '50%', display: 'block' }} />
           </span>
           {isCrossToken && (
             <button
@@ -671,18 +743,53 @@ export default function TagToTagSendCard({
           )}
         </div>
 
-        {/* Suggestion Chips: only show when input is empty */}
+        {/* Suggestion Chips with DiceBear avatar & top-left Self ID badge */}
         {!recipientInput && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginTop: '2px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginTop: '6px', flexWrap: 'wrap' }}>
             {['segun', 'bloom', 'alice'].map((tag) => (
               <button
                 key={tag}
                 type="button"
                 className="swap-slippage-chip"
-                style={{ padding: '2px 7px', fontSize: '10.5px', borderRadius: '9999px' }}
+                style={{
+                  position: 'relative',
+                  overflow: 'visible',
+                  padding: '4px 10px 4px 8px',
+                  fontSize: '11px',
+                  borderRadius: '9999px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                }}
                 onClick={() => setRecipientInput(`₦${tag}`)}
+                title={`Send to ₦${tag} (Self Agent ID)`}
               >
-                ₦{tag}
+                <span
+                  style={{
+                    position: 'absolute',
+                    top: '-5px',
+                    right: '-5px',
+                    left: 'auto',
+                    zIndex: 2,
+                    width: '15px',
+                    height: '15px',
+                    borderRadius: '50%',
+                    background: '#ffffff',
+                    border: '1px solid rgba(5, 150, 105, 0.25)',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    boxShadow: '0 1px 2px rgba(0,0,0,0.12)',
+                  }}
+                >
+                  <SelfIcon size={9} color="#059669" />
+                </span>
+                <img
+                  src={`https://api.dicebear.com/11.x/adventurer-neutral/svg?seed=${encodeURIComponent(tag)}`}
+                  alt=""
+                  style={{ width: 16, height: 16, borderRadius: '50%', objectFit: 'cover', flexShrink: 0, display: 'block' }}
+                />
+                <span>₦{tag}</span>
               </button>
             ))}
           </div>
@@ -702,8 +809,16 @@ export default function TagToTagSendCard({
               fontSize: '11px',
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
               <span style={{ fontWeight: 800, color: '#047857' }}>{resolvedRecipient.displayName}</span>
+              {!recipientSelfGate.checking && (
+                <SelfAgentIdBadge size="xs" isVerified={recipientSelfGate.allowed} />
+              )}
+              {recipientSelfGate.allowed && recipientSelfGate.agentId != null && (
+                <span style={{ fontSize: '10px', fontFamily: 'monospace', fontWeight: 700, color: '#047857' }}>
+                  #{recipientSelfGate.agentId}
+                </span>
+              )}
               <span style={{ color: 'var(--privy-color-foreground-3)', fontFamily: 'monospace', fontSize: '10.5px' }}>
                 ({resolvedRecipient.address.slice(0, 6)}...{resolvedRecipient.address.slice(-4)})
               </span>
@@ -720,6 +835,13 @@ export default function TagToTagSendCard({
           </div>
         )}
 
+        {resolvedRecipient && !recipientSelfGate.checking && !recipientSelfGate.allowed && (
+          <div style={{ fontSize: '11px', color: '#dc2626', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '3px', fontWeight: 600 }}>
+            <AlertCircle size={12} style={{ flexShrink: 0 }} />
+            <span>Recipient agent is unverified — Self Agent ID is required to receive payment.</span>
+          </div>
+        )}
+
         {resolutionError && (
           <div style={{ fontSize: '11px', color: '#dc2626', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px' }}>
             <AlertCircle size={11} />
@@ -728,10 +850,10 @@ export default function TagToTagSendCard({
         )}
       </div>
 
-      {/* ── SECTION 2: YOU PAY ── */}
+      {/* ── SECTION 2: AMOUNT TO SEND ── */}
       <div className="swap-card-box">
         <div className="swap-card-top-row">
-          <span className="swap-card-label">You Pay</span>
+          <span className="swap-card-label">Amount to Send</span>
           <div className="swap-balance-row">
             <span>Bal: {activeSenderBalance}</span>
             {walletAddress && activeSenderBalanceNum > 0 && (
@@ -764,7 +886,7 @@ export default function TagToTagSendCard({
             type="button"
             className="swap-token-pill"
             onClick={() => setTokenModalMode('source')}
-            title="Change token"
+            title="Change currency to send"
           >
             <div className="swap-token-badge-icon">
               <TokenIcon symbol={sourceToken} size={22} />
@@ -783,124 +905,6 @@ export default function TagToTagSendCard({
           )}
         </div>
       </div>
-
-      {/* ── Central Switcher Arrow ── */}
-      <div className="swap-flip-divider-wrap">
-        <button
-          type="button"
-          className="swap-flip-circle-btn"
-          onClick={() => {
-            const prevSource = sourceToken;
-            setSourceToken(targetToken);
-            setTargetToken(prevSource);
-          }}
-          title="Switch currencies"
-        >
-          <ArrowDown size={14} />
-        </button>
-      </div>
-
-      {/* ── SECTION 3: RECIPIENT RECEIVES ── */}
-      <div className="swap-card-box">
-        <div className="swap-card-top-row">
-          <span className="swap-card-label">{recipientReceivesLabel}</span>
-          {firmQuote && quoteSecondsLeft !== null && (
-            <div className={`swap-countdown-pill ${quoteSecondsLeft <= 10 ? 'urgent' : ''}`} style={{ fontSize: '10px', padding: '1px 6px' }}>
-              <Clock size={9} />
-              <span>{quoteSecondsLeft}s</span>
-            </div>
-          )}
-        </div>
-
-        <div className="swap-card-main-row">
-          <div
-            className={`swap-number-output ${
-              !amountIn || Number(amountIn) <= 0 ? 'empty' : ''
-            }`}
-          >
-            {estimatedDisplay}
-          </div>
-
-          <button
-            type="button"
-            className="swap-token-pill"
-            onClick={() => setTokenModalMode('target')}
-            title="Change delivered token"
-          >
-            <div className="swap-token-badge-icon">
-              <TokenIcon symbol={targetToken} size={22} />
-            </div>
-            <div className="swap-token-info-stack">
-              <span className="swap-token-symbol">{targetToken}</span>
-            </div>
-            <ChevronDown size={13} className="swap-token-chevron" />
-          </button>
-        </div>
-
-        <div className="swap-card-bottom-row">
-          <span>
-            {targetToken === 'cNGN' ? `₦${estimatedDisplay}` : `≈ $${parseFloat(amountIn || '0').toFixed(2)}`}
-          </span>
-          {isCrossToken && (
-            <span style={{ fontSize: '10.5px', color: '#059669', fontWeight: 600 }}>
-              Textile FX Corridor
-            </span>
-          )}
-        </div>
-      </div>
-
-      {/* ── Live Rate Bar & Collapsed Details ── */}
-      {isCrossToken && (
-        <div className="swap-rate-intelligence-strip">
-          <div
-            className="swap-rate-summary-bar"
-            onClick={() => setShowDetails(!showDetails)}
-            title="Toggle corridor details"
-            style={{ cursor: 'pointer', padding: '5px 8px' }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px' }}>
-              <span className="swap-pulse-dot" />
-              <span style={{ fontWeight: 600, color: 'var(--privy-color-foreground-2)' }}>
-                1 {sourceToken} ≈ {(firmQuote?.effectiveRate || rates.rateUsdtToCngn).toLocaleString('en-US', { maximumFractionDigits: 2 })} {targetToken}
-              </span>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-              <span style={{ fontSize: '10px', color: '#059669', fontWeight: 700 }}>Textile FX</span>
-              <ChevronDown
-                size={12}
-                style={{
-                  transform: showDetails ? 'rotate(180deg)' : 'rotate(0deg)',
-                  transition: 'transform 0.2s ease',
-                  color: 'var(--privy-color-foreground-3, #9ca3af)',
-                }}
-              />
-            </div>
-          </div>
-
-          {showDetails && (
-            <div className="swap-breakdown-table" style={{ padding: '4px 8px 6px' }}>
-              <div className="swap-breakdown-row">
-                <span>Min Received</span>
-                <span>{minimumReceived} {targetToken}</span>
-              </div>
-              <div className="swap-breakdown-row">
-                <span>Slippage</span>
-                <span>{slippageTolerance}% (Auto)</span>
-              </div>
-              <div className="swap-breakdown-row">
-                <span>Network Fee</span>
-                <span>&lt; 0.0001 CELO</span>
-              </div>
-              <div className="swap-breakdown-row">
-                <span>Attribution</span>
-                <span style={{ fontSize: '10px', color: '#059669', fontWeight: 700 }}>
-                  celo_9f7deabd99a6
-                </span>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
 
       {/* ── Optional Memo / Note ── */}
       <div style={{ padding: '0 2px' }}>
@@ -936,6 +940,16 @@ export default function TagToTagSendCard({
         <button type="button" className="swap-primary-action-btn" onClick={onConnectWallet}>
           <span>Connect Wallet</span>
         </button>
+      ) : !selfGate.checking && !selfGate.allowed ? (
+        <button
+          type="button"
+          className="swap-primary-action-btn"
+          onClick={() => (onOpenSelfVerification ? onOpenSelfVerification() : setError(selfGate.reason))}
+          style={{ background: 'linear-gradient(135deg, #059669 0%, #047857 100%)', color: '#ffffff' }}
+        >
+          <ShieldCheck size={15} />
+          <span>Verify Self Agent ID to Send</span>
+        </button>
       ) : !recipientInput.trim() ? (
         <button type="button" className="swap-primary-action-btn" disabled>
           <span>Enter Recipient</span>
@@ -948,6 +962,10 @@ export default function TagToTagSendCard({
       ) : !resolvedRecipient ? (
         <button type="button" className="swap-primary-action-btn" disabled>
           <span>Invalid Recipient Tag</span>
+        </button>
+      ) : !recipientSelfGate.checking && !recipientSelfGate.allowed ? (
+        <button type="button" className="swap-primary-action-btn" disabled>
+          <span>Recipient Unverified (Self ID Required)</span>
         </button>
       ) : !amountIn || Number(amountIn) <= 0 ? (
         <button type="button" className="swap-primary-action-btn" disabled>

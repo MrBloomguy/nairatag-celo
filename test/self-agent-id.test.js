@@ -929,3 +929,60 @@ test('31. Serverless API Route handler for /api/self-gated-service executes Hack
   assert.ok(jsonResponseA.error.includes('Self Human Proof Required'));
 });
 
+test('32. Send/Swap Self ID Gate rejects unverified agent wallet', async () => {
+  const { checkSelfHumanGate } = await import('../src/services/selfAgentIdService.js');
+  const res = await checkSelfHumanGate({ agentAddress: '0x000000000000000000000000000000000000dEaD' });
+  assert.equal(res.allowed, false);
+  assert.ok(res.reason.includes('Self Agent ID'));
+});
+
+test('33. Shared humanNullifier reward quota blocks second agent from same human', async () => {
+  const { enforceSharedHumanRewardQuota, resetSharedHumanQuotaStore } = await import('../src/services/selfAgentIdService.js');
+  const { submitCeloRewardAction } = await import('../src/services/celoRewards.js');
+
+  resetSharedHumanQuotaStore();
+
+  const sharedNullifier = '0xabc123human999';
+  const agentA = '0x1111111111111111111111111111111111111111';
+  const agentB = '0x2222222222222222222222222222222222222222';
+
+  // First agent claims daily_claim -> allowed
+  const firstClaim = await submitCeloRewardAction({
+    action: 'daily_claim',
+    walletAddress: agentA,
+    _selfGateOverride: { allowed: true, agentId: 101, nullifier: sharedNullifier },
+  });
+  assert.ok(firstClaim.result.points > 0);
+
+  // Second agent belonging to the SAME humanNullifier tries daily_claim -> rejected!
+  await assert.rejects(
+    () => submitCeloRewardAction({
+      action: 'daily_claim',
+      walletAddress: agentB,
+      _selfGateOverride: { allowed: true, agentId: 102, nullifier: sharedNullifier },
+    }),
+    /shared across all your agents/i
+  );
+
+  // Unverified agent trying to claim rewards -> rejected!
+  await assert.rejects(
+    () => submitCeloRewardAction({
+      action: 'daily_claim',
+      walletAddress: agentB,
+      _selfGateOverride: { allowed: false, reason: 'Self Agent ID verification required' },
+    }),
+    /Self Agent ID verification required/i
+  );
+
+  // Direct quota check confirms count=1 and agentA recorded
+  const dupCheck = enforceSharedHumanRewardQuota({
+    agentAddress: agentB,
+    nullifier: sharedNullifier,
+    action: 'daily_claim',
+    dailyLimit: 1,
+  });
+  assert.equal(dupCheck.allowed, false);
+  assert.equal(dupCheck.count, 1);
+  assert.ok(dupCheck.agentsUsed.includes(agentA));
+});
+

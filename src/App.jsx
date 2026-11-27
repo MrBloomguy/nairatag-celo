@@ -7,7 +7,6 @@ import PersonalAgentPanel from './components/chat/PersonalAgentPanel';
 import TagToTagSendCard from './components/TagToTagSendCard.jsx';
 import SelfAgentVerificationCard from './components/SelfAgentVerificationCard';
 import SelfAgentIdBadge, { SelfIcon } from './components/SelfAgentIdBadge.jsx';
-import ConcordiumAgentIdentityPanel from './components/ConcordiumAgentIdentityPanel.jsx';
 import ChatVerificationCard from './components/chat/ChatVerificationCard.jsx';
 import AgentVaultCard from './components/AgentVaultCard';
 import BookingMarketplace from './components/bookings/BookingMarketplace.jsx';
@@ -38,6 +37,7 @@ import {
   Copy,
   ExternalLink,
   ArrowRight,
+  Shield,
   ShieldCheck,
   Key,
   RefreshCw,
@@ -47,10 +47,12 @@ import {
   X,
   ChevronRight,
   Clock,
+  Lock,
   History,
   AlertTriangle,
   Info,
   Check,
+  BadgeCheck,
   User,
   Link as LinkIcon,
   ArrowLeft,
@@ -149,7 +151,13 @@ import {
   resolveTag,
 } from './services/nairatagResolver.js';
 import { checkArcTagAvailability, claimArcNairaTag, getArcTagForWallet } from './services/celoNairaTag.js';
-import { revokeAgentSession, getAgentLifecycleRecord } from './services/agentLifecycleService.js';
+import {
+  revokeAgentSession,
+  getAgentLifecycleRecord,
+  claimAndProvisionAgent,
+  getAgentControlStatus,
+  grantAgentSessionPolicy,
+} from './services/agentLifecycleService.js';
 import {
   buildNairaTagAgentMetadataUri,
   findArcAgentForTag,
@@ -194,7 +202,7 @@ import { getRecentArcTagActivity } from './services/celoRecentTagActivity.js';
 import { getArcAgentFollowState, setArcAgentFollow } from './services/celoAgentFollows.js';
 import { fetchArcAgentMetrics } from './services/celoAgentMetrics.js';
 import { discoverAgentsByCapability, isAgentDiscoveryRequest, resolveAgentMention, filterAgentsByVerification } from './services/agentDiscovery.js';
-import { SELF_REGISTRY_CELO_MAINNET, getVerificationStatusLabel } from './services/selfAgentIdService.js';
+import { SELF_REGISTRY_CELO_MAINNET, getVerificationStatusLabel, checkSelfHumanGate } from './services/selfAgentIdService.js';
 import {
   recordReferralSignup,
   rememberReferralFromUrl,
@@ -239,7 +247,8 @@ import { recordConfirmedPaymentSpin } from './services/wheelRewards.js';
 import { getArcRewardState, markArcNotificationsRead, submitArcRewardAction } from './services/celoRewards.js';
 import { getArcAgentCompletedTaskCount, listArcTasks, mapTask, startArcTask, submitArcTask } from './services/celoTasks.js';
 import { saveDurableTask, updateTaskState, getDurableTasks, syncTaskToRemote, syncTaskPatchToRemote } from './services/durableTaskStore.js';
-import { prepareTaskMilestonePayment } from './services/unifiedPaymentEngine.js';
+import { prepareTaskMilestonePayment, executeDirectSend } from './services/unifiedPaymentEngine.js';
+import { requestFirmQuote, toAtomicUnits } from './services/textileRfqService.js';
 import { IN_HOUSE_TASKS, claimInHouseVoucher, getInHouseVouchers, syncInHouseVouchers } from './services/inHouseTasks.js';
 import {
   getNotificationInbox,
@@ -1048,7 +1057,7 @@ function ArcAppShell() {
     let replyAgentName = currentTaggedAgent ? currentTaggedAgent.name : '₦NAIRATAG Master Protocol Agent';
     let replyAvatar = currentTaggedAgent
       ? currentTaggedAgent.avatar
-      : 'https://api.dicebear.com/7.x/identicon/svg?seed=nairatag-master';
+      : 'https://api.dicebear.com/11.x/adventurer-neutral/svg?seed=nairatag-master';
     let widget = null;
 
     if (foundAgent) {
@@ -1066,12 +1075,12 @@ function ArcAppShell() {
         replyText = `I found more than one matching agent: ${options}. Please mention the exact NairaTag you want.`;
         replyAgentTag = 'discovery';
         replyAgentName = 'NairaTag Discovery';
-        replyAvatar = 'https://api.dicebear.com/7.x/identicon/svg?seed=nairatag-discovery';
+        replyAvatar = 'https://api.dicebear.com/11.x/adventurer-neutral/svg?seed=nairatag-discovery';
       } else if (agentResolution.kind === 'unavailable') {
         replyText = `₦${agentResolution.tag} is not currently listed as a published agent, so I did not send your request to a runtime.`;
         replyAgentTag = 'discovery';
         replyAgentName = 'NairaTag Discovery';
-        replyAvatar = 'https://api.dicebear.com/7.x/identicon/svg?seed=nairatag-discovery';
+        replyAvatar = 'https://api.dicebear.com/11.x/adventurer-neutral/svg?seed=nairatag-discovery';
       } else if (discoveryRequest) {
         if (capabilityMatches.length) {
           replyText = `These published agents have matching callable capabilities:\n${capabilityMatches.map(({ agent, matchedTools, matchedTerms }, index) => {
@@ -1083,7 +1092,7 @@ function ArcAppShell() {
         }
         replyAgentTag = 'discovery';
         replyAgentName = 'NairaTag Discovery';
-        replyAvatar = 'https://api.dicebear.com/7.x/identicon/svg?seed=nairatag-discovery';
+        replyAvatar = 'https://api.dicebear.com/11.x/adventurer-neutral/svg?seed=nairatag-discovery';
       } else if (isVerificationQuery(textToSend)) {
         // High-level Self Agent ID & Trust Points Conversational Intelligence
         const nairatagResult = await processNairaTagChatMessage({
@@ -1123,7 +1132,7 @@ function ArcAppShell() {
           } else {
             replyAgentTag = chatResult.personalAgent?.tag || 'nairatag';
             replyAgentName = chatResult.personalAgent?.name || '₦NAIRATAG Master Protocol Agent';
-            replyAvatar = 'https://api.dicebear.com/7.x/identicon/svg?seed=nairatag-master';
+            replyAvatar = 'https://api.dicebear.com/11.x/adventurer-neutral/svg?seed=nairatag-master';
           }
         } catch (serverErr) {
           // Seamless fallback to ChatGPT / Claude tier NairaTag Conversational Intelligence
@@ -1218,7 +1227,7 @@ function ArcAppShell() {
           sender: isAgent ? 'agent' : 'user',
           agentTag: isAgent ? (agent?.tag || 'ArcAgent') : undefined,
           agentName: isAgent ? (agent?.name || 'Celo Sovereign Agent') : undefined,
-          avatar: isAgent ? (agent?.avatar || 'https://api.dicebear.com/7.x/identicon/svg?seed=celo-agent') : undefined,
+          avatar: isAgent ? (agent?.avatar || 'https://api.dicebear.com/11.x/adventurer-neutral/svg?seed=celo-agent') : undefined,
           text: message.content,
           time: new Date(message.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
           widget: null,
@@ -1425,6 +1434,7 @@ function ArcAppShell() {
     deadline: '3 days left',
     description: '',
     requirements: '',
+    bannerUrl: '',
   });
 
   // Dedicated In-Place Task Workspace & Escrow Chat
@@ -1726,6 +1736,53 @@ function ArcAppShell() {
   const [activeVerificationDetailAgent, setActiveVerificationDetailAgent] = useState(null);
   const [isSelfDemoModalOpen, setIsSelfDemoModalOpen] = useState(false);
   const [selectedAgentProfile, setSelectedAgentProfile] = useState(null);
+  const [isProfileShareMenuOpen, setIsProfileShareMenuOpen] = useState(false);
+  const [agentControlStatus, setAgentControlStatus] = useState(null);
+  const [myAgentControlStatus, setMyAgentControlStatus] = useState(null);
+  const [sessionExpiryHoursChoice, setSessionExpiryHoursChoice] = useState(24);
+  const [ownerDailyUsdtLimit, setOwnerDailyUsdtLimit] = useState('50');
+  const [ownerDailyCngnLimit, setOwnerDailyCngnLimit] = useState('100000');
+  const [ownerCapabilityToggles, setOwnerCapabilityToggles] = useState({ send: true, swap: true, protocols: true });
+  const [isUpdatingAgentSession, setIsUpdatingAgentSession] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    if (!selectedAgentProfile?.tag) {
+      setAgentControlStatus(null);
+      return () => { active = false; };
+    }
+    getAgentControlStatus(selectedAgentProfile.tag)
+      .then((status) => { if (active) setAgentControlStatus(status); })
+      .catch(() => { if (active) setAgentControlStatus(null); });
+    return () => { active = false; };
+  }, [selectedAgentProfile?.tag]);
+
+  useEffect(() => {
+    let active = true;
+    const ownedTag = myTag?.tag?.replace(/^[$₦]/, '').toLowerCase();
+    if (!ownedTag) {
+      setMyAgentControlStatus(null);
+      return () => { active = false; };
+    }
+    getAgentControlStatus(ownedTag)
+      .then((status) => {
+        if (!active) return;
+        setMyAgentControlStatus(status);
+        if (status?.spendingLimits) {
+          setOwnerDailyUsdtLimit(String(status.spendingLimits.dailyUsdt || '50'));
+          setOwnerDailyCngnLimit(String(status.spendingLimits.dailyCngn || '100000'));
+        }
+        if (status?.allowedActions && status.hasActiveSession) {
+          setOwnerCapabilityToggles({
+            send: Boolean(status.allowedActions.send),
+            swap: Boolean(status.allowedActions.swap),
+            protocols: Boolean(status.allowedActions.protocols),
+          });
+        }
+      })
+      .catch(() => { if (active) setMyAgentControlStatus(null); });
+    return () => { active = false; };
+  }, [myTag?.tag, mainTab]);
   const [agentProfileLiveLoading, setAgentProfileLiveLoading] = useState(false);
   const [agentProfileLiveData, setAgentProfileLiveData] = useState(null);
   const [agentFollowState, setAgentFollowState] = useState({ agentId: null, followerCount: 0, following: false, loading: false, updating: false, error: null });
@@ -1747,7 +1804,7 @@ function ArcAppShell() {
       name: `₦${sharedTag.toUpperCase()}`,
       category: 'Celo agent',
       role: 'Shared Celo agent profile',
-      avatar: `https://api.dicebear.com/7.x/identicon/svg?seed=${encodeURIComponent(sharedTag)}`,
+      avatar: `https://api.dicebear.com/11.x/adventurer-neutral/svg?seed=${encodeURIComponent(sharedTag)}`,
       profileType: 'shared-agent',
     });
   }, [agentDirectoryError, chatAgents]);
@@ -1777,12 +1834,13 @@ function ArcAppShell() {
   }, []);
 
   useEffect(() => {
-    if (!selectedAgentProfile || selectedAgentProfile.profileType === 'claimed-tag' || selectedAgentProfile.profileType === 'platform-agent' || selectedAgentProfile.profileType === 'shared-agent') {
+    const followKey = selectedAgentProfile?.id || selectedAgentProfile?.identity?.erc8004AgentId || selectedAgentProfile?.tag;
+    if (!selectedAgentProfile || !followKey) {
       setAgentFollowState({ agentId: null, followerCount: 0, following: false, loading: false, updating: false, error: null });
       return undefined;
     }
     let active = true;
-    const agentId = String(selectedAgentProfile.id);
+    const agentId = String(followKey);
     setAgentFollowState((current) => ({ ...current, agentId, loading: true, error: null }));
     getArcAgentFollowState(agentId, walletAddress || '')
       .then((state) => {
@@ -1792,7 +1850,7 @@ function ArcAppShell() {
         if (active) setAgentFollowState((current) => ({ ...current, agentId, loading: false, error: error.message }));
       });
     return () => { active = false; };
-  }, [selectedAgentProfile?.id, selectedAgentProfile?.profileType, walletAddress]);
+  }, [selectedAgentProfile?.id, selectedAgentProfile?.identity?.erc8004AgentId, selectedAgentProfile?.tag, walletAddress]);
 
   // Filtered agents
   const filteredAgents = useMemo(() => {
@@ -2056,7 +2114,7 @@ function ArcAppShell() {
   // Disconnect active wallet (Privy, Circle or Injected)
   const handleDisconnect = () => {
     if (privyAuthenticated && logoutPrivy) {
-      logoutPrivy().catch(() => {});
+      logoutPrivy().catch(() => { });
     }
     if (authProvider === 'circle') {
       clearCircleSession();
@@ -2251,6 +2309,12 @@ function ArcAppShell() {
       return;
     }
     try {
+      const selfGateCheck = await checkSelfHumanGate({ agentAddress: walletAddress });
+      if (!selfGateCheck?.allowed) {
+        showToast(selfGateCheck?.reason || 'Verify your agent with Self Agent ID before participating in a task.', 'info', 4500);
+        setIsSelfDemoModalOpen(true);
+        return;
+      }
       const workerTag = myTag?.tag || displayUserTag || (walletAddress ? `₦${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}` : '₦WORKER');
       const progress = await startArcTask({
         taskId: task.id,
@@ -2300,6 +2364,17 @@ function ArcAppShell() {
   };
 
   const handleSubmitTask = async (task) => {
+    if (!walletAddress) {
+      showToast('Connect your wallet before submitting work.', 'info');
+      setIsConnectModalOpen(true);
+      return;
+    }
+    const selfGateCheck = await checkSelfHumanGate({ agentAddress: walletAddress });
+    if (!selfGateCheck?.allowed) {
+      showToast(selfGateCheck?.reason || 'Verify your agent with Self Agent ID before submitting task work.', 'info', 4500);
+      setIsSelfDemoModalOpen(true);
+      return;
+    }
     const submission = taskSubmissionDraft.trim();
     if (submission.length < 5) {
       showToast('Add a submission link or a short description of your completed work.', 'error');
@@ -2532,7 +2607,26 @@ function ArcAppShell() {
         return;
       }
 
-      showToast(`Releasing Milestone Escrow: Converting ${rewardAmt} ${payerToken === 'USDT' ? 'USD₮' : payerToken} ➔ ${targetToken} via Textile FX...`, 'info', 3000);
+      if (!walletAddress || !isAddress(walletAddress)) {
+        setTaskProgress((prev) => ({ ...prev, [task.id]: { status: 'submitted' } }));
+        setBackendTasks((prev) => prev.map((t) => t.id === task.id ? { ...t, status: 'submitted', escrowStatus: '📩 Deliverable Under Review' } : t));
+        showToast('Connect your Celo wallet to sign and release the milestone payout on-chain.', 'info', 4000);
+        setIsConnectModalOpen(true);
+        return;
+      }
+
+      const provider = getEthereumProvider(null, walletAddress);
+      if (!provider) {
+        throw new Error('No EVM wallet provider detected. Please connect MetaMask, Rabby, or MiniPay.');
+      }
+
+      const activeAccount = getAddress(walletAddress);
+      const walletClient = createWalletClient({
+        chain: activeCeloChain,
+        transport: custom(provider),
+      });
+
+      showToast(`Preparing Milestone Settlement: ${rewardAmt} ${payerToken === 'USDT' ? 'USD₮' : payerToken} ➔ ${targetToken}...`, 'info', 3000);
 
       const payout = await prepareTaskMilestonePayment({
         taskId: task.id,
@@ -2541,18 +2635,72 @@ function ArcAppShell() {
         rewardAmount: rewardAmt,
         rewardToken: targetToken,
         payerSourceToken: payerToken,
+        payerAddress: activeAccount,
       });
 
-      const payoutHash = payout.txHash || '0x5dea3fcc2e575a5a90c7812e36152eaa0d412367d49f67f9e3bb5b2cec0044d7';
-      const deliveredStr = payout.estimatedDelivery ? `${Number(payout.estimatedDelivery).toLocaleString()} ${targetToken}` : `${rewardAmt} ${targetToken}`;
+      let firmQuote = null;
+      if (payout.isCrossToken) {
+        showToast(`Step 1/3: Requesting live Textile FX quote (${rewardAmt} ${payerToken === 'USDT' ? 'USD₮' : payerToken} ➔ ${targetToken})...`, 'info', 4000);
+        firmQuote = await requestFirmQuote({
+          takerAddress: activeAccount,
+          sellToken: payout.sourceTokenAddress,
+          buyToken: payout.targetTokenAddress,
+          sellAmount: toAtomicUnits(rewardAmt, payout.sourceTokenDecimals),
+          signTypedDataFn: async (args) => {
+            try {
+              return await walletClient.signTypedData({ ...args, account: activeAccount });
+            } catch (signErr) {
+              if (provider && typeof provider.request === 'function') {
+                const payload = JSON.stringify(
+                  { types: args.types, domain: args.domain, primaryType: args.primaryType, message: args.message },
+                  (_, v) => (typeof v === 'bigint' ? v.toString() : v)
+                );
+                return await provider.request({
+                  method: 'eth_signTypedData_v4',
+                  params: [activeAccount, payload],
+                });
+              }
+              throw signErr;
+            }
+          },
+        });
 
-      // Persist in durable task store and remote sync
+        if (!firmQuote?.isFirm) {
+          if (firmQuote?.status === 'no_quote') {
+            throw new Error(`Textile FX RFQ returned no quote for ${rewardAmt} ${payerToken === 'USDT' ? 'USD₮' : payerToken} (minimum swap size is 0.01 USD₮). Use a bounty ≥ 0.01 USD₮ for Textile FX conversion or pay directly in ${payerToken}.`);
+          }
+          throw new Error(firmQuote?.reason || 'Failed to obtain a firm quote from Textile FX.');
+        }
+      }
+
+      const receipt = await executeDirectSend({
+        preparedSend: payout,
+        firmQuoteRecord: firmQuote,
+        fromAddress: activeAccount,
+        onStatusUpdate: (u) => {
+          if (u?.message) showToast(u.message, 'info', 3500);
+        },
+      });
+
+      const payoutHash = receipt.payoutTxHash || receipt.transferTxHash;
+      const swapHash = receipt.swapTxHash || null;
+      if (!payoutHash) {
+        throw new Error('On-chain payout transaction hash was not confirmed.');
+      }
+
+      const deliveredNum = Number(receipt.amountDelivered || 0);
+      const deliveredToken = receipt.tokenDelivered || targetToken;
+      const deliveredFormatted = deliveredNum.toLocaleString(undefined, { maximumFractionDigits: 4 });
+      const deliveredStr = `${deliveredFormatted} ${deliveredToken}`;
+
+      // Persist confirmed on-chain settlement in durable task store and remote sync
       updateTaskState(task.id, {
         status: 'paid',
         escrowStatus: '✅ Released & Settled',
         payoutHash,
+        swapHash,
         payoutDelivered: deliveredStr,
-        payoutToken: targetToken,
+        payoutToken: deliveredToken,
         paidAt: Date.now(),
       });
       syncTaskPatchToRemote(task.id, {
@@ -2560,7 +2708,7 @@ function ArcAppShell() {
         escrow_status: '✅ Released & Settled',
         payout_hash: payoutHash,
         payout_delivered: deliveredStr,
-        payout_token: targetToken,
+        payout_token: deliveredToken,
       });
 
       setTaskProgress((prev) => ({
@@ -2568,8 +2716,9 @@ function ArcAppShell() {
         [task.id]: {
           status: 'paid',
           payoutHash,
+          swapHash,
           payoutDelivered: deliveredStr,
-          targetToken,
+          targetToken: deliveredToken,
           rewardAmt,
           reviewedAt: Date.now(),
         },
@@ -2580,22 +2729,23 @@ function ArcAppShell() {
         status: 'paid',
         escrowStatus: '✅ Released & Settled',
         payoutHash,
+        swapHash,
         payoutDelivered: deliveredStr,
-        payoutToken: targetToken,
+        payoutToken: deliveredToken,
         paidAt: Date.now(),
       } : t));
 
       setUserPoints((prev) => prev + (task.points || 100));
       triggerCelebrationConfetti();
-      showToast(`🎉 Milestone Escrow Approved! Settled ${deliveredStr} to ${workerTag} via Textile FX Corridor (celo_9f7deabd99a6)`, 'success', 5000);
+      showToast(`🎉 Milestone Escrow Settled On-Chain! Sent ${deliveredStr} to ${workerTag} (Tx: ${payoutHash.slice(0, 10)}...)`, 'success', 6000);
 
-      // Append milestone settlement to Project Workspace Chat
+      // Append verified on-chain settlement to Project Workspace Chat
       sendTaskChatMessage(
         task.id,
         {
           sender: 'system',
           senderTag: 'SETTLED',
-          text: `🎉 Milestone Escrow Approved: Settled ${deliveredStr} to ${workerTag} via Textile FX (celo_9f7deabd99a6).`,
+          text: `🎉 Milestone Escrow Settled On-Chain: Sent ${deliveredStr} to ${workerTag} (${cleanWorkerAddr}). Payout Tx: ${payoutHash}${swapHash ? ` · Textile FX Swap Tx: ${swapHash}` : ''} (celo_9f7deabd99a6).`,
           isAgent: false,
         },
         task
@@ -2783,6 +2933,7 @@ function ArcAppShell() {
         escrowTxHash: escrowHash,
         description: postTaskForm.description || 'Community bounty on Celo Mainnet with automated milestone escrow settlement.',
         deliverable: postTaskForm.requirements || 'Public verification link, GitHub PR, or live demo.',
+        bannerUrl: postTaskForm.bannerUrl?.trim() || null,
         createdAt: Date.now(),
       };
 
@@ -2815,6 +2966,7 @@ function ArcAppShell() {
         deadline: '3 days left',
         description: '',
         requirements: '',
+        bannerUrl: '',
       });
 
       setSelectedTaskId(taskId);
@@ -3167,7 +3319,7 @@ function ArcAppShell() {
       role: `NairaTag agent on Celo · ERC-8004 #${registration.agentId}`,
       category: 'NairaTag',
       owner,
-      avatar: `https://api.dicebear.com/7.x/identicon/svg?seed=${encodeURIComponent(cleanTag)}`,
+      avatar: `https://api.dicebear.com/11.x/adventurer-neutral/svg?seed=${encodeURIComponent(cleanTag)}`,
       metadataUri: registration.finalMetadataURI || registration.metadataURI,
       registrationTxHash: registration.txHash,
       linkTxHash: registration.linkTxHash || null,
@@ -3231,24 +3383,25 @@ function ArcAppShell() {
 
   const handleToggleAgentFollow = async () => {
     const agent = selectedAgentProfile;
-    if (!agent || agent.profileType === 'claimed-tag' || agent.profileType === 'platform-agent') return;
+    const followAgentId = agent?.id || agent?.identity?.erc8004AgentId || agent?.tag;
+    if (!agent || !followAgentId) return;
     if (!walletAddress) {
       setIsConnectModalOpen(true);
       return;
     }
     const agentOwner = agentProfileLiveData?.details?.owner || agent.owner || '';
-    if (String(agentOwner).toLowerCase() === walletAddress.toLowerCase()) return;
+    if (agentOwner && String(agentOwner).toLowerCase() === walletAddress.toLowerCase()) return;
 
     const action = agentFollowState.following ? 'unfollow' : 'follow';
     setAgentFollowState((current) => ({ ...current, updating: true, error: null }));
     try {
       const state = await setArcAgentFollow({
         action,
-        agentId: agent.id,
+        agentId: followAgentId,
         tag: agent.tag,
         walletAddress,
       });
-      setAgentFollowState({ agentId: String(agent.id), ...state, loading: false, updating: false, error: null });
+      setAgentFollowState({ agentId: String(followAgentId), ...state, loading: false, updating: false, error: null });
     } catch (error) {
       setAgentFollowState((current) => ({ ...current, updating: false, error: error.message }));
       showToast(error.message || 'Could not update agent follow.', 'error', 4000);
@@ -3298,7 +3451,7 @@ function ArcAppShell() {
       tag,
       name: `₦${tag}`,
       role: 'NairaTag',
-      avatar: `https://api.dicebear.com/7.x/identicon/svg?seed=${encodeURIComponent(tag)}`,
+      avatar: `https://api.dicebear.com/11.x/adventurer-neutral/svg?seed=${encodeURIComponent(tag)}`,
       owner: typeof activity === 'object' ? activity.owner || null : null,
       activity: typeof activity === 'object' ? activity.activity : null,
       profileLoading: true,
@@ -3330,12 +3483,26 @@ function ArcAppShell() {
     }
   };
 
-  // Pay Agent directly in USDC from profile
+  // Pay Agent directly in USDC/cNGN from profile
   const handlePayAgentFromProfile = (agent) => {
+    const cleanTag = String(agent?.tag || '').replace(/^[₦$@#]/, '').toUpperCase();
     setSelectedAgentProfile(null);
-    setRecipientInput(`₦${agent.tag}`);
+    setRecipientInput(`₦${cleanTag}`);
     setMainTab('pay');
-    showToast(`Recipient pre-filled: ₦${agent.tag.toUpperCase()}`, 'info', 3000);
+    showToast(`Recipient pre-filled: ₦${cleanTag}`, 'info', 3000);
+  };
+
+  // Send directly to the agent's designated Altana wallet from profile
+  const handleSendToAgentWalletFromProfile = (agent, resolvedOwner = null) => {
+    const altanaWallet = agent?.altana?.walletAddress || resolvedOwner || agent?.owner;
+    if (!altanaWallet) {
+      showToast('This agent does not have an active Altana wallet address yet.', 'error', 3500);
+      return;
+    }
+    setSelectedAgentProfile(null);
+    setRecipientInput(altanaWallet);
+    setMainTab('pay');
+    showToast(`Send to ₦${agent.tag.toUpperCase()} Altana Wallet (${shorten(altanaWallet)})`, 'info', 3500);
   };
 
   // Claim Tag Check
@@ -3406,11 +3573,20 @@ function ArcAppShell() {
         erc8004Id: agentRegistration?.id || null,
       }).catch((broadcastErr) => console.warn('[Telegram Broadcast]', broadcastErr));
 
+      // ── Automatically provision Altana Smart Agentic Wallet on Claim ──
+      let altanaProvisioned = null;
+      try {
+        altanaProvisioned = await claimAndProvisionAgent({
+          tag: res.cleanTag,
+          ownerAddress: walletAddress,
+          name: `₦${res.cleanTag.toUpperCase()}`,
+        });
+      } catch (altanaErr) {
+        console.warn('[Claim Altana Provision]', altanaErr?.message);
+      }
+
       // ── Immediately update the user's identity across the app ──
       setMyTag({ tag: res.cleanTag, owner: walletAddress });
-      try {
-
-      } catch { }
 
       triggerCelebrationConfetti();
       setCelebrationDetails({
@@ -3422,6 +3598,7 @@ function ArcAppShell() {
         explorerUrl: res.explorerUrl,
         erc8004Id: agentRegistration?.id || null,
         erc8004LinkError: agentLinkError,
+        altanaWalletAddress: altanaProvisioned?.walletAddress || null,
       });
       setIsCelebrationOpen(true);
       setIsClaimModalOpen(false);
@@ -4031,7 +4208,7 @@ function ArcAppShell() {
               <div>
                 <span className="account-dashboard-eyebrow">ACCOUNT</span>
                 <h1>Profile dashboard</h1>
-              <p>{IS_CONCORDIUM_SITE ? 'Your NairaTag identity and agent profile in one place.' : 'Your NairaTag identity, Celo wallet, and rewards in one place.'}</p>
+                <p>{IS_CONCORDIUM_SITE ? 'Your NairaTag identity and agent profile in one place.' : 'Your NairaTag identity, Celo wallet, and rewards in one place.'}</p>
               </div>
               <button type="button" className="quick-chip-btn" onClick={() => setMainTab('chat')}><ArrowLeft size={14} /> Back to chat</button>
             </div>
@@ -4064,6 +4241,149 @@ function ArcAppShell() {
                     {myTag?.tag ? <button type="button" className="quick-chip-btn" onClick={() => setIsPersonalAgentOpen(true)}><Brain size={15} /> Personal agent</button> : <button type="button" className="quick-chip-btn" onClick={() => setMainTab('claim')}><Tag size={15} /> Claim a NairaTag</button>}
                   </div>
                 </article>
+
+                {!IS_CONCORDIUM_SITE && myTag?.tag && (() => {
+                  const cleanOwnedTag = myTag.tag.replace(/^[$₦]/, '').toLowerCase();
+                  return (
+                    <article className="account-wallet-card" style={{ marginTop: '14px' }}>
+                      <div className="account-wallet-heading">
+                        <div>
+                          <span className="account-dashboard-eyebrow">SETTINGS · ALTANA AGENTIC WALLET</span>
+                          <h2>₦{cleanOwnedTag.toUpperCase()} Wallet &amp; Permissions</h2>
+                        </div>
+                        <span className="account-network-pill">
+                          <span /> {myAgentControlStatus?.hasActiveSession ? 'Session Active' : myAgentControlStatus?.sessionStatus === 'revoked' ? 'Session Revoked' : 'Not Authorized'}
+                        </span>
+                      </div>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '6px 12px', fontSize: '13px', marginBottom: '12px' }}>
+                        <span style={{ opacity: 0.72 }}>Altana Smart Wallet</span>
+                        <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>
+                          {myAgentControlStatus?.walletAddress
+                            ? `${myAgentControlStatus.walletAddress.slice(0, 6)}...${myAgentControlStatus.walletAddress.slice(-4)} (Active)`
+                            : 'Provisioned on claim'}
+                        </span>
+                        <span style={{ opacity: 0.72 }}>Self ID Owner Gate</span>
+                        <span style={{ fontWeight: 600, color: myAgentControlStatus?.selfVerified ? '#059669' : '#b45309' }}>
+                          {myAgentControlStatus?.selfVerified ? 'Verified Human' : 'Verification Pending'}
+                        </span>
+                      </div>
+
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', padding: '12px', borderRadius: '12px', background: 'var(--bg-secondary, rgba(15, 23, 42, 0.03))', border: '1px solid var(--border-color, rgba(15, 23, 42, 0.08))' }}>
+                        <div style={{ fontSize: '12px', fontWeight: 700, opacity: 0.8 }}>CAPABILITY TOGGLES</div>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', fontSize: '13px' }}>
+                          <label style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                            <input
+                              type="checkbox"
+                              checked={ownerCapabilityToggles.send}
+                              onChange={(e) => setOwnerCapabilityToggles((p) => ({ ...p, send: e.target.checked }))}
+                            />
+                            Send payments
+                          </label>
+                          <label style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                            <input
+                              type="checkbox"
+                              checked={ownerCapabilityToggles.swap}
+                              onChange={(e) => setOwnerCapabilityToggles((p) => ({ ...p, swap: e.target.checked }))}
+                            />
+                            Swap tokens
+                          </label>
+                          <span style={{ fontSize: '12px', opacity: 0.65 }}>· Unlimited spending: Not allowed</span>
+                        </div>
+
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '10px', marginTop: '4px' }}>
+                          <label style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '12px' }}>
+                            <span style={{ opacity: 0.72 }}>Daily USD₮ cap</span>
+                            <input
+                              type="number"
+                              min="1"
+                              value={ownerDailyUsdtLimit}
+                              onChange={(e) => setOwnerDailyUsdtLimit(e.target.value)}
+                              style={{ padding: '6px 8px', borderRadius: '8px', border: '1px solid var(--border-color, rgba(15, 23, 42, 0.15))', fontSize: '13px' }}
+                            />
+                          </label>
+                          <label style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '12px' }}>
+                            <span style={{ opacity: 0.72 }}>Daily cNGN cap</span>
+                            <input
+                              type="number"
+                              min="100"
+                              value={ownerDailyCngnLimit}
+                              onChange={(e) => setOwnerDailyCngnLimit(e.target.value)}
+                              style={{ padding: '6px 8px', borderRadius: '8px', border: '1px solid var(--border-color, rgba(15, 23, 42, 0.15))', fontSize: '13px' }}
+                            />
+                          </label>
+                          <label style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '12px' }}>
+                            <span style={{ opacity: 0.72 }}>Session expiry</span>
+                            <select
+                              value={sessionExpiryHoursChoice}
+                              onChange={(e) => setSessionExpiryHoursChoice(Number(e.target.value))}
+                              style={{ padding: '6px 8px', borderRadius: '8px', border: '1px solid var(--border-color, rgba(15, 23, 42, 0.15))', fontSize: '13px' }}
+                            >
+                              <option value={1}>1 hour</option>
+                              <option value={24}>24 hours</option>
+                              <option value={168}>7 days</option>
+                            </select>
+                          </label>
+                        </div>
+                      </div>
+
+                      <div className="account-dashboard-actions" style={{ marginTop: '12px' }}>
+                        {!myAgentControlStatus?.selfVerified && (
+                          <button type="button" className="btn-action-primary" onClick={() => setIsSelfDemoModalOpen(true)}>
+                            <ShieldCheck size={15} /> Verify Self ID First
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          className="btn-action-primary"
+                          disabled={isUpdatingAgentSession || !myAgentControlStatus?.selfVerified}
+                          onClick={async () => {
+                            setIsUpdatingAgentSession(true);
+                            try {
+                              await grantAgentSessionPolicy({
+                                tag: cleanOwnedTag,
+                                sessionDurationSeconds: Number(sessionExpiryHoursChoice) * 3600,
+                                dailyUsdtLimit: String(ownerDailyUsdtLimit || '50'),
+                                dailyCngnLimit: String(ownerDailyCngnLimit || '100000'),
+                                allowedActions: ownerCapabilityToggles,
+                              });
+                              setMyAgentControlStatus(await getAgentControlStatus(cleanOwnedTag));
+                              showStatus?.(`Updated Altana session permissions for ₦${cleanOwnedTag.toUpperCase()}`, 'success');
+                            } catch (err) {
+                              showStatus?.(err?.message || 'Failed to update Altana session key', 'error');
+                            } finally {
+                              setIsUpdatingAgentSession(false);
+                            }
+                          }}
+                        >
+                          <Shield size={15} /> {isUpdatingAgentSession ? 'Saving...' : myAgentControlStatus?.hasActiveSession ? 'Update Session Permissions' : 'Grant Altana Session Key'}
+                        </button>
+                        {myAgentControlStatus?.hasActiveSession && (
+                          <button
+                            type="button"
+                            className="quick-chip-btn"
+                            disabled={isUpdatingAgentSession}
+                            style={{ color: '#dc2626', borderColor: 'rgba(239, 68, 68, 0.35)' }}
+                            onClick={async () => {
+                              setIsUpdatingAgentSession(true);
+                              try {
+                                await revokeAgentSession({ tag: cleanOwnedTag, reason: 'Owner revoked from Profile Dashboard Settings' });
+                                setMyAgentControlStatus(await getAgentControlStatus(cleanOwnedTag));
+                                showStatus?.(`Revoked Altana session key for ₦${cleanOwnedTag.toUpperCase()}`, 'info');
+                              } catch (err) {
+                                showStatus?.(err?.message || 'Failed to revoke session key', 'error');
+                              } finally {
+                                setIsUpdatingAgentSession(false);
+                              }
+                            }}
+                          >
+                            Revoke Agent Permissions
+                          </button>
+                        )}
+                      </div>
+                    </article>
+                  );
+                })()}
               </>
             ) : (
               <article className="account-wallet-card account-profile-empty"><User size={24} /><h2>Sign in to view your profile</h2><p>Your account details and rewards will appear here after sign in.</p><button type="button" className="btn-action-primary" onClick={() => setIsConnectModalOpen(true)}>Sign in</button></article>
@@ -4085,22 +4405,23 @@ function ArcAppShell() {
               </article>
             </div>
           ) : (
-          <div className="terminal-layout-centered" style={{ maxWidth: '412px' }}>
-            <TagToTagSendCard
-              walletAddress={walletAddress}
-              onConnectWallet={() => setIsConnectModalOpen(true)}
-              initialRecipient={recipientInput}
-              onPaymentSuccess={(rcpt) => {
-                triggerCelebrationConfetti();
-                setCelebrationDetails({
-                  type: 'payment',
-                  txHash: rcpt.transferTxHash || rcpt.payoutTxHash || rcpt.swapTxHash,
-                  recipient: rcpt.recipientTag || rcpt.recipientAddress,
-                  amount: `${rcpt.amountDelivered || rcpt.amountSent} ${rcpt.tokenDelivered || rcpt.tokenSent}`,
-                });
-              }}
-            />
-          </div>
+            <div className="terminal-layout-centered" style={{ maxWidth: '412px' }}>
+              <TagToTagSendCard
+                walletAddress={walletAddress}
+                onConnectWallet={() => setIsConnectModalOpen(true)}
+                onOpenSelfVerification={() => setIsSelfDemoModalOpen(true)}
+                initialRecipient={recipientInput}
+                onPaymentSuccess={(rcpt) => {
+                  triggerCelebrationConfetti();
+                  setCelebrationDetails({
+                    type: 'payment',
+                    txHash: rcpt.transferTxHash || rcpt.payoutTxHash || rcpt.swapTxHash,
+                    recipient: rcpt.recipientTag || rcpt.recipientAddress,
+                    amount: `${rcpt.amountDelivered || rcpt.amountSent} ${rcpt.tokenDelivered || rcpt.tokenSent}`,
+                  });
+                }}
+              />
+            </div>
           )
         )}
 
@@ -4170,7 +4491,7 @@ function ArcAppShell() {
 
                 {/* Center Stage: Live Type Tag Searching Display */}
                 <div className="claim-hero-stage">
-                  <div className="claim-stage-subtitle">Claim your NairaTag</div>
+                  <div className="claim-stage-subtitle">Claim your Agent tag</div>
                   <div
                     className={`claim-live-tag-display ${claimInput.trim() ? 'has-value' : ''}`}
                     style={{
@@ -4203,35 +4524,38 @@ function ArcAppShell() {
                     onChange={(e) => handleCheckClaim(e.target.value)}
                   />
                   <div className="claim-input-right-cluster">
-                    <div
-                      className={`tag-status-indicator ${claimStatus?.loading
-                        ? 'checking'
-                        : claimStatus?.available
-                          ? 'available'
-                          : claimInput.trim()
-                            ? 'taken'
-                            : ''
-                        }`}
-                    >
-                      {claimStatus?.loading ? (
-                        <>
-                          <RefreshCw size={11} className="animate-spin" />
-                          <span>Checking...</span>
-                        </>
-                      ) : claimStatus?.available ? (
-                        <>
-                          <Check size={12} strokeWidth={2.8} />
-                          <span>Available</span>
-                        </>
-                      ) : claimInput.trim() ? (
-                        <>
-                          <X size={12} strokeWidth={2.8} />
-                          <span>Taken</span>
-                        </>
-                      ) : (
-                        <span>Ready</span>
-                      )}
-                    </div>
+                    {(claimStatus?.loading || claimStatus?.available || claimStatus?.reserved || /reserved/i.test(claimStatus?.reason || '') || claimInput.trim()) && (
+                      <div
+                        className={`tag-status-indicator ${claimStatus?.loading
+                          ? 'checking'
+                          : claimStatus?.available
+                            ? 'available'
+                            : 'taken'
+                          }`}
+                      >
+                        {claimStatus?.loading ? (
+                          <>
+                            <RefreshCw size={11} className="animate-spin" />
+                            <span>Checking...</span>
+                          </>
+                        ) : claimStatus?.available ? (
+                          <>
+                            <img src="/verified-badge.png" alt="" style={{ width: 15, height: 15, flexShrink: 0, display: 'block' }} />
+                            <span>Available</span>
+                          </>
+                        ) : (claimStatus?.reserved || /reserved/i.test(claimStatus?.reason || '')) ? (
+                          <>
+                            <Lock size={11} strokeWidth={2.6} />
+                            <span>Reserved</span>
+                          </>
+                        ) : (
+                          <>
+                            <X size={12} strokeWidth={2.8} />
+                            <span>Taken</span>
+                          </>
+                        )}
+                      </div>
+                    )}
 
                     {/* Live Interactive Mascot right beside Ready/Available */}
                     <div
@@ -4249,10 +4573,12 @@ function ArcAppShell() {
                         }
                       }}
                     >
-                      <div
+                      <img
                         id="claim-live-mascot-avatar"
                         className="claim-mascot-svg"
-                        dangerouslySetInnerHTML={{ __html: liveMascotProfile?.avatarSvg || '' }}
+                        src={`https://api.dicebear.com/11.x/adventurer-neutral/svg?seed=${encodeURIComponent(claimInput.replace(/^[$₦]/, '').trim().toLowerCase() || 'nairatag')}`}
+                        alt="Live NairaTag avatar"
+                        style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover', display: 'block' }}
                       />
                     </div>
                   </div>
@@ -4307,7 +4633,7 @@ function ArcAppShell() {
                           >
                             <img
                               className="reg-dicebear-avatar"
-                              src={`https://api.dicebear.com/7.x/identicon/svg?seed=${encodeURIComponent(item.tag)}`}
+                              src={`https://api.dicebear.com/11.x/adventurer-neutral/svg?seed=${encodeURIComponent(item.tag)}`}
                               alt=""
                               onError={(event) => { event.currentTarget.style.visibility = 'hidden'; }}
                             />
@@ -4423,21 +4749,26 @@ function ArcAppShell() {
                     <div className="agent-directory-tag">₦{String(agent.tag || '').replace(/^[₦$@#]/, '')}</div>
                     {(IS_CONCORDIUM_SITE || agent.role) && <div style={{ fontSize: '11px', color: 'var(--privy-color-foreground-3)', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' }}>{IS_CONCORDIUM_SITE ? (agent.concordium?.description || 'NairaTag agent identity · Concordium Testnet') : agent.role}</div>}
 
-                    {/* ERC-8004 & Altana Account Indicators */}
-                    {IS_CONCORDIUM_SITE ? (
-                      <div style={{ fontSize: '10px', fontFamily: 'monospace', background: 'rgba(13, 148, 136, 0.08)', color: '#0d9488', padding: '2px 7px', borderRadius: '4px', fontWeight: 600, marginTop: '6px' }}>
-                        Concordium Testnet · Agent Card available in profile
-                      </div>
-                    ) : <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '6px', justifyContent: 'center' }}>
-                      <span style={{ fontSize: '10px', fontFamily: 'monospace', background: 'rgba(99, 102, 241, 0.08)', color: '#6366f1', padding: '1px 6px', borderRadius: '4px', fontWeight: 600 }}>
-                        ERC-8004 #{agent.erc8004?.agentId || agent.identity?.erc8004AgentId || agent.id || '1'}
-                      </span>
+                    {/* Self ID & Altana Account Indicators */}
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '6px', justifyContent: 'center', alignItems: 'center' }}>
+                      <SelfAgentIdBadge
+                        size="xs"
+                        isVerified={agent.self?.verified !== false && agent.status !== 'unverified'}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setActiveVerificationDetailAgent(agent);
+                        }}
+                      />
                       <span style={{ fontSize: '10px', fontFamily: 'monospace', background: 'rgba(13, 148, 136, 0.08)', color: '#0d9488', padding: '1px 6px', borderRadius: '4px', fontWeight: 600 }}>
                         Altana {shorten(agent.altana?.walletAddress || agent.owner || '0x653f...1693')}
                       </span>
-                    </div>}
+                    </div>
 
-                    {(IS_CONCORDIUM_SITE || agent.category) && <div className="agent-directory-category" style={{ marginTop: '6px' }}>{IS_CONCORDIUM_SITE ? 'NairaTag Agent' : agent.category}</div>}
+                    {(IS_CONCORDIUM_SITE || agent.category) && (
+                      <div className="agent-directory-category" style={{ marginTop: '6px' }}>
+                        {IS_CONCORDIUM_SITE ? 'NairaTag Agent' : (/^user\s*agent$/i.test(String(agent.category || '').trim()) ? 'Personal' : (agent.category || 'Personal'))}
+                      </div>
+                    )}
                     <div className="agent-directory-points">{agentPointsLabel(agent)}</div>
                     <div className="agent-directory-card-earnings">
                       <strong>{agentEarningsLabel(agent)} earned</strong>
@@ -4468,7 +4799,14 @@ function ArcAppShell() {
                       <div className="agent-circle-meta">
                         <div className="agent-circle-name" style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                           <span className="agent-circle-tag-pill">₦{String(agent.tag || '').replace(/^[₦$@#]/, '')}</span>
-                          {IS_CONCORDIUM_SITE && <span className="agent-directory-category">Concordium Testnet</span>}
+                          <SelfAgentIdBadge
+                            size="xs"
+                            isVerified={agent.self?.verified !== false && agent.status !== 'unverified'}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setActiveVerificationDetailAgent(agent);
+                            }}
+                          />
                         </div>
                         {(IS_CONCORDIUM_SITE || agent.role) && <div style={{ fontSize: '11px', color: 'var(--privy-color-foreground-3)', marginTop: '2px' }}>{IS_CONCORDIUM_SITE ? (agent.concordium?.description || 'NairaTag agent identity · Concordium Testnet') : agent.role}</div>}
                       </div>
@@ -4652,9 +4990,9 @@ function ArcAppShell() {
                                 <p>
                                   {isPaid ? 'Milestone completed and funds released on Celo Mainnet.'
                                     : isReleasing ? 'Releasing milestone escrow via Textile FX Corridor...'
-                                    : isSubmitted ? (isCreator ? 'Freelancer deliverable received. Review submission and release escrow.' : 'Your deliverable is in review. Awaiting client milestone approval.')
-                                    : isOngoing ? (isCreator ? `Milestone in progress by ${assignedWorker}.` : 'You claimed this milestone. Complete the requirements and submit below.')
-                                    : (isCreator ? 'Your milestone bounty is funded in escrow. Seeking verified workers.' : 'Claim this milestone bounty, complete the task, and get paid in your preferred currency.')}
+                                      : isSubmitted ? (isCreator ? 'Freelancer deliverable received. Review submission and release escrow.' : 'Your deliverable is in review. Awaiting client milestone approval.')
+                                        : isOngoing ? (isCreator ? `Milestone in progress by ${assignedWorker}.` : 'You claimed this milestone. Complete the requirements and submit below.')
+                                          : (isCreator ? 'Your milestone bounty is funded in escrow. Seeking verified workers.' : 'Claim this milestone bounty, complete the task, and get paid in your preferred currency.')}
                                 </p>
                               </div>
                               <span className={`task-progress-badge ${isPaid ? 'paid' : isReleasing ? 'releasing' : isSubmitted ? 'submitted' : isOngoing ? 'in_progress' : 'not-started'}`}>
@@ -4671,7 +5009,23 @@ function ArcAppShell() {
                                     Milestone Escrow Released & Paid
                                   </strong>
                                   <div style={{ fontSize: '12px', color: 'var(--privy-color-foreground-2)', marginBottom: '8px' }}>
-                                    Settled <strong>{selectedTask.payoutDelivered || `${selectedTask.rewardAmount || selectedTask.rewardUSDC} ${selectedTask.rewardToken || (IS_CONCORDIUM_SITE ? 'CCD' : 'USDT')}`}</strong> to <strong>{assignedWorker}</strong>{selectedTask.payoutToken === 'CCD' ? ' on Concordium Testnet.' : ' via Textile FX Corridor.'}
+                                    {(() => {
+                                      const raw = taskProgress[selectedTask.id]?.payoutDelivered || selectedTask.payoutDelivered;
+                                      const tok = taskProgress[selectedTask.id]?.targetToken || selectedTask.payoutToken || (IS_CONCORDIUM_SITE ? 'CCD' : 'cNGN');
+                                      const amt = Number(selectedTask.rewardAmount || selectedTask.rewardUSDC || 0);
+                                      const validRaw = raw && !/^0(\.0+)?\s/i.test(String(raw).trim());
+                                      let fallbackAmt = amt;
+                                      if (selectedTask.rewardToken === 'USDT' && tok === 'cNGN') fallbackAmt = amt * 1448;
+                                      else if (selectedTask.rewardToken === 'cNGN' && tok === 'USDT') fallbackAmt = amt / 1448;
+                                      else if (selectedTask.rewardToken === 'CELO' && tok === 'cNGN') fallbackAmt = amt * 0.45 * 1448;
+                                      else if (selectedTask.rewardToken === 'USDT' && tok === 'CELO') fallbackAmt = amt / 0.45;
+                                      const displayPaid = validRaw ? raw : `${Number(fallbackAmt).toLocaleString(undefined, { maximumFractionDigits: 4 })} ${tok}`;
+                                      return (
+                                        <>
+                                          Settled <strong>{displayPaid}</strong> to <strong>{assignedWorker}</strong>{tok === 'CCD' ? ' on Concordium Testnet.' : ' via Textile FX Corridor.'}
+                                        </>
+                                      );
+                                    })()}
                                   </div>
                                   {selectedTask.payoutHash && (
                                     <div style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', marginBottom: '10px', wordBreak: 'break-all' }}>
@@ -4973,7 +5327,7 @@ function ArcAppShell() {
 
                         return (
                           <article ref={taskChatRef} className="task-detail-panel task-chat-panel" style={{ marginTop: '16px' }}>
-                            <div className="task-detail-panel-heading" style={{ borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '10px', marginBottom: '12px' }}>
+                            <div className="task-detail-panel-heading task-chat-header">
                               <div>
                                 <h2 style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: 0, fontSize: '15px' }}>
                                   <MessageSquare size={16} color="#10B981" />
@@ -5006,17 +5360,7 @@ function ArcAppShell() {
                                 taskChatList.map((msg) => {
                                   if (msg.role === 'system' || msg.type === 'system') {
                                     return (
-                                      <div key={msg.id} style={{
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '8px',
-                                        padding: '7px 12px',
-                                        background: 'rgba(255,255,255,0.04)',
-                                        borderRadius: '8px',
-                                        fontSize: '11.5px',
-                                        border: '1px solid rgba(255,255,255,0.06)',
-                                        color: 'var(--privy-color-foreground-2)',
-                                      }}>
+                                      <div key={msg.id} className="task-chat-system-msg">
                                         <span style={{ fontWeight: 700, color: '#10B981', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                                           [{msg.senderTag || 'ESCROW'}]
                                         </span>
@@ -5046,23 +5390,12 @@ function ArcAppShell() {
                                       gap: '2px',
                                     }}>
                                       <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '10.5px', color: 'var(--privy-color-foreground-2)', padding: '0 4px' }}>
-                                        <span style={{ fontWeight: 600, color: isMsgClient ? '#38BDF8' : '#10B981' }}>
+                                        <span style={{ fontWeight: 600, color: isMsgClient ? '#0284C7' : '#10B981' }}>
                                           {isMsgClient ? '👑 Client' : '💼 Freelancer'} ({msg.senderTag})
                                         </span>
                                         <span>· {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                                       </div>
-                                      <div style={{
-                                        maxWidth: '85%',
-                                        padding: '9px 13px',
-                                        borderRadius: isSenderMe ? '12px 12px 2px 12px' : '12px 12px 12px 2px',
-                                        background: isSenderMe ? '#2563EB' : 'rgba(255,255,255,0.07)',
-                                        color: '#fff',
-                                        fontSize: '12.5px',
-                                        lineHeight: 1.45,
-                                        border: isSenderMe ? 'none' : '1px solid rgba(255,255,255,0.1)',
-                                        wordBreak: 'break-word',
-                                        whiteSpace: 'pre-wrap',
-                                      }}>
+                                      <div className={`task-chat-bubble ${isSenderMe ? 'outgoing' : 'incoming'}`}>
                                         {msg.text}
                                       </div>
                                     </div>
@@ -5118,8 +5451,8 @@ function ArcAppShell() {
                         <span className="task-detail-eyebrow">BOUNTY REWARD</span>
                         <strong>
                           {selectedTask.rewardToken === 'cNGN' ? `₦${Number(selectedTask.rewardAmount || selectedTask.rewardUSDC).toLocaleString()}` :
-                           selectedTask.rewardToken === 'CELO' ? `${selectedTask.rewardAmount || selectedTask.rewardUSDC}` :
-                           `$${selectedTask.rewardAmount || selectedTask.rewardUSDC}`}
+                            selectedTask.rewardToken === 'CELO' ? `${selectedTask.rewardAmount || selectedTask.rewardUSDC}` :
+                              `$${selectedTask.rewardAmount || selectedTask.rewardUSDC}`}
                           <small style={{ marginLeft: '4px' }}>{selectedTask.rewardToken === 'USDT' ? 'USD₮' : (selectedTask.rewardToken || 'USD₮')}</small>
                         </strong>
                         <div style={{ fontSize: '11px', color: 'var(--privy-color-foreground-2)', marginTop: '2px', marginBottom: '6px' }}>
@@ -5135,16 +5468,82 @@ function ArcAppShell() {
                         <h2><ShieldCheck size={16} /> Escrow status</h2>
                         <div className="task-escrow-status">{selectedTask.escrowStatus}</div>
 
-                        {/* Explicit Amount Locked Display */}
-                        <div style={{ marginTop: '8px', padding: '8px 10px', background: 'rgba(16, 185, 129, 0.08)', borderRadius: '6px', border: '1px solid rgba(16, 185, 129, 0.2)' }}>
-                          <div style={{ fontSize: '11px', color: 'var(--privy-color-foreground-2)', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 600 }}>Amount Locked</div>
-                          <div style={{ fontSize: '14px', fontWeight: 700, color: '#10B981', marginTop: '2px' }}>
-                            {selectedTask.rewardAmount || selectedTask.rewardUSDC} {selectedTask.rewardToken === 'USDT' ? 'USD₮' : (selectedTask.rewardToken || 'USD₮')}
-                            <span style={{ fontSize: '11px', fontWeight: 500, color: 'var(--privy-color-foreground-2)', marginLeft: '6px' }}>
-                              ({selectedTask.rewardNGN})
-                            </span>
-                          </div>
-                        </div>
+                        {(() => {
+                          const prog = taskProgress[selectedTask.id];
+                          const statusVal = prog?.status || selectedTask.status;
+                          const isSettled = statusVal === 'paid' || statusVal === 'completed';
+                          const lockedAmt = Number(selectedTask.rewardAmount || selectedTask.rewardUSDC || 0);
+                          const lockedTok = selectedTask.rewardToken === 'USDT' ? 'USD₮' : (selectedTask.rewardToken || 'USD₮');
+                          const paidTok = prog?.targetToken || selectedTask.payoutToken || (IS_CONCORDIUM_SITE ? 'CCD' : 'cNGN');
+                          const rawDelivered = prog?.payoutDelivered || selectedTask.payoutDelivered;
+                          const hasNonZeroDelivered = rawDelivered && !/^0(\.0+)?\s/i.test(String(rawDelivered).trim());
+                          let computedPaidAmt = lockedAmt;
+                          if (selectedTask.rewardToken === 'USDT' && paidTok === 'cNGN') computedPaidAmt = lockedAmt * 1448;
+                          else if (selectedTask.rewardToken === 'cNGN' && paidTok === 'USDT') computedPaidAmt = lockedAmt / 1448;
+                          else if (selectedTask.rewardToken === 'CELO' && paidTok === 'cNGN') computedPaidAmt = lockedAmt * 0.45 * 1448;
+                          else if (selectedTask.rewardToken === 'USDT' && paidTok === 'CELO') computedPaidAmt = lockedAmt / 0.45;
+                          const releasedDisplay = hasNonZeroDelivered
+                            ? rawDelivered
+                            : `${Number(computedPaidAmt).toLocaleString(undefined, { maximumFractionDigits: 4 })} ${paidTok}`;
+                          const releaseTx = prog?.payoutHash || selectedTask.payoutHash;
+                          const swapTx = prog?.swapHash || selectedTask.swapHash;
+                          const workerAddr = selectedTask.assignedWorkerAddress || selectedTask.assigned_worker_address;
+                          const verifyTokenAddr = paidTok === 'cNGN' ? CELO_CNGN_ADDRESS : paidTok === 'USDT' ? CELO_USDT_ADDRESS : null;
+
+                          return (
+                            <>
+                              {/* Explicit Amount Locked Display */}
+                              <div style={{ marginTop: '8px', padding: '8px 10px', background: 'rgba(16, 185, 129, 0.08)', borderRadius: '6px', border: '1px solid rgba(16, 185, 129, 0.2)' }}>
+                                <div style={{ fontSize: '11px', color: 'var(--privy-color-foreground-2)', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 600 }}>
+                                  {isSettled ? 'Original Escrow Locked' : 'Amount Locked'}
+                                </div>
+                                <div style={{ fontSize: '14px', fontWeight: 700, color: '#10B981', marginTop: '2px' }}>
+                                  {selectedTask.rewardAmount || selectedTask.rewardUSDC} {lockedTok}
+                                  <span style={{ fontSize: '11px', fontWeight: 500, color: 'var(--privy-color-foreground-2)', marginLeft: '6px' }}>
+                                    ({selectedTask.rewardNGN})
+                                  </span>
+                                </div>
+                              </div>
+
+                              {/* Amount Released & Paid Currency when settled */}
+                              {isSettled && (
+                                <div style={{ marginTop: '8px', padding: '8px 10px', background: 'rgba(59, 130, 246, 0.08)', borderRadius: '6px', border: '1px solid rgba(59, 130, 246, 0.25)' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px' }}>
+                                    <span style={{ fontSize: '11px', color: 'var(--privy-color-foreground-2)', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 600 }}>
+                                      Amount Released
+                                    </span>
+                                    <span style={{ fontSize: '10px', fontWeight: 700, color: '#059669', background: 'rgba(16, 185, 129, 0.14)', padding: '1px 6px', borderRadius: '4px' }}>
+                                      Paid in {paidTok}
+                                    </span>
+                                  </div>
+                                  <div style={{ fontSize: '15px', fontWeight: 700, color: '#2563EB', marginTop: '3px' }}>
+                                    {releasedDisplay}
+                                  </div>
+                                  <div style={{ fontSize: '10.5px', color: 'var(--privy-color-foreground-2)', marginTop: '2px' }}>
+                                    Settled from {selectedTask.rewardAmount || selectedTask.rewardUSDC} {lockedTok} via {paidTok === 'CCD' ? 'Concordium Testnet' : 'Textile FX'}
+                                  </div>
+                                  {releaseTx && (
+                                    <div style={{ fontSize: '11px', marginTop: '6px', wordBreak: 'break-all', fontFamily: 'var(--font-mono)' }}>
+                                      Release Tx: <a href={paidTok === 'CCD' ? `https://testnet.ccdscan.io/transaction/${releaseTx}` : `https://celoscan.io/tx/${releaseTx}`} target="_blank" rel="noopener noreferrer" style={{ color: '#0052FF', textDecoration: 'underline' }}>{shorten(releaseTx)}</a>
+                                    </div>
+                                  )}
+                                  {swapTx && (
+                                    <div style={{ fontSize: '11px', marginTop: '3px', wordBreak: 'break-all', fontFamily: 'var(--font-mono)' }}>
+                                      Textile FX Swap: <a href={`https://celoscan.io/tx/${swapTx}`} target="_blank" rel="noopener noreferrer" style={{ color: '#0052FF', textDecoration: 'underline' }}>{shorten(swapTx)}</a>
+                                    </div>
+                                  )}
+                                  {verifyTokenAddr && workerAddr && isAddress(workerAddr) && (
+                                    <div style={{ fontSize: '11px', marginTop: '4px' }}>
+                                      <a href={`https://celoscan.io/token/${verifyTokenAddr}?a=${workerAddr}`} target="_blank" rel="noopener noreferrer" style={{ color: '#059669', textDecoration: 'underline', fontWeight: 600 }}>
+                                        Verify {paidTok} in Worker Wallet on CeloScan ↗
+                                      </a>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </>
+                          );
+                        })()}
 
                         {selectedTask.escrowTxHash && (
                           <div style={{ fontSize: '11px', marginTop: '8px', wordBreak: 'break-all', fontFamily: 'var(--font-mono)' }}>
@@ -5286,8 +5685,32 @@ function ArcAppShell() {
                           )}
                         </div>
 
-                        {/* Create Task Button */}
+                        {/* Category Dropdown & Create Task Button */}
                         <div className="task-header-actions" style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0, marginLeft: 'auto' }}>
+                          <select
+                            className="agents-directory-sort"
+                            aria-label="Filter tasks by category"
+                            value={tasksTabSection === 'services' ? 'services' : tasksFilter}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              if (val === 'services') {
+                                setTasksTabSection('services');
+                              } else {
+                                setTasksTabSection('tasks');
+                                setTasksFilter(val);
+                              }
+                            }}
+                            style={{ minHeight: '30px', fontSize: '11.5px', padding: '0 8px' }}
+                          >
+                            <option value="all">All Tasks</option>
+                            <option value="services">🗓️ Services</option>
+                            <option value="dev">⚡ Engineering</option>
+                            <option value="design">🎨 Design</option>
+                            <option value="data">📊 Data &amp; AI</option>
+                            <option value="content">✍️ Content</option>
+                            <option value="test">🧪 Testing</option>
+                            <option value="community">📱 Community</option>
+                          </select>
                           <button
                             type="button"
                             className="btn-agent-primary create-task-header-btn"
@@ -5348,36 +5771,6 @@ function ArcAppShell() {
                           onClick={() => setTaskStatusFilter(st.id)}
                         >
                           {st.label}
-                        </button>
-                      ))}
-                    </div>
-
-                    {/* Category Filter Pills Row */}
-                    <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '4px', scrollbarWidth: 'none' }}>
-                      {[
-                        { id: 'all', label: 'All Tasks' },
-                        { id: 'services', label: '🗓️ Services' },
-                        { id: 'dev', label: '⚡ Engineering' },
-                        { id: 'design', label: '🎨 Design' },
-                        { id: 'data', label: '📊 Data & AI' },
-                        { id: 'content', label: '✍️ Content' },
-                        { id: 'test', label: '🧪 Testing' },
-                        { id: 'community', label: '📱 Community' },
-                      ].map((cat) => (
-                        <button
-                          key={cat.id}
-                          type="button"
-                          className={`task-cat-pill ${tasksFilter === cat.id ? 'active' : ''}`}
-                          onClick={() => {
-                            if (cat.id === 'services') {
-                              setTasksTabSection('services');
-                            } else {
-                              setTasksTabSection('tasks');
-                              setTasksFilter(cat.id);
-                            }
-                          }}
-                        >
-                          {cat.label}
                         </button>
                       ))}
                     </div>
@@ -5497,9 +5890,19 @@ function ArcAppShell() {
                               <span className="card-rank-tag">{rankLabel}</span>
                               <span className={`card-status-tag ${statusBadgeClass}`}>{statusBadgeLabel}</span>
 
-                              <div className="milestone-badge-stage">
-                                <AgentMedallion type={task.badgeType || (idx % 2 === 0 ? 'emerald' : 'cyan')} size={46} />
-                              </div>
+                              {(task.bannerUrl || task.banner_url) ? (
+                                <div style={{ width: '100%', height: '84px', borderRadius: '10px', overflow: 'hidden', marginBottom: '6px' }}>
+                                  <img
+                                    src={task.bannerUrl || task.banner_url}
+                                    alt={task.title}
+                                    style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                                  />
+                                </div>
+                              ) : (
+                                <div className="milestone-badge-stage">
+                                  <AgentMedallion type={task.badgeType || (idx % 2 === 0 ? 'emerald' : 'cyan')} size={46} />
+                                </div>
+                              )}
 
                               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
                                 <h3 className="milestone-card-title" style={{ margin: 0 }}>₦{task.creatorTag?.replace(/^₦/, '').toUpperCase()}</h3>
@@ -5513,8 +5916,27 @@ function ArcAppShell() {
                               </div>
                               <div className="milestone-card-role" title={task.title}>{task.title}</div>
 
-                              <div className="milestone-task-status">
+                              <div className="milestone-task-status" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
                                 <span>{task.categoryLabel} • {task.deadline}</span>
+                                {!IS_CONCORDIUM_SITE && task.requiresSelfId !== false && (
+                                  <span
+                                    title="Self Agent ID verification required to participate"
+                                    style={{
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '4px',
+                                      padding: '2px 7px',
+                                      borderRadius: '999px',
+                                      background: 'rgba(16, 185, 129, 0.1)',
+                                      color: '#059669',
+                                      fontSize: '10px',
+                                      fontWeight: 700
+                                    }}
+                                  >
+                                    <SelfIcon size={11} />
+                                    <span>Self ID Required</span>
+                                  </span>
+                                )}
                               </div>
 
                               <div className="milestone-progress-bar-wrap">
@@ -5532,8 +5954,8 @@ function ArcAppShell() {
                                 <span className="milestone-earnings-value" style={{ color: isDone ? '#10B981' : 'var(--primary, #0052FF)' }}>
                                   {isDone ? `Paid (${task.payoutDelivered || task.rewardNGN || 'Settled'})` : (
                                     task.rewardToken === 'cNGN' ? `₦${Number(task.rewardAmount || task.rewardUSDC).toLocaleString()} cNGN` :
-                                    task.rewardToken === 'CELO' ? `${task.rewardAmount || task.rewardUSDC} CELO` :
-                                    `$${task.rewardAmount || task.rewardUSDC} ${task.rewardToken === 'USDT' ? 'USD₮' : (task.rewardToken || 'USD₮')}`
+                                      task.rewardToken === 'CELO' ? `${task.rewardAmount || task.rewardUSDC} CELO` :
+                                        `$${task.rewardAmount || task.rewardUSDC} ${task.rewardToken === 'USDT' ? 'USD₮' : (task.rewardToken || 'USD₮')}`
                                   )}
                                 </span>
                               </div>
@@ -6181,15 +6603,15 @@ function ArcAppShell() {
                     { id: 'contracts', label: 'Contracts' },
                     { id: 'social', label: 'Social & Community' },
                   ]).map((chip) => (
-                  <button
-                    key={chip.id}
-                    type="button"
-                    className={`faq-chip ${faqActiveCategory === chip.id ? 'active' : ''}`}
-                    onClick={() => setFaqActiveCategory(chip.id)}
-                  >
-                    {chip.label}
-                  </button>
-                ))}
+                    <button
+                      key={chip.id}
+                      type="button"
+                      className={`faq-chip ${faqActiveCategory === chip.id ? 'active' : ''}`}
+                      onClick={() => setFaqActiveCategory(chip.id)}
+                    >
+                      {chip.label}
+                    </button>
+                  ))}
               </div>
             </div>
 
@@ -6567,6 +6989,40 @@ function ArcAppShell() {
                   </button>
                 </div>
               )}
+              {celebrationDetails.type === 'claim' && celebrationDetails.altanaWalletAddress && (
+                <div style={{ marginTop: '10px', padding: '10px 12px', borderRadius: '10px', background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.25)', textAlign: 'left' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+                    <span style={{ fontSize: '11px', fontWeight: 700, color: '#059669' }}>Altana Agent Wallet Active</span>
+                    <span style={{ fontSize: '10px', fontFamily: 'monospace', color: 'var(--privy-color-foreground-2)' }}>
+                      {shorten(celebrationDetails.altanaWalletAddress)}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: '11.5px', color: 'var(--privy-color-foreground)', lineHeight: 1.4, marginBottom: '8px' }}>
+                    Your agent wallet is ready. Verify your identity to unlock payments, transactions and agent services.
+                  </div>
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    <button
+                      type="button"
+                      className="btn-agent-primary"
+                      style={{ flex: 1, fontSize: '11.5px', padding: '7px 10px', justifyContent: 'center' }}
+                      onClick={() => {
+                        setIsCelebrationOpen(false);
+                        setIsSelfDemoModalOpen(true);
+                      }}
+                    >
+                      Verify now
+                    </button>
+                    <button
+                      type="button"
+                      className="btn-agent-secondary"
+                      style={{ fontSize: '11.5px', padding: '7px 10px' }}
+                      onClick={() => setIsCelebrationOpen(false)}
+                    >
+                      Verify later
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Social Intent Sharing & Telegram Broadcast Confirmation */}
@@ -6706,102 +7162,280 @@ function ArcAppShell() {
           ─────────────────────────────────────────────────────────────────── */}
       {selectedAgentProfile && (
         <div className="agent-modal-backdrop" onClick={() => setSelectedAgentProfile(null)}>
-          <div className="agent-modal-dialog" onClick={(event) => event.stopPropagation()}>
-            <div className="agent-profile-content">
-              <div className="agent-profile-title-row">
-                <button
-                  type="button"
-                  className="agent-modal-close-btn"
-                  onClick={() => setSelectedAgentProfile(null)}
-                  aria-label="Close profile"
-                >
-                  <X size={16} />
-                </button>
-              </div>
+          <div className="agent-modal-dialog" style={{ maxWidth: '390px', width: '100%', borderRadius: '22px' }} onClick={(event) => event.stopPropagation()}>
+            <div className="agent-profile-content" style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <div className="agent-profile-main-row" style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: 0, position: 'relative' }}>
+                <div style={{ position: 'relative', width: '50px', height: '50px', flexShrink: 0 }}>
+                  <img className="agent-profile-avatar" src={selectedAgentProfile.avatar} alt="" style={{ width: '50px', height: '50px', borderRadius: '50%', display: 'block' }} />
+                  {!IS_CONCORDIUM_SITE && (agentControlStatus?.selfVerified ?? selectedAgentProfile.self?.verified) && (
+                    <span
+                      title="Verified with Self Agent ID"
+                      style={{
+                        position: 'absolute',
+                        bottom: '-2px',
+                        right: '-2px',
+                        width: '19px',
+                        height: '19px',
+                        borderRadius: '50%',
+                        background: 'var(--bg-primary, #fff)',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        boxShadow: '0 1px 4px rgba(0, 0, 0, 0.18)'
+                      }}
+                    >
+                      <SelfIcon size={15} />
+                    </span>
+                  )}
+                </div>
 
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, margin: '0 0 16px' }}>
-                <a href={getAgentTwitterShareUrl({ tag: selectedAgentProfile.tag })} target="_blank" rel="noopener noreferrer" className="agent-tool-chip">Share on X</a>
-                <a href={getAgentTelegramShareUrl({ tag: selectedAgentProfile.tag })} target="_blank" rel="noopener noreferrer" className="agent-tool-chip">Telegram</a>
-                <a href={getAgentWhatsAppShareUrl({ tag: selectedAgentProfile.tag })} target="_blank" rel="noopener noreferrer" className="agent-tool-chip">WhatsApp</a>
-                <button type="button" className="agent-tool-chip" onClick={() => triggerCopy(`agent_share_${selectedAgentProfile.tag}`, getAgentShareUrl(selectedAgentProfile.tag))}>Copy profile link</button>
-              </div>
-
-              <div className="agent-profile-main-row">
-                <img className="agent-profile-avatar" src={selectedAgentProfile.avatar} alt="" />
-                <div className="agent-profile-heading-copy">
-                  <div className="agent-profile-name-line" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <h2>₦{selectedAgentProfile.tag.toUpperCase()}</h2>
+                <div className="agent-profile-heading-copy" style={{ flex: 1, minWidth: 0 }}>
+                  <div className="agent-profile-name-line" style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                    <h2 style={{ margin: 0, fontSize: '17px', fontWeight: 800, letterSpacing: '-0.02em' }}>₦{selectedAgentProfile.tag.toUpperCase()}</h2>
+                    <span
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        padding: '2px 7px',
+                        borderRadius: '999px',
+                        fontSize: '10.5px',
+                        fontWeight: 600,
+                        background: 'var(--bg-secondary, rgba(15, 23, 42, 0.06))',
+                        border: '1px solid var(--border-color, rgba(15, 23, 42, 0.08))',
+                        opacity: 0.85
+                      }}
+                    >
+                      {IS_CONCORDIUM_SITE ? 'NairaTag Agent' : (/^user\s*agent$/i.test(String(selectedAgentProfile.category || '').trim()) ? 'Personal' : (selectedAgentProfile.category || 'Personal'))}
+                    </span>
                   </div>
-                  <div className="agent-profile-subtitle">
-                    {IS_CONCORDIUM_SITE ? 'NairaTag Agent Identity' : selectedAgentProfile.profileType === 'claimed-tag' ? 'NairaTag on Celo' : selectedAgentProfile.name}
+                  <div className="agent-profile-subtitle" style={{ fontSize: '11px', opacity: 0.65, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {IS_CONCORDIUM_SITE ? 'NairaTag Agent Identity' : selectedAgentProfile.profileType === 'claimed-tag' ? 'NairaTag on Celo' : (selectedAgentProfile.role || selectedAgentProfile.name)}
                   </div>
                 </div>
-                {selectedAgentProfile.profileType !== 'claimed-tag' && selectedAgentProfile.profileType !== 'platform-agent' && (
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
                   <button
                     type="button"
-                    className={`agent-follow-button agent-follow-button-inline ${agentFollowState.following ? 'following' : ''}`}
-                    onClick={handleToggleAgentFollow}
-                    disabled={agentFollowState.loading || agentFollowState.updating || String(agentProfileLiveData?.details?.owner || selectedAgentProfile.owner || '').toLowerCase() === String(walletAddress || '').toLowerCase()}
-                    aria-pressed={agentFollowState.following}
+                    className="agent-modal-close-btn"
+                    title="Share agent profile"
+                    aria-label="Share agent profile"
+                    onClick={async () => {
+                      const shareUrl = getAgentShareUrl(selectedAgentProfile.tag);
+                      const shareTitle = `₦${selectedAgentProfile.tag.toUpperCase()} on NairaTag`;
+                      if (typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
+                        try {
+                          await navigator.share({ title: shareTitle, text: `Check out ₦${selectedAgentProfile.tag.toUpperCase()} on NairaTag`, url: shareUrl });
+                          return;
+                        } catch (err) {
+                          if (err?.name === 'AbortError') return;
+                        }
+                      }
+                      setIsProfileShareMenuOpen((prev) => !prev);
+                    }}
                   >
-                    {agentFollowState.loading ? '…' : agentFollowState.updating ? 'Saving…' : String(agentProfileLiveData?.details?.owner || selectedAgentProfile.owner || '').toLowerCase() === String(walletAddress || '').toLowerCase() ? 'Your agent' : agentFollowState.following ? 'Following' : 'Follow'}
+                    <Share2 size={15} aria-hidden="true" />
                   </button>
+                  <button
+                    type="button"
+                    className="agent-modal-close-btn"
+                    onClick={() => { setIsProfileShareMenuOpen(false); setSelectedAgentProfile(null); }}
+                    aria-label="Close profile"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+
+                {isProfileShareMenuOpen && (
+                  <div
+                    role="menu"
+                    style={{
+                      position: 'absolute',
+                      top: '42px',
+                      right: '0',
+                      zIndex: 20,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '4px',
+                      minWidth: '160px',
+                      padding: '6px',
+                      borderRadius: '12px',
+                      background: 'var(--bg-primary, #fff)',
+                      border: '1px solid var(--border-color, rgba(15, 23, 42, 0.12))',
+                      boxShadow: '0 12px 30px rgba(15, 23, 42, 0.16)',
+                      fontSize: '12px'
+                    }}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => {
+                        triggerCopy(`agent_share_${selectedAgentProfile.tag}`, getAgentShareUrl(selectedAgentProfile.tag));
+                        setIsProfileShareMenuOpen(false);
+                      }}
+                      style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 10px', borderRadius: '8px', border: 'none', background: 'transparent', cursor: 'pointer', textAlign: 'left', color: 'inherit', fontWeight: 600 }}
+                    >
+                      <Copy size={13} /> Copy profile link
+                    </button>
+                    <a href={getAgentTwitterShareUrl({ tag: selectedAgentProfile.tag })} target="_blank" rel="noopener noreferrer" onClick={() => setIsProfileShareMenuOpen(false)} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 10px', borderRadius: '8px', textDecoration: 'none', color: 'inherit', fontWeight: 600 }}>
+                      <ExternalLink size={13} /> Share on X
+                    </a>
+                    <a href={getAgentTelegramShareUrl({ tag: selectedAgentProfile.tag })} target="_blank" rel="noopener noreferrer" onClick={() => setIsProfileShareMenuOpen(false)} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 10px', borderRadius: '8px', textDecoration: 'none', color: 'inherit', fontWeight: 600 }}>
+                      <Send size={13} /> Share on Telegram
+                    </a>
+                    <a href={getAgentWhatsAppShareUrl({ tag: selectedAgentProfile.tag })} target="_blank" rel="noopener noreferrer" onClick={() => setIsProfileShareMenuOpen(false)} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 10px', borderRadius: '8px', textDecoration: 'none', color: 'inherit', fontWeight: 600 }}>
+                      <Share2 size={13} /> Share on WhatsApp
+                    </a>
+                  </div>
                 )}
               </div>
 
-              <p className="agent-profile-description">
-                {IS_CONCORDIUM_SITE
-                  ? (selectedAgentProfile.concordium?.description || 'NairaTag agent identity · Concordium Testnet Agent Card publishing available to the owner.')
-                  : (selectedAgentProfile.profileType === 'claimed-tag' ? 'NairaTag holder' : selectedAgentProfile.role)}
-              </p>
-
-              <div className="agent-profile-stats">
-                <div><strong>{selectedAgentProfile.profileType === 'claimed-tag' || selectedAgentProfile.profileType === 'platform-agent' ? '—' : agentFollowState.loading ? '…' : agentFollowState.error ? '—' : agentFollowState.followerCount}</strong><span>Followers</span></div>
-                <div><strong>{selectedAgentProfile.profileType === 'platform-agent' ? (selectedAgentProfile.callableTools?.length || 0) : selectedAgentProfile.earnings || '—'}</strong><span>{selectedAgentProfile.profileType === 'platform-agent' ? 'Enabled tools' : 'Earned'}</span></div>
-                <div><strong>{selectedAgentProfile.identity?.verifiedOnchain && selectedAgentProfile.identity?.erc8004AgentId ? `#${selectedAgentProfile.identity.erc8004AgentId}` : selectedAgentProfile.profileType === 'platform-agent' ? 'Platform' : selectedAgentProfile.id ? `#${selectedAgentProfile.id}` : '—'}</strong><span>{selectedAgentProfile.profileType === 'platform-agent' ? 'Identity' : 'Agent ID'}</span></div>
-                <div><strong>{selectedAgentProfile.profileType === 'platform-agent' ? '—' : selectedAgentProfile.profileType === 'claimed-tag'
-                  ? selectedAgentProfile.profileLoading ? '…' : selectedAgentProfile.completedTaskCount ?? '—'
-                  : agentProfileLiveLoading ? '…' : agentProfileLiveData?.completedTaskCount ?? '—'}</strong><span>Tasks done</span></div>
+              <div
+                style={{
+                  width: '100%',
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
+                  alignItems: 'center',
+                  padding: '10px 6px',
+                  borderRadius: '14px',
+                  background: 'var(--bg-secondary, rgba(15, 23, 42, 0.04))',
+                  border: '1px solid var(--border-color, rgba(15, 23, 42, 0.07))',
+                  textAlign: 'center'
+                }}
+              >
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1px', borderRight: '1px solid var(--border-color, rgba(15, 23, 42, 0.08))' }}>
+                  <strong style={{ fontSize: '13.5px', fontWeight: 800 }}>
+                    {agentFollowState.loading ? '…' : agentFollowState.error ? '—' : agentFollowState.followerCount}
+                  </strong>
+                  <span style={{ fontSize: '10.5px', opacity: 0.6 }}>Followers</span>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1px', borderRight: '1px solid var(--border-color, rgba(15, 23, 42, 0.08))' }}>
+                  <strong style={{ fontSize: '13.5px', fontWeight: 800 }}>
+                    {selectedAgentProfile.profileType === 'platform-agent'
+                      ? (selectedAgentProfile.callableTools?.length || 0)
+                      : selectedAgentProfile.earnings || '—'}
+                  </strong>
+                  <span style={{ fontSize: '10.5px', opacity: 0.6 }}>{selectedAgentProfile.profileType === 'platform-agent' ? 'Tools' : 'Earned'}</span>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1px', borderRight: '1px solid var(--border-color, rgba(15, 23, 42, 0.08))' }}>
+                  <strong style={{ fontSize: '13.5px', fontWeight: 800 }}>
+                    {selectedAgentProfile.profileType === 'platform-agent'
+                      ? '—'
+                      : selectedAgentProfile.profileType === 'claimed-tag'
+                        ? (selectedAgentProfile.profileLoading ? '…' : selectedAgentProfile.completedTaskCount ?? 0)
+                        : (agentProfileLiveLoading ? '…' : agentProfileLiveData?.completedTaskCount ?? 0)}
+                  </strong>
+                  <span style={{ fontSize: '10.5px', opacity: 0.6 }}>Tasks done</span>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
+                  <strong style={{ fontSize: '13.5px', fontWeight: 800 }}>
+                    ${agentControlStatus?.spendingLimits?.dailyUsdt || '50'}/d
+                  </strong>
+                  <span style={{ fontSize: '10.5px', opacity: 0.6 }}>Daily cap</span>
+                </div>
               </div>
 
-              {selectedAgentProfile.profileType === 'platform-agent' ? (
-                <div className="agent-profile-detail-row agent-profile-platform-tools">
-                  <div className="agent-profile-category">{selectedAgentProfile.category || 'Platform agent'}</div>
-                </div>
-              ) : <div className="agent-profile-detail-row">
-                <div className="agent-profile-category">{IS_CONCORDIUM_SITE ? 'NairaTag Agent' : selectedAgentProfile.category || 'NairaTag'}</div>
-                <div className="agent-profile-owner">
-                  <span>Owner</span>
-                  <strong>{selectedAgentProfile.profileType === 'claimed-tag' && selectedAgentProfile.profileLoading
-                    ? 'Loading…'
-                    : (agentProfileLiveData?.details?.owner || selectedAgentProfile.owner)
-                      ? shorten(agentProfileLiveData?.details?.owner || selectedAgentProfile.owner)
-                      : 'Unavailable'}</strong>
-                  {(agentProfileLiveData?.details?.owner || selectedAgentProfile.owner) && (
+              {!IS_CONCORDIUM_SITE && (() => {
+                const walletAddr = agentControlStatus?.walletAddress || selectedAgentProfile.altana?.walletAddress || null;
+                const hasWallet = Boolean(agentControlStatus?.hasWallet ?? walletAddr);
+                const selfVerified = Boolean(agentControlStatus?.selfVerified ?? selectedAgentProfile.self?.verified);
+                const hasActiveSession = Boolean(agentControlStatus?.hasActiveSession ?? (selectedAgentProfile.altana?.sessionStatus === 'active'));
+                const canReceive = Boolean(agentControlStatus?.canReceive ?? hasWallet);
+                const canSendOrSwap = Boolean(agentControlStatus?.canSendOrSwap ?? (hasWallet && selfVerified && hasActiveSession));
+                const actions = agentControlStatus?.allowedActions || { send: false, swap: false, protocols: false };
+                const caps = [
+                  { key: 'receive', label: 'Receive', enabled: canReceive },
+                  { key: 'send', label: 'Send', enabled: canSendOrSwap && actions.send },
+                  { key: 'swap', label: 'Swap', enabled: canSendOrSwap && actions.swap },
+                ];
+                return (
+                  <div
+                    className="agent-wallet-permissions-card"
+                    title={`Altana Wallet: ${walletAddr || 'Pending'} | Self ID: ${selfVerified ? 'Verified' : 'Pending'} | Cap: $${agentControlStatus?.spendingLimits?.perTxUsd || '50'}/tx`}
+                    style={{
+                      width: '100%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: '6px',
+                      padding: '6px 10px',
+                      borderRadius: '999px',
+                      border: '1px solid var(--border-color, rgba(15, 23, 42, 0.08))',
+                      background: 'var(--bg-secondary, rgba(15, 23, 42, 0.025))',
+                      fontSize: '10.5px'
+                    }}
+                  >
+                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', fontWeight: 700, flexShrink: 0 }}>
+                      <img src="/altana-icon.svg" alt="" style={{ width: '13px', height: '13px', objectFit: 'contain' }} />
+                      <span>Altana</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                      {caps.map(({ key, label, enabled }) => (
+                        <span
+                          key={key}
+                          title={enabled ? `${label} enabled` : `${label} disabled`}
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '3px',
+                            padding: '2px 6px',
+                            borderRadius: '999px',
+                            background: enabled ? 'rgba(16, 185, 129, 0.12)' : 'rgba(148, 163, 184, 0.1)',
+                            color: enabled ? '#059669' : 'inherit',
+                            opacity: enabled ? 1 : 0.48,
+                            fontWeight: 600,
+                            fontSize: '10px'
+                          }}
+                        >
+                          {enabled && <Check size={10} strokeWidth={2.75} aria-hidden="true" />}
+                          <span>{label}</span>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {!IS_CONCORDIUM_SITE && (() => {
+                const isTagLoading = selectedAgentProfile.profileType === 'claimed-tag' && (!selectedAgentProfile.owner || selectedAgentProfile.profileLoading);
+                const ownerAddr = String(agentProfileLiveData?.details?.owner || selectedAgentProfile.owner || '').toLowerCase();
+                const isOwnAgent = Boolean(walletAddress && ownerAddr && ownerAddr === walletAddress.toLowerCase());
+                return (
+                  <div className="agent-profile-card-actions" style={{ display: 'flex', gap: '8px', width: '100%' }}>
                     <button
                       type="button"
-                      onClick={() => triggerCopy(`agent_owner_${selectedAgentProfile.id || selectedAgentProfile.tag}`, agentProfileLiveData?.details?.owner || selectedAgentProfile.owner)}
-                      aria-label="Copy owner address"
-                    ><Copy size={14} /></button>
-                  )}
-                </div>
-              </div>}
-
-              <ConcordiumAgentIdentityPanel
-                agent={selectedAgentProfile}
-                activeEvmAddress={walletAddress}
-                profileOwnerAddress={agentProfileLiveData?.details?.owner || selectedAgentProfile.owner}
-                evmProvider={getEthereumProvider(undefined, walletAddress)}
-              />
-
-              {!IS_CONCORDIUM_SITE && <div className="agent-profile-card-actions">
-                <button
-                  type="button"
-                  className="agent-profile-pay-button agent-profile-pay-full"
-                  disabled={selectedAgentProfile.profileType === 'claimed-tag' && (!selectedAgentProfile.owner || selectedAgentProfile.profileLoading)}
-                  onClick={() => handlePayAgentFromProfile(selectedAgentProfile)}
-                ><Send size={15} /> Pay ₦{selectedAgentProfile.tag.toUpperCase()}</button>
-              </div>}
+                      className="agent-profile-pay-button"
+                      style={{ flex: 1, borderRadius: '999px' }}
+                      disabled={isTagLoading}
+                      onClick={() => handlePayAgentFromProfile(selectedAgentProfile)}
+                    ><Send size={15} /> Pay ₦{selectedAgentProfile.tag.toUpperCase()}</button>
+                    <button
+                      type="button"
+                      className={`btn-agent-primary ${agentFollowState.following ? 'following' : ''}`}
+                      style={{
+                        flex: 1,
+                        borderRadius: '999px',
+                        justifyContent: 'center',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        ...(agentFollowState.following ? { background: 'rgba(15, 23, 42, 0.08)', color: 'inherit', border: '1px solid var(--border-color, rgba(15, 23, 42, 0.16))' } : {}),
+                      }}
+                      disabled={agentFollowState.loading || agentFollowState.updating || isOwnAgent}
+                      aria-pressed={agentFollowState.following}
+                      onClick={handleToggleAgentFollow}
+                    >
+                      {agentFollowState.loading
+                        ? '…'
+                        : agentFollowState.updating
+                          ? 'Saving…'
+                          : isOwnAgent
+                            ? 'Your agent'
+                            : agentFollowState.following
+                              ? 'Unfollow'
+                              : 'Follow'}
+                    </button>
+                  </div>
+                );
+              })()}
 
               {!IS_CONCORDIUM_SITE && selectedAgentProfile.identity?.verifiedOnchain && selectedAgentProfile.identity?.erc8004AgentId && (
                 <a
@@ -6821,16 +7455,16 @@ function ArcAppShell() {
           ─────────────────────────────────────────────────────────────────── */}
       {!IS_CONCORDIUM_SITE && activeVerificationDetailAgent && (
         <div className="agent-modal-backdrop" onClick={() => setActiveVerificationDetailAgent(null)}>
-          <div className="agent-modal-dialog" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '480px' }}>
+          <div className="agent-modal-dialog" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '380px' }}>
             <div className="agent-profile-content">
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'rgba(5, 150, 105, 0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <ShieldCheck size={18} color="#059669" />
+                  <div style={{ width: '30px', height: '30px', borderRadius: '8px', background: 'rgba(5, 150, 105, 0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <ShieldCheck size={16} color="#059669" />
                   </div>
                   <div>
-                    <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 700 }}>Self Agent ID Verification</h3>
-                    <span style={{ fontSize: '11px', color: '#64748b' }}>Celo Mainnet (Chain ID: 42220)</span>
+                    <h3 style={{ margin: 0, fontSize: '14.5px', fontWeight: 700 }}>₦{activeVerificationDetailAgent.tag.toUpperCase()}</h3>
+                    <span style={{ fontSize: '11px', color: 'var(--privy-color-foreground-2)' }}>Self Agent ID · Celo</span>
                   </div>
                 </div>
                 <button
@@ -6843,116 +7477,96 @@ function ArcAppShell() {
                 </button>
               </div>
 
-              {/* Status Banner */}
-              <div style={{ background: 'var(--surface-2, #f8fafc)', borderRadius: '12px', padding: '14px', border: '1px solid rgba(0,0,0,0.08)', marginBottom: '14px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                  <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary, #64748b)' }}>Verification Status</span>
+              <div style={{ background: 'var(--surface3, #f8fafc)', borderRadius: '12px', padding: '12px 14px', border: '1px solid var(--border, rgba(0,0,0,0.08))', marginBottom: 0, display: 'flex', flexDirection: 'column', gap: '9px', fontSize: '12px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ color: 'var(--privy-color-foreground-2)' }}>Status</span>
                   <SelfAgentIdBadge
                     size="sm"
                     isVerified={activeVerificationDetailAgent.self?.verified !== false && activeVerificationDetailAgent.status !== 'unverified'}
                   />
                 </div>
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '12px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: '#64748b' }}>Agent Tag:</span>
-                    <strong style={{ fontFamily: 'monospace' }}>₦{activeVerificationDetailAgent.tag.toUpperCase()}</strong>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: '#64748b' }}>Self Agent ID:</span>
-                    <strong style={{ fontFamily: 'monospace' }}>#{activeVerificationDetailAgent.self?.agentId || '1'}</strong>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: '#64748b' }}>Linked Agent Key:</span>
-                    <strong style={{ fontFamily: 'monospace' }}>{shorten(activeVerificationDetailAgent.owner || '0x653f773C9062e71A6554b42a9525fcD47fCC1693')}</strong>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: '#64748b' }}>Proof Freshness:</span>
-                    <span style={{ color: '#059669', fontWeight: 600 }}>Active (Fresh on Celo Mainnet)</span>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: '#64748b' }}>Registry Contract:</span>
-                    <a
-                      href="https://celoscan.io/address/0xaC3DF9ABf80d0F5c020C06B04Cced27763355944"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      style={{ color: '#059669', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px', fontFamily: 'monospace' }}
-                    >
-                      <span>0xaC3D...5944</span>
-                      <ExternalLink size={11} />
-                    </a>
-                  </div>
-                  {String(activeVerificationDetailAgent.owner || '').toLowerCase() === String(walletAddress || '').toLowerCase() && activeVerificationDetailAgent.altana?.sessionStatus !== 'revoked' && (
-                    <div style={{ marginTop: '8px', paddingTop: '8px', borderTop: '1px dashed rgba(0,0,0,0.08)' }}>
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          if (!confirm(`Revoke autonomous session for ₦${activeVerificationDetailAgent.tag.toUpperCase()}?`)) return;
-                          await revokeAgentSession({ tag: activeVerificationDetailAgent.tag, reason: 'Owner manual revocation' });
-                          setActiveVerificationDetailAgent((prev) => ({
-                            ...prev,
-                            altana: { ...(prev.altana || {}), sessionStatus: 'revoked' },
-                          }));
-                          showToast('Autonomous session revoked.', 'info', 2500);
-                        }}
-                        style={{
-                          width: '100%',
-                          padding: '6px 10px',
-                          borderRadius: '6px',
-                          border: '1px solid #fecaca',
-                          background: '#fff1f2',
-                          color: '#b91c1c',
-                          fontSize: '11px',
-                          fontWeight: 600,
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: '4px',
-                        }}
-                      >
-                        <AlertTriangle size={12} />
-                        <span>Revoke Altana Session Key</span>
-                      </button>
-                    </div>
-                  )}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ color: 'var(--privy-color-foreground-2)' }}>Self ID</span>
+                  <strong style={{ fontFamily: 'monospace' }}>#{activeVerificationDetailAgent.self?.agentId || '1'}</strong>
                 </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ color: 'var(--privy-color-foreground-2)' }}>Agent Key</span>
+                  <strong style={{ fontFamily: 'monospace' }}>{shorten(activeVerificationDetailAgent.owner || '0x653f773C9062e71A6554b42a9525fcD47fCC1693')}</strong>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ color: 'var(--privy-color-foreground-2)' }}>Registry</span>
+                  <a
+                    href="https://celoscan.io/address/0xaC3DF9ABf80d0F5c020C06B04Cced27763355944"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ color: '#059669', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px', fontFamily: 'monospace', fontWeight: 600 }}
+                  >
+                    <span>0xaC3D...5944</span>
+                    <ExternalLink size={11} />
+                  </a>
+                </div>
+                {String(activeVerificationDetailAgent.owner || '').toLowerCase() === String(walletAddress || '').toLowerCase() && activeVerificationDetailAgent.altana?.sessionStatus !== 'revoked' && (
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (!confirm(`Revoke autonomous session for ₦${activeVerificationDetailAgent.tag.toUpperCase()}?`)) return;
+                      await revokeAgentSession({ tag: activeVerificationDetailAgent.tag, reason: 'Owner manual revocation' });
+                      setActiveVerificationDetailAgent((prev) => ({
+                        ...prev,
+                        altana: { ...(prev.altana || {}), sessionStatus: 'revoked' },
+                      }));
+                      showToast('Autonomous session revoked.', 'info', 2500);
+                    }}
+                    style={{
+                      marginTop: '4px',
+                      width: '100%',
+                      padding: '6px 10px',
+                      borderRadius: '6px',
+                      border: '1px solid #fecaca',
+                      background: '#fff1f2',
+                      color: '#b91c1c',
+                      fontSize: '11px',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '4px',
+                    }}
+                  >
+                    <AlertTriangle size={12} />
+                    <span>Revoke Altana Session Key</span>
+                  </button>
+                )}
               </div>
-
-              {/* Zero-Knowledge Privacy Guarantee */}
-              <div style={{ background: 'rgba(99, 102, 241, 0.05)', borderRadius: '10px', padding: '12px', border: '1px solid rgba(99, 102, 241, 0.15)', fontSize: '12px', color: '#4338ca', lineHeight: 1.45, marginBottom: '14px' }}>
-                <strong>Zero-Knowledge Privacy Guarantee:</strong>
-                <p style={{ margin: '4px 0 0 0' }}>
-                  Self verifies that a real, unique human holds the cryptographic key behind this agent using NFC passport zero-knowledge proofs. No passport photos, numbers, or private identity documents are ever revealed or stored.
-                </p>
-              </div>
-
-              {/* Action Button: Test Self-Gated Capability */}
-              <button
-                type="button"
-                onClick={() => {
-                  setActiveVerificationDetailAgent(null);
-                  setIsSelfDemoModalOpen(true);
-                }}
-                style={{
-                  width: '100%',
-                  padding: '10px 14px',
-                  borderRadius: '10px',
-                  background: 'linear-gradient(135deg, #059669 0%, #047857 100%)',
-                  color: '#ffffff',
-                  border: 'none',
-                  fontWeight: 700,
-                  fontSize: '13px',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '8px',
-                }}
-              >
-                <Sparkles size={15} />
-                <span>Launch Self-Gated Payment Demo</span>
-              </button>
+              {!(activeVerificationDetailAgent.self?.verified !== false && activeVerificationDetailAgent.status !== 'unverified') && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveVerificationDetailAgent(null);
+                    setIsSelfDemoModalOpen(true);
+                  }}
+                  style={{
+                    marginTop: '12px',
+                    width: '100%',
+                    padding: '9px 14px',
+                    borderRadius: '10px',
+                    background: 'linear-gradient(135deg, #059669 0%, #047857 100%)',
+                    color: '#ffffff',
+                    border: 'none',
+                    fontWeight: 700,
+                    fontSize: '12.5px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                  }}
+                >
+                  <ShieldCheck size={14} />
+                  <span>Verify with Self App</span>
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -6981,6 +7595,8 @@ function ArcAppShell() {
             <SelfAgentVerificationCard
               walletAddress={walletAddress}
               onConnectWallet={openAuthModal}
+              initialAgentTag={myTag?.tag ? `₦${myTag.tag.replace(/^₦/, '')}` : undefined}
+              initialAgentAddress={walletAddress || undefined}
             />
           </div>
         </div>
@@ -7023,59 +7639,50 @@ function ArcAppShell() {
               </div>
             ) : (
               <form onSubmit={handleCreateTask} style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '10px' }}>
-                <div>
-                  <label style={{ fontSize: '11px', fontWeight: 700, color: 'var(--privy-color-foreground-2)', textTransform: 'uppercase' }}>
-                    Bounty Title
-                  </label>
-                  <input
-                    type="text"
+                <input
+                  type="text"
+                  aria-label="Bounty Title"
+                  className="token-amount-field"
+                  style={{ width: '100%', fontSize: '13px', padding: '9px 10px' }}
+                  placeholder="Bounty Title (e.g. Build Webhook Listener for Celo)"
+                  value={postTaskForm.title}
+                  onChange={(e) => setPostTaskForm((prev) => ({ ...prev, title: e.target.value }))}
+                  required
+                />
+
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
+                  <select
+                    aria-label="Category"
                     className="token-amount-field"
-                    style={{ width: '100%', fontSize: '13px', padding: '8px 10px', marginTop: '4px' }}
-                    placeholder="e.g. Build Webhook Listener for Celo Mainnet"
-                    value={postTaskForm.title}
-                    onChange={(e) => setPostTaskForm((prev) => ({ ...prev, title: e.target.value }))}
-                    required
-                  />
-                </div>
+                    style={{ flex: 1, fontSize: '12px', padding: '9px 8px', cursor: 'pointer' }}
+                    value={postTaskForm.category}
+                    onChange={(e) => setPostTaskForm((prev) => ({ ...prev, category: e.target.value }))}
+                  >
+                    <option value="dev">⚡ Engineering</option>
+                    <option value="design">🎨 Design</option>
+                    <option value="data">📊 Data & AI</option>
+                    <option value="content">✍️ Content</option>
+                    <option value="test">🧪 Testing</option>
+                  </select>
 
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  <div style={{ flex: 1 }}>
-                    <label style={{ fontSize: '11px', fontWeight: 700, color: 'var(--privy-color-foreground-2)', textTransform: 'uppercase' }}>
-                      Category
-                    </label>
-                    <select
-                      className="token-amount-field"
-                      style={{ width: '100%', fontSize: '12px', padding: '8px', marginTop: '4px', cursor: 'pointer' }}
-                      value={postTaskForm.category}
-                      onChange={(e) => setPostTaskForm((prev) => ({ ...prev, category: e.target.value }))}
-                    >
-                      <option value="dev">⚡ Engineering</option>
-                      <option value="design">🎨 Design</option>
-                      <option value="data">📊 Data & AI</option>
-                      <option value="content">✍️ Content</option>
-                      <option value="test">🧪 Testing</option>
-                    </select>
-                  </div>
-
-                  <div style={{ flex: 1 }}>
-                    <label style={{ fontSize: '11px', fontWeight: 700, color: 'var(--privy-color-foreground-2)', textTransform: 'uppercase' }}>
-                      Reward Asset & Amount
-                    </label>
-                    <div style={{ display: 'flex', gap: '6px', marginTop: '4px' }}>
+                  <div style={{ flex: 1.2 }}>
+                    <div style={{ display: 'flex', gap: '6px' }}>
                       <input
                         type="number"
                         step="any"
                         min="0.000001"
+                        aria-label="Reward Amount"
                         className="token-amount-field"
-                        style={{ flex: 1, fontSize: '13px', padding: '8px 10px' }}
-                        placeholder="0.0001"
+                        style={{ flex: 1, fontSize: '13px', padding: '9px 10px' }}
+                        placeholder="Reward amount"
                         value={postTaskForm.reward}
                         onChange={(e) => setPostTaskForm((prev) => ({ ...prev, reward: e.target.value }))}
                         required
                       />
                       <select
+                        aria-label="Reward Token"
                         className="token-amount-field"
-                        style={{ width: '92px', fontSize: '12px', padding: '8px 4px', cursor: 'pointer', fontWeight: 700 }}
+                        style={{ width: '88px', fontSize: '12px', padding: '9px 4px', cursor: 'pointer', fontWeight: 700 }}
                         value={postTaskForm.rewardToken || 'USDT'}
                         onChange={(e) => setPostTaskForm((prev) => ({ ...prev, rewardToken: e.target.value }))}
                       >
@@ -7098,21 +7705,71 @@ function ArcAppShell() {
                 </div>
 
                 <div>
-                  <label style={{ fontSize: '11px', fontWeight: 700, color: 'var(--privy-color-foreground-2)', textTransform: 'uppercase' }}>
-                    Description & Deliverables
-                  </label>
-                  <textarea
-                    className="token-amount-field"
-                    rows={3}
-                    style={{ width: '100%', fontSize: '12px', padding: '8px 10px', marginTop: '4px', resize: 'vertical' }}
-                    placeholder="Describe task scope, requirements, and deliverable format..."
-                    value={postTaskForm.description}
-                    onChange={(e) => setPostTaskForm((prev) => ({ ...prev, description: e.target.value }))}
-                  />
+                  <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                    <input
+                      type="url"
+                      aria-label="Task Banner URL"
+                      className="token-amount-field"
+                      style={{ flex: 1, fontSize: '12px', padding: '8px 10px' }}
+                      placeholder="Task Banner URL (optional) or upload"
+                      value={postTaskForm.bannerUrl || ''}
+                      onChange={(e) => setPostTaskForm((prev) => ({ ...prev, bannerUrl: e.target.value }))}
+                    />
+                    <label
+                      style={{
+                        padding: '8px 10px',
+                        borderRadius: '8px',
+                        border: '1px solid var(--privy-color-border-subtle)',
+                        background: 'var(--privy-color-background-surface)',
+                        fontSize: '11px',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        whiteSpace: 'nowrap'
+                      }}
+                    >
+                      Upload
+                      <input
+                        type="file"
+                        accept="image/*"
+                        style={{ display: 'none' }}
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          const reader = new FileReader();
+                          reader.onload = () => {
+                            if (typeof reader.result === 'string') {
+                              setPostTaskForm((prev) => ({ ...prev, bannerUrl: reader.result }));
+                            }
+                          };
+                          reader.readAsDataURL(file);
+                        }}
+                      />
+                    </label>
+                  </div>
+                  {postTaskForm.bannerUrl && (
+                    <div style={{ marginTop: '6px', height: '56px', borderRadius: '8px', overflow: 'hidden', border: '1px solid var(--privy-color-border-subtle)' }}>
+                      <img src={postTaskForm.bannerUrl} alt="Task banner preview" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                    </div>
+                  )}
                 </div>
 
-                <div style={{ padding: '8px 10px', background: 'rgba(0, 82, 255, 0.06)', borderRadius: '6px', border: '1px solid rgba(0, 82, 255, 0.15)', fontSize: '11px', color: 'var(--privy-color-interactive)' }}>
-                  🔒 <strong>Smart Escrow:</strong> Funds are locked until milestone verification.
+                <textarea
+                  aria-label="Description & Deliverables"
+                  className="token-amount-field"
+                  rows={3}
+                  style={{ width: '100%', fontSize: '12px', padding: '9px 10px', resize: 'vertical' }}
+                  placeholder="Description & Deliverables (scope, requirements, format)..."
+                  value={postTaskForm.description}
+                  onChange={(e) => setPostTaskForm((prev) => ({ ...prev, description: e.target.value }))}
+                />
+
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap', padding: '6px 9px', borderRadius: '8px', background: 'rgba(15, 23, 42, 0.04)', border: '1px solid rgba(15, 23, 42, 0.08)', fontSize: '10.5px' }}>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#059669', fontWeight: 600 }}>
+                    <SelfIcon size={12} /> Self ID required to apply
+                  </span>
+                  <span style={{ color: 'var(--privy-color-interactive)', fontWeight: 600 }}>
+                    🔒 Smart Escrow locked
+                  </span>
                 </div>
 
                 <button type="submit" className="btn-action-primary" style={{ marginTop: '4px' }}>

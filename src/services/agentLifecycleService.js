@@ -103,7 +103,7 @@ export async function createAgentDraft({
     name: String(name || canonicalTag),
     description: String(description || ''),
     category: String(category || 'general'),
-    avatar: avatar || `https://api.dicebear.com/7.x/identicon/svg?seed=${encodeURIComponent(cleanTag)}`,
+    avatar: avatar || `https://api.dicebear.com/11.x/adventurer-neutral/svg?seed=${encodeURIComponent(cleanTag)}`,
     ownerAddress: cleanOwner,
     status: LIFECYCLE_STATUS.VERIFICATION_REQUIRED,
     chainId: ALTANA_CELO_CHAIN_ID,
@@ -204,13 +204,19 @@ export async function provisionAltanaWallet({
   tag,
   adminSigner = null,
   targetWalletAddress = null,
+  requireSelfVerification = true,
 }) {
   const cleanTag = String(tag).trim().replace(/^[₦$@#]/, '').toLowerCase();
   const agent = await getAgentRecord(cleanTag);
   if (!agent) throw new Error(`Agent '${cleanTag}' not found.`);
 
-  // Self verification prerequisite check
-  if (!agent.self.verified) {
+  // Idempotency: return existing active wallet if already provisioned
+  if (agent.altana?.walletAddress && !targetWalletAddress) {
+    return agent;
+  }
+
+  // Self verification prerequisite check (optional during automatic claim-time provisioning)
+  if (requireSelfVerification && !agent.self.verified) {
     throw new Error(`Cannot provision Altana wallet: Agent '${cleanTag}' has not completed Self Agent ID human verification.`);
   }
 
@@ -231,8 +237,116 @@ export async function provisionAltanaWallet({
   }
 
   agent.altana.walletAddress = getAddress(walletAddress.toLowerCase());
-  agent.status = LIFECYCLE_STATUS.SESSION_AUTHORIZATION_REQUIRED;
+  agent.altana.provisioningStatus = 'active';
+  agent.altana.provisionedAt = agent.altana.provisionedAt || Date.now();
+  agent.status = agent.self.verified
+    ? LIFECYCLE_STATUS.SESSION_AUTHORIZATION_REQUIRED
+    : LIFECYCLE_STATUS.VERIFICATION_REQUIRED;
   return await saveAgentRecord(cleanTag, agent);
+}
+
+/**
+ * Unified Claim-to-Wallet Flow:
+ * 1. Creates/loads the NairaTag agent identity idempotently.
+ * 2. Automatically provisions its non-custodial Altana smart wallet (without blocking on Self ID).
+ * 3. Returns wallet + next-step prompts (Self ID verification & Session Key authorization).
+ */
+export async function claimAndProvisionAgent({
+  tag,
+  ownerAddress,
+  name,
+  description = '',
+  category = 'Personal',
+  adminSigner = null,
+}) {
+  const cleanTag = String(tag || '').trim().replace(/^[₦$@#]/, '').toLowerCase();
+  if (!cleanTag) throw new Error('Agent tag is required.');
+
+  let existing = await getAgentRecord(cleanTag);
+  if (!existing) {
+    existing = await createAgentDraft({
+      tag: cleanTag,
+      name: name || `₦${cleanTag.toUpperCase()}`,
+      description,
+      ownerAddress,
+      category,
+    });
+  }
+
+  const provisioned = await provisionAltanaWallet({
+    tag: cleanTag,
+    adminSigner,
+    requireSelfVerification: false,
+  });
+
+  return {
+    agent: provisioned,
+    walletAddress: provisioned.altana.walletAddress,
+    provisioningStatus: provisioned.altana.provisioningStatus || 'active',
+    needsSelfVerification: !provisioned.self?.verified,
+    needsSessionKey: provisioned.altana?.sessionStatus !== 'active',
+  };
+}
+
+/**
+ * Single source of truth for Dashboard Wallet & Permissions + Conversational Chat.
+ */
+export async function getAgentControlStatus(tagOrAddress) {
+  if (!tagOrAddress) return null;
+  const raw = String(tagOrAddress).trim();
+  const cleanTag = raw.replace(/^[₦$@#]/, '').toLowerCase();
+  let agent = await getAgentRecord(cleanTag);
+
+  if (!agent && isAddress(raw)) {
+    const all = await listAllAgentLifecycleRecords();
+    const norm = raw.toLowerCase();
+    agent = all.find(
+      (a) => a.ownerAddress?.toLowerCase() === norm || a.altana?.walletAddress?.toLowerCase() === norm
+    ) || null;
+  }
+
+  if (!agent) return null;
+
+  const nowSec = Math.floor(Date.now() / 1000);
+  const expiry = agent.altana?.sessionExpiry ? Number(agent.altana.sessionExpiry) : null;
+  const isExpired = Boolean(expiry && expiry <= nowSec);
+  const rawSessionStatus = agent.altana?.sessionStatus || 'none';
+  const sessionStatus = rawSessionStatus === 'active' && isExpired ? 'expired' : rawSessionStatus;
+  const hasActiveSession = sessionStatus === 'active' && Boolean(agent.altana?.activeSessionId);
+
+  const limits = Array.isArray(agent.altana?.spendLimits) ? agent.altana.spendLimits : [];
+  const usdtLimit = limits.find((l) => l.token === 'USDT')?.amount || DEFAULT_DAILY_LIMITS.USDT;
+  const cngnLimit = limits.find((l) => l.token === 'cNGN')?.amount || DEFAULT_DAILY_LIMITS.CNGN;
+  const celoLimit = limits.find((l) => l.token === 'CELO')?.amount || DEFAULT_DAILY_LIMITS.CELO;
+
+  return {
+    tag: agent.tag,
+    canonicalTag: agent.canonicalTag,
+    ownerAddress: agent.ownerAddress,
+    hasWallet: Boolean(agent.altana?.walletAddress),
+    walletAddress: agent.altana?.walletAddress || null,
+    provisioningStatus: agent.altana?.walletAddress ? (agent.altana.provisioningStatus || 'active') : 'unprovisioned',
+    keystoreAddress: ALTANA_CELO_KEYSTORE,
+    selfVerified: Boolean(agent.self?.verified),
+    selfStatus: agent.self?.status || VERIFICATION_STATUS.UNVERIFIED,
+    hasActiveSession,
+    sessionStatus,
+    sessionExpiry: expiry,
+    spendingLimits: {
+      perTxUsd: agent.altana?.perTxUsd || '50',
+      dailyUsdt: usdtLimit,
+      dailyCngn: cngnLimit,
+      dailyCelo: celoLimit,
+    },
+    allowedActions: {
+      send: hasActiveSession && (agent.altana?.allowedActions?.send ?? true),
+      swap: hasActiveSession && (agent.altana?.allowedActions?.swap ?? true),
+      protocols: hasActiveSession && (agent.altana?.allowedActions?.protocols ?? true),
+      unlimited: false,
+    },
+    canSendOrSwap: Boolean(agent.altana?.walletAddress && agent.self?.verified && hasActiveSession),
+    canReceive: Boolean(agent.altana?.walletAddress),
+  };
 }
 
 /**
@@ -245,6 +359,8 @@ export async function grantAgentSessionPolicy({
   dailyCngnLimit = DEFAULT_DAILY_LIMITS.CNGN,
   dailyUsdtLimit = DEFAULT_DAILY_LIMITS.USDT,
   dailyCeloLimit = DEFAULT_DAILY_LIMITS.CELO,
+  perTxUsd = '50',
+  allowedActions = { send: true, swap: true, protocols: true },
 }) {
   const cleanTag = String(tag).trim().replace(/^[₦$@#]/, '').toLowerCase();
   const agent = await getAgentRecord(cleanTag);
@@ -266,6 +382,13 @@ export async function grantAgentSessionPolicy({
   agent.altana.activeSessionId = sessionId;
   agent.altana.sessionStatus = 'active';
   agent.altana.sessionExpiry = policy.expiry;
+  agent.altana.perTxUsd = String(perTxUsd || '50');
+  agent.altana.allowedActions = {
+    send: Boolean(allowedActions?.send ?? true),
+    swap: Boolean(allowedActions?.swap ?? true),
+    protocols: Boolean(allowedActions?.protocols ?? true),
+    unlimited: false,
+  };
   agent.altana.spendLimits = [
     { token: 'cNGN', amount: dailyCngnLimit, period: 'day' },
     { token: 'USDT', amount: dailyUsdtLimit, period: 'day' },

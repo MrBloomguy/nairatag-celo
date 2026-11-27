@@ -13,6 +13,8 @@ import {
   grantAgentSessionPolicy,
   linkERC8004Identity,
   revokeAgentSession,
+  claimAndProvisionAgent,
+  getAgentControlStatus,
   checkAgentExecutionPermission,
   seedDefaultAgents,
   getAgentLifecycleRecord,
@@ -439,4 +441,78 @@ test('20. Full End-to-End Orchestration: Tag Claim -> Self Proof -> Altana Walle
   assert.equal(confirmed.status, 'confirmed');
   assert.ok(confirmed.paymentTxHash);
   assert.ok(confirmed.settledAt);
+});
+
+test('20. Unified Altana Journey: Claim Provisions Wallet Immediately, Self ID + Session Unlocks Send/Swap, Revoke Blocks', async () => {
+  const tag = 'altanajourney';
+  const ownerAddress = '0x8888888888888888888888888888888888888888';
+
+  // Step 1: Claiming a tag automatically provisions an Altana wallet before Self ID
+  const claimed = await claimAndProvisionAgent({
+    tag,
+    ownerAddress,
+    name: '₦ALTANAJOURNEY',
+    description: 'End-to-end Altana + Self ID + Pay test agent',
+  });
+  assert.ok(claimed.walletAddress);
+  assert.equal(claimed.agent.self.verified, false);
+
+  const afterClaim = await getAgentControlStatus(tag);
+  assert.equal(afterClaim.hasWallet, true);
+  assert.equal(afterClaim.canReceive, true);
+  assert.equal(afterClaim.selfVerified, false);
+  assert.equal(afterClaim.hasActiveSession, false);
+  assert.equal(afterClaim.canSendOrSwap, false);
+
+  // Step 2: Owner completes Self ID verification
+  await submitSelfVerification({
+    tag,
+    skipOnChainCheck: true,
+    proofData: {
+      nullifierHash: `0xaltana_nullifier_${Date.now()}`,
+    },
+  });
+  const afterSelf = await getAgentControlStatus(tag);
+  assert.equal(afterSelf.selfVerified, true);
+  assert.equal(afterSelf.hasActiveSession, false);
+  assert.equal(afterSelf.canSendOrSwap, false);
+
+  // Step 3: Owner grants scoped Altana session key
+  await grantAgentSessionPolicy({ tag, sessionDurationSeconds: 3600 });
+  const afterGrant = await getAgentControlStatus(tag);
+  assert.equal(afterGrant.hasActiveSession, true);
+  assert.equal(afterGrant.canSendOrSwap, true);
+
+  const permitted = await checkAgentExecutionPermission({ tag, requestedAmount: 10, token: 'USDT' });
+  assert.equal(permitted.allowed, true);
+
+  // Step 4: Owner revokes session key -> autonomous execution is blocked
+  await revokeAgentSession({ tag, reason: 'Owner revoked in test' });
+  const afterRevoke = await getAgentControlStatus(tag);
+  assert.equal(afterRevoke.sessionStatus, 'revoked');
+  assert.equal(afterRevoke.hasActiveSession, false);
+  assert.equal(afterRevoke.canSendOrSwap, false);
+  assert.equal(afterRevoke.canReceive, true);
+
+  const blocked = await checkAgentExecutionPermission({ tag, requestedAmount: 10, token: 'USDT' });
+  assert.equal(blocked.allowed, false);
+});
+
+test('21. Chat Engine: Conversational Wallet & Permissions Uses Shared Control Status', async () => {
+  const { processNairaTagChatMessage } = await import('../src/services/nairatagChatEngine.js');
+
+  const statusReply = await processNairaTagChatMessage({
+    prompt: 'What permissions does @bloom have?',
+    walletAddress: '0x7c264210D5C992b8ea3224eb6B39F477a493AF26',
+  });
+  assert.equal(statusReply.widget?.type, 'altana_wallet');
+  assert.match(statusReply.reply, /Session Key Status/i);
+  assert.match(statusReply.reply, /Receive Capability/i);
+
+  const revokeReply = await processNairaTagChatMessage({
+    prompt: 'Revoke @bloom access',
+    walletAddress: '0x7c264210D5C992b8ea3224eb6B39F477a493AF26',
+  });
+  assert.equal(revokeReply.widget?.type, 'altana_wallet');
+  assert.match(revokeReply.reply, /Only the verified human owner can revoke/i);
 });

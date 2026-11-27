@@ -127,24 +127,45 @@ function InAppNotificationCard({ item, onDismiss, onAction }) {
  * MAIN NOTIFICATION LAYER (IN-APP STACK + PUSH PERMISSION PROMPT)
  * ─────────────────────────────────────────────────────────────────────────────
  */
+const PUSH_BANNER_STORAGE_KEY = 'nairatag_push_banner_shown_v1';
 let pushBannerDismissed = false;
 const shownRewardNudges = new Set();
+
+function hasPushBannerBeenShown() {
+  if (pushBannerDismissed) return true;
+  try {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      return window.localStorage.getItem(PUSH_BANNER_STORAGE_KEY) === '1';
+    }
+  } catch {}
+  return false;
+}
+
+function markPushBannerShown() {
+  pushBannerDismissed = true;
+  try {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      window.localStorage.setItem(PUSH_BANNER_STORAGE_KEY, '1');
+    }
+  } catch {}
+}
 
 export default function NotificationLayer({ onNavigateTab, onOpenRewards, accountKey = '', userTag = '', hasBlockingModal = false }) {
   const [notifications, setNotifications] = useState([]);
   const [showPushBanner, setShowPushBanner] = useState(false);
   const [isSubscribing, setIsSubscribing] = useState(false);
 
-  // Check if push permission banner should be shown
+  // Show the push permission prompt once per browser, then persist so it never nags on refresh
   useEffect(() => {
     if (!isPushSupported()) return;
 
-    const isDismissed = pushBannerDismissed;
+    const isDismissed = hasPushBannerBeenShown();
     const isSubscribed = getNotificationPermission() === 'granted';
     const permission = getNotificationPermission();
 
     if (permission === 'default' && !isDismissed && !isSubscribed) {
       const timer = setTimeout(() => {
+        markPushBannerShown();
         setShowPushBanner(true);
       }, 2500);
       return () => clearTimeout(timer);
@@ -257,6 +278,7 @@ export default function NotificationLayer({ onNavigateTab, onOpenRewards, accoun
     setIsSubscribing(false);
 
     if (res.success) {
+      markPushBannerShown();
       setShowPushBanner(false);
       sendNotificationAlert({
         title: '🔔 Browser alerts enabled',
@@ -266,15 +288,15 @@ export default function NotificationLayer({ onNavigateTab, onOpenRewards, accoun
         url: '/#rewards',
       });
     } else if (res.reason === 'denied') {
+      markPushBannerShown();
       setShowPushBanner(false);
-      pushBannerDismissed = true;
     }
   };
 
   const handleDismissBanner = () => {
     playMicroSound('pop');
+    markPushBannerShown();
     setShowPushBanner(false);
-    pushBannerDismissed = true;
   };
 
   return (

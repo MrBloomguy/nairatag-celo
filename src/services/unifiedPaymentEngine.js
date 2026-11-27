@@ -505,7 +505,9 @@ export async function executeDirectSend({
       // Step 2: Transfer Resulting cNGN / target token to verified recipient
       onStatusUpdate({ step: 'payout', message: `Step 2/2: Settling ${deliveryAmount} ${preparedSend.targetToken} to ${preparedSend.recipientTag || preparedSend.recipientAddress}...` });
 
-      const parsedUnits = parseUnits(deliveryAmount, preparedSend.targetTokenDecimals);
+      const parsedUnits = firmQuoteRecord.buyAmountRaw
+        ? BigInt(firmQuoteRecord.buyAmountRaw)
+        : parseUnits(deliveryAmount, preparedSend.targetTokenDecimals);
       const provider = getEthereumProvider(null, senderAddr);
       const { createWalletClient, custom } = await import('viem');
       const walletClient = createWalletClient({

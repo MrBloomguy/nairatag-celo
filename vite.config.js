@@ -2,6 +2,7 @@ import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'node:path';
 import circleHandler from './api/circle.js';
+import agentIdentitiesHandler from './api/agent-identities.js';
 
 const circleApiPlugin = {
   name: 'circle-api-dev',
@@ -16,6 +17,32 @@ const circleApiPlugin = {
 function mountCircleHandler(server) {
   server.middlewares.use('/api/circle', (req, res, next) => {
     Promise.resolve(circleHandler(req, res)).catch(next);
+  });
+  server.middlewares.use('/api/agent-identities', (req, res, next) => {
+    const url = new URL(req.url || '/', 'http://localhost');
+    req.query = Object.fromEntries(url.searchParams.entries());
+    if (typeof res.status !== 'function') {
+      res.status = (code) => { res.statusCode = code; return res; };
+    }
+    if (typeof res.json !== 'function') {
+      res.json = (data) => {
+        if (!res.headersSent) res.setHeader('Content-Type', 'application/json');
+        res.end(JSON.stringify(data));
+        return res;
+      };
+    }
+    const chunks = [];
+    req.on('data', (chunk) => chunks.push(chunk));
+    req.on('end', () => {
+      if (chunks.length > 0) {
+        try {
+          req.body = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+        } catch {
+          req.body = Buffer.concat(chunks).toString('utf8');
+        }
+      }
+      Promise.resolve(agentIdentitiesHandler(req, res)).catch(next);
+    });
   });
 }
 

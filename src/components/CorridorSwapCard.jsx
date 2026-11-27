@@ -45,6 +45,8 @@ import {
   CELO_CUSD_ADDRESS,
 } from '../config/celo.js';
 import { getEthereumProvider } from '../services/celoPayment.js';
+import { checkSelfHumanGate, enforceSharedHumanRewardQuota } from '../services/selfAgentIdService.js';
+import { getAgentControlStatus } from '../services/agentLifecycleService.js';
 import './swap/SwapWidget.css';
 
 // ── High-Fidelity Official Token Icons ──
@@ -166,10 +168,30 @@ const SUPPORTED_TOKENS = [
 export default function CorridorSwapCard({
   walletAddress,
   onConnectWallet,
+  onOpenSelfVerification,
   embedded = false,
   paySubMode = 'corridor',
   onSelectSubMode,
 }) {
+  const [selfGate, setSelfGate] = useState({ checking: false, allowed: true, reason: null, agentId: null });
+  const [altanaGate, setAltanaGate] = useState({ hasWallet: false, hasActiveSession: true, sessionStatus: 'unprovisioned' });
+
+  useEffect(() => {
+    let active = true;
+    if (!walletAddress) {
+      setSelfGate({ checking: false, allowed: false, reason: 'Connect wallet first.', agentId: null });
+      setAltanaGate({ hasWallet: false, hasActiveSession: false, sessionStatus: 'unprovisioned' });
+      return () => { active = false; };
+    }
+    setSelfGate((prev) => ({ ...prev, checking: true }));
+    getAgentControlStatus(walletAddress)
+      .then((c) => { if (active && c) setAltanaGate(c); })
+      .catch(() => {});
+    checkSelfHumanGate({ agentAddress: walletAddress })
+      .then((res) => { if (active) setSelfGate({ checking: false, ...res }); })
+      .catch(() => { if (active) setSelfGate({ checking: false, allowed: false, reason: 'Self Agent ID check failed.', agentId: null }); });
+    return () => { active = false; };
+  }, [walletAddress]);
   // Primary direction: 'USDT_TO_CNGN' | 'CNGN_TO_USDT'
   const [direction, setDirection] = useState('USDT_TO_CNGN');
   const [amountIn, setAmountIn] = useState('');
@@ -313,6 +335,31 @@ export default function CorridorSwapCard({
   const handleRequestFirmQuote = async () => {
     if (!walletAddress) {
       if (onConnectWallet) onConnectWallet();
+      return;
+    }
+
+    if (!selfGate.allowed) {
+      setError(selfGate.reason || 'Self Agent ID verification is required to swap.');
+      return;
+    }
+
+    if (altanaGate.hasWallet && !altanaGate.hasActiveSession) {
+      setError(
+        altanaGate.sessionStatus === 'revoked'
+          ? 'Altana agent session key was revoked by the owner. Re-authorize in Wallet & Permissions to swap.'
+          : 'Altana agent session key is not authorized. Grant a scoped session key in Wallet & Permissions to swap.'
+      );
+      return;
+    }
+
+    const quota = enforceSharedHumanRewardQuota({
+      agentAddress: walletAddress,
+      nullifier: selfGate.nullifier,
+      action: 'send_swap',
+      dailyLimit: 20,
+    });
+    if (!quota.allowed) {
+      setError(quota.reason);
       return;
     }
 
@@ -884,6 +931,16 @@ export default function CorridorSwapCard({
           onClick={onConnectWallet}
         >
           <span>Connect Wallet</span>
+        </button>
+      ) : !selfGate.checking && !selfGate.allowed ? (
+        <button
+          type="button"
+          className="swap-primary-action-btn"
+          onClick={() => (onOpenSelfVerification ? onOpenSelfVerification() : setError(selfGate.reason))}
+          style={{ background: 'linear-gradient(135deg, #059669 0%, #047857 100%)', color: '#ffffff' }}
+        >
+          <ShieldCheck size={17} />
+          <span>Verify Self Agent ID to Swap</span>
         </button>
       ) : !amountIn || Number(amountIn) <= 0 ? (
         <button type="button" className="swap-primary-action-btn" disabled>

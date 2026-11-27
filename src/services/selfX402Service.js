@@ -214,6 +214,43 @@ export async function verifyOnchainSettlement({
 }
 
 /**
+ * Verifies and settles an x402 payment authorization through Celo's native facilitator (api.x402.celo.org).
+ */
+export async function settleWithCeloFacilitator({ paymentPayload, paymentRequirements }) {
+  if (!paymentPayload || !paymentRequirements) {
+    throw new Error('Both paymentPayload and paymentRequirements are required for Celo x402 facilitator settlement.');
+  }
+
+  const verifyRes = await fetch(`${X402_FACILITATOR_API}/verify`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({ paymentPayload, paymentRequirements }),
+  });
+  const verifyData = await verifyRes.json().catch(() => ({}));
+  if (!verifyRes.ok || verifyData.isValid === false) {
+    throw new Error(verifyData.invalidReason || verifyData.error || `x402 facilitator verify failed (${verifyRes.status})`);
+  }
+
+  const settleRes = await fetch(`${X402_FACILITATOR_API}/settle`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({ paymentPayload, paymentRequirements }),
+  });
+  const settleData = await settleRes.json().catch(() => ({}));
+  if (!settleRes.ok || settleData.success === false) {
+    throw new Error(settleData.errorReason || settleData.error || `x402 facilitator settle failed (${settleRes.status})`);
+  }
+
+  return {
+    settled: true,
+    txHash: settleData.transaction || settleData.txHash,
+    network: settleData.network || X402_CELO_NETWORK,
+    payer: settleData.payer || null,
+    facilitatorUrl: X402_FACILITATOR_API,
+  };
+}
+
+/**
  * Cryptographically verifies an incoming x402 payment proof before releasing protected agent responses.
  * 
  * Verification Checks:

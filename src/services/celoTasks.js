@@ -101,7 +101,7 @@ export async function listCeloTasks(walletAddress = '') {
 
     // Direct Supabase REST fallback
     if (!remoteRows) {
-      const fallbackUrl = `${SUPABASE_REST_URL}&_t=${Date.now()}`;
+      const fallbackUrl = SUPABASE_REST_URL;
       const res = await fetch(fallbackUrl, {
         headers: {
           apikey: SUPABASE_ANON_KEY,

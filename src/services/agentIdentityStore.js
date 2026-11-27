@@ -79,19 +79,40 @@ function assertZeroSecrets(record) {
 export async function loadAgentStore() {
   if (isStoreLoaded) return agentMemoryMap;
 
-  // 1. Browser localStorage
-  if (typeof window !== 'undefined' && window.localStorage) {
+  // 1. Browser: fetch authoritative records from PostgreSQL-backed API route (when served as JSON)
+  if (typeof window !== 'undefined' && typeof fetch === 'function') {
     try {
-      const raw = window.localStorage.getItem(LS_AGENTS_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        for (const [tag, record] of Object.entries(parsed)) {
-          assertZeroSecrets(record);
-          agentMemoryMap.set(tag.toLowerCase(), record);
+      const apiRes = await fetch('/api/agent-identities');
+      const contentType = apiRes.headers?.get?.('content-type') || '';
+      if (apiRes.ok && contentType.includes('application/json')) {
+        const data = await apiRes.json();
+        const rows = Array.isArray(data?.rows) ? data.rows : [];
+        for (const row of rows) {
+          if (row.tag && row.record) {
+            assertZeroSecrets(row.record);
+            agentMemoryMap.set(row.tag.toLowerCase(), row.record);
+          }
         }
       }
     } catch (err) {
-      console.warn('[AgentIdentityStore] LocalStorage load warning:', err.message);
+      console.warn('[AgentIdentityStore] API load warning:', err.message);
+    }
+
+    if (window.localStorage) {
+      try {
+        const raw = window.localStorage.getItem(LS_AGENTS_KEY);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          for (const [tag, record] of Object.entries(parsed)) {
+            if (!agentMemoryMap.has(tag.toLowerCase())) {
+              assertZeroSecrets(record);
+              agentMemoryMap.set(tag.toLowerCase(), record);
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('[AgentIdentityStore] LocalStorage load warning:', err.message);
+      }
     }
   }
 
@@ -152,15 +173,35 @@ export async function saveAgentRecord(tag, record) {
   assertZeroSecrets(record);
 
   // 1. Memory
-  agentMemoryMap.set(normalizedTag, { ...record, tag: normalizedTag, updatedAt: Date.now() });
+  const normalizedRecord = { ...record, tag: normalizedTag, updatedAt: Date.now() };
+  agentMemoryMap.set(normalizedTag, normalizedRecord);
 
-  // 2. Browser localStorage
-  if (typeof window !== 'undefined' && window.localStorage) {
-    try {
-      const serialized = JSON.stringify(Object.fromEntries(agentMemoryMap.entries()));
-      window.localStorage.setItem(LS_AGENTS_KEY, serialized);
-    } catch (err) {
-      console.warn('[AgentIdentityStore] LocalStorage write error:', err.message);
+  // 2. Browser: persist to PostgreSQL-backed API + localStorage cache
+  if (typeof window !== 'undefined') {
+    if (typeof fetch === 'function') {
+      try {
+        const apiRes = await fetch('/api/agent-identities', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ tag: normalizedTag, record: normalizedRecord }),
+        });
+        const contentType = apiRes.headers?.get?.('content-type') || '';
+        if (!apiRes.ok && contentType.includes('application/json')) {
+          const errText = await apiRes.text().catch(() => '');
+          console.warn('[AgentIdentityStore] API write warning:', apiRes.status, errText);
+        }
+      } catch (err) {
+        console.warn('[AgentIdentityStore] API write error:', err.message);
+      }
+    }
+
+    if (window.localStorage) {
+      try {
+        const serialized = JSON.stringify(Object.fromEntries(agentMemoryMap.entries()));
+        window.localStorage.setItem(LS_AGENTS_KEY, serialized);
+      } catch (err) {
+        console.warn('[AgentIdentityStore] LocalStorage write error:', err.message);
+      }
     }
   }
 
@@ -191,7 +232,11 @@ export async function saveAgentRecord(tag, record) {
         },
         body: JSON.stringify({
           tag: normalizedTag,
-          record,
+          owner_address: normalizedRecord.ownerAddress || null,
+          altana_wallet_address: normalizedRecord.altana?.walletAddress || null,
+          self_verified: Boolean(normalizedRecord.self?.verified),
+          session_status: normalizedRecord.altana?.sessionStatus || 'unprovisioned',
+          record: normalizedRecord,
           updated_at: new Date().toISOString(),
         }),
       });

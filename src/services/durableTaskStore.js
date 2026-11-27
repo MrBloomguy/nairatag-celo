@@ -365,6 +365,7 @@ export async function syncTaskToRemote(task) {
         escrow_status: task.escrowStatus,
         escrow_contract: task.escrowContract,
         escrow_tx_hash: task.escrowTxHash,
+        banner_url: task.bannerUrl || task.banner_url || null,
         assigned_worker_tag: task.assignedWorkerTag,
         assigned_worker_address: task.assignedWorkerAddress,
         submission_deliverable: task.submissionDeliverable,

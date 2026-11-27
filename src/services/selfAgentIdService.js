@@ -628,3 +628,141 @@ export async function verifyAgentRequestSignature({
   };
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// SELF ID SEND/SWAP & SHARED HUMAN-NULLIFIER REWARD QUOTA GATE
+// ─────────────────────────────────────────────────────────────────────────────
+
+const SHARED_HUMAN_QUOTA_STORAGE_KEY = 'nairatag_self_human_quota_v1';
+const inMemoryHumanQuotas = new Map();
+
+function loadHumanQuotaMap() {
+  if (typeof window !== 'undefined' && window.localStorage) {
+    try {
+      const raw = window.localStorage.getItem(SHARED_HUMAN_QUOTA_STORAGE_KEY);
+      if (raw) return JSON.parse(raw);
+    } catch {}
+  }
+  return Object.fromEntries(inMemoryHumanQuotas.entries());
+}
+
+function saveHumanQuotaMap(mapObj) {
+  for (const [k, v] of Object.entries(mapObj)) {
+    inMemoryHumanQuotas.set(k, v);
+  }
+  if (typeof window !== 'undefined' && window.localStorage) {
+    try {
+      window.localStorage.setItem(SHARED_HUMAN_QUOTA_STORAGE_KEY, JSON.stringify(mapObj));
+    } catch {}
+  }
+}
+
+export function resetSharedHumanQuotaStore() {
+  inMemoryHumanQuotas.clear();
+  if (typeof window !== 'undefined' && window.localStorage) {
+    try {
+      window.localStorage.removeItem(SHARED_HUMAN_QUOTA_STORAGE_KEY);
+    } catch {}
+  }
+}
+
+/**
+ * Checks whether an agent/wallet holds an active, fresh Self Agent ID on Celo Mainnet.
+ * Used to gate Send, Swap, and cNGN/NTAG rewards.
+ */
+export async function checkSelfHumanGate({ agentAddress } = {}) {
+  if (!agentAddress || !isAddress(agentAddress)) {
+    return {
+      allowed: false,
+      status: VERIFICATION_STATUS.UNVERIFIED,
+      agentId: null,
+      nullifier: null,
+      agentCountForHuman: 0,
+      reason: 'Connect a valid Celo wallet to verify Self Agent ID.',
+    };
+  }
+
+  const verification = await getAgentVerificationStatus({ agentAddress });
+  const allowed = Boolean(
+    verification.status === VERIFICATION_STATUS.VERIFIED &&
+    verification.isVerified &&
+    verification.hasHumanProof &&
+    verification.isProofFresh
+  );
+
+  return {
+    allowed,
+    status: verification.status,
+    agentId: verification.agentId ?? null,
+    nullifier: verification.nullifier || null,
+    agentCountForHuman: verification.agentCountForHuman || 0,
+    reason: allowed
+      ? null
+      : verification.status === VERIFICATION_STATUS.EXPIRED
+        ? 'Self Agent ID proof has expired. Re-verify in the Self App to unlock Send/Swap and rewards.'
+        : 'Self Agent ID verification required: prove unique human backing in the Self App to unlock Send/Swap and cNGN/NTAG rewards.',
+    verification,
+  };
+}
+
+/**
+ * Enforces per-human daily reward/cashback quota keyed by Self humanNullifier.
+ * Multiple agents owned by the same human share one combined daily limit.
+ */
+export function enforceSharedHumanRewardQuota({
+  agentAddress,
+  nullifier,
+  action = 'daily_claim',
+  dailyLimit = 1,
+  dayKey = new Date().toISOString().slice(0, 10),
+} = {}) {
+  if (!nullifier) {
+    return {
+      allowed: false,
+      count: 0,
+      dailyLimit,
+      nullifier: null,
+      reason: 'Self Agent ID humanNullifier is required to claim cNGN/NTAG rewards.',
+    };
+  }
+
+  const normNullifier = String(nullifier).toLowerCase();
+  const quotaKey = `${normNullifier}:${action}:${dayKey}`;
+  const store = loadHumanQuotaMap();
+  const current = store[quotaKey] || { count: 0, agents: [] };
+
+  if (current.count >= dailyLimit) {
+    return {
+      allowed: false,
+      count: current.count,
+      dailyLimit,
+      nullifier: normNullifier,
+      agentsUsed: current.agents || [],
+      reason: `Daily ${action.replace(/_/g, ' ')} limit (${dailyLimit}/day) already reached for your Self human identity (shared across all your agents).`,
+    };
+  }
+
+  const cleanAgent = agentAddress && isAddress(agentAddress) ? getAddress(agentAddress) : String(agentAddress || '');
+  const updatedAgents = cleanAgent && !(current.agents || []).includes(cleanAgent)
+    ? [...(current.agents || []), cleanAgent]
+    : (current.agents || []);
+
+  const updatedEntry = {
+    count: current.count + 1,
+    agents: updatedAgents,
+    updatedAt: Date.now(),
+  };
+
+  store[quotaKey] = updatedEntry;
+  saveHumanQuotaMap(store);
+
+  return {
+    allowed: true,
+    count: updatedEntry.count,
+    dailyLimit,
+    remaining: Math.max(0, dailyLimit - updatedEntry.count),
+    nullifier: normNullifier,
+    agentsUsed: updatedAgents,
+    reason: null,
+  };
+}
+

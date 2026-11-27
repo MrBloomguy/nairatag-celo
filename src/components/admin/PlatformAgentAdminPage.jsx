@@ -979,7 +979,7 @@ export default function PlatformAgentAdminPage() {
                               <img
                                 src={
                                   agent.avatar ||
-                                  `https://api.dicebear.com/7.x/identicon/svg?seed=${agent.tag}`
+                                  `https://api.dicebear.com/11.x/adventurer-neutral/svg?seed=${agent.tag}`
                                 }
                                 alt=""
                                 className="admin-agent-avatar"

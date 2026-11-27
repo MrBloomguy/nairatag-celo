@@ -1,5 +1,7 @@
 import { broadcastCeloRewardToTelegram } from './celoSocialBroadcast.js';
-const CELO_REWARDS_API = import.meta.env.VITE_CELO_REWARDS_API || (import.meta.env.DEV ? '/api/arc-rewards' : 'https://nairatag.ng/api/arc-rewards');
+import { checkSelfHumanGate, enforceSharedHumanRewardQuota } from './selfAgentIdService.js';
+const CELO_REWARDS_API = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_CELO_REWARDS_API)
+  || ((typeof import.meta !== 'undefined' && import.meta.env?.DEV) ? '/api/arc-rewards' : 'https://nairatag.ng/api/arc-rewards');
 const CELO_CHAIN_ID = 42220;
 
 function arcRewardsUrl() {
@@ -85,10 +87,30 @@ export async function getCeloRewardState(walletAddress) {
   return mapState(localData);
 }
 
-export async function submitCeloRewardAction({ action, walletAddress, tag, referrerTag, txHash, requestId, ids }) {
+export async function submitCeloRewardAction({ action, walletAddress, tag, referrerTag, txHash, requestId, ids, _selfGateOverride = null }) {
   if (!walletAddress) throw new Error('Connect your Celo wallet to continue.');
   const storageKey = `nairatag_celo_rewards_${walletAddress.toLowerCase()}`;
   const today = new Date().toISOString().slice(0, 10);
+
+  // Enforce Self Agent ID & shared humanNullifier quota on reward-earning actions
+  const GATED_REWARD_ACTIONS = ['daily_claim', 'spin', 'payment_confirmed', 'referral_signup'];
+  if (GATED_REWARD_ACTIONS.includes(action)) {
+    const gate = _selfGateOverride || await checkSelfHumanGate({ agentAddress: walletAddress });
+    if (!gate.allowed) {
+      throw new Error(gate.reason || 'Self Agent ID verification is required to earn cNGN/NTAG rewards.');
+    }
+    const dailyLimit = action === 'spin' ? 2 : 1;
+    const quota = enforceSharedHumanRewardQuota({
+      agentAddress: walletAddress,
+      nullifier: gate.nullifier,
+      action,
+      dailyLimit,
+      dayKey: today,
+    });
+    if (!quota.allowed) {
+      throw new Error(quota.reason);
+    }
+  }
 
   // 1. Attempt upstream API
   try {

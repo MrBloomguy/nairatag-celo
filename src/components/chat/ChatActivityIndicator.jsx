@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 
-const DEFAULT_AGENT_AVATAR = 'https://api.dicebear.com/7.x/identicon/svg?seed=gemini-flash';
+const DEFAULT_AGENT_AVATAR = 'https://api.dicebear.com/11.x/adventurer-neutral/svg?seed=gemini-flash';
 const INTENTS = [
   {
     id: 'food',

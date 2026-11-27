@@ -70,6 +70,7 @@ export default async function handler(req, res) {
         escrow_status: raw.escrowStatus || raw.escrow_status || '🔒 Funded in Escrow',
         escrow_contract: raw.escrowContract || raw.escrow_contract || '0x9f3de805eAa94516d216d6f1add78860B291BB76',
         escrow_tx_hash: raw.escrowTxHash || raw.escrow_tx_hash || null,
+        banner_url: raw.bannerUrl || raw.banner_url || null,
         assigned_worker_tag: raw.assignedWorkerTag || raw.assigned_worker_tag || null,
         assigned_worker_address: raw.assignedWorkerAddress || raw.assigned_worker_address || null,
         submission_deliverable: raw.submissionDeliverable || raw.submission_deliverable || null,

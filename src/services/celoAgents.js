@@ -4,6 +4,21 @@ import { listAllAgentLifecycleRecords } from './agentLifecycleService.js';
 
 const CELO_AGENTS_API = import.meta.env?.VITE_CELO_AGENTS_API || (import.meta.env?.DEV ? '/api/arc-agents' : 'https://nairatag.ng/api/arc-agents');
 
+export function resolveAgentCategory(agent = {}) {
+  const raw = String(agent.category || '').trim();
+  if (raw && !/^user\s*agent$/i.test(raw) && !/^nairatag$/i.test(raw)) {
+    return raw;
+  }
+  const haystack = `${agent.tag || ''} ${agent.displayName || agent.name || ''} ${agent.description || agent.role || ''}`.toLowerCase();
+  if (/\b(music|audio|sound|beat|song|track|radio|spotify)\b/.test(haystack)) return 'Music';
+  if (/\b(finance|defi|swap|fx|forex|treasury|yield|payment|bank|trading|bloom|usdt|cngn)\b/.test(haystack)) return 'Finance';
+  if (/\b(weather|meteo|climate|forecast)\b/.test(haystack)) return 'Weather';
+  if (/\b(defillama|coingecko|tvl|analytics|indexer|data|oracle|price)\b/.test(haystack)) return 'Data & AI';
+  if (/\b(design|figma|ui|ux|brand|art)\b/.test(haystack)) return 'Design';
+  if (/\b(nairatag|protocol|registry|escrow)\b/.test(haystack)) return 'Protocol';
+  return 'Personal';
+}
+
 export function mapCeloAgentRecord(agent = {}) {
   const tag = String(agent.tag || '').trim().replace(/^[₦$@#]/, '').toLowerCase();
   if (!/^[a-z0-9_-]{2,32}$/.test(tag)) return null;
@@ -15,9 +30,11 @@ export function mapCeloAgentRecord(agent = {}) {
     canonicalTag: `₦${tag.toUpperCase()}`,
     name: String(agent.displayName || agent.name || tag),
     owner: agent.owner || agent.ownerAddress || agent.owner_address || agent.walletAddress || agent.wallet_address || agent.identity?.owner || null,
-    category: String(agent.category || ''),
+    category: resolveAgentCategory(agent),
     role: String(agent.description || agent.role || ''),
-    avatar: agent.avatarUrl || agent.avatar || `https://api.dicebear.com/7.x/identicon/svg?seed=${encodeURIComponent(tag)}`,
+    avatar: ((agent.avatarUrl || agent.avatar) && !String(agent.avatarUrl || agent.avatar).includes('dicebear.com/7.x/identicon'))
+      ? (agent.avatarUrl || agent.avatar)
+      : `https://api.dicebear.com/11.x/adventurer-neutral/svg?seed=${encodeURIComponent(tag)}`,
     status: String(agent.status || 'unknown').toLowerCase(),
     self: agent.self || null,
     altana: agent.altana || null,
@@ -89,7 +106,7 @@ export async function fetchCeloAgentDirectory({ signal } = {}) {
     canonicalTag: r.canonicalTag,
     name: r.name,
     owner: r.ownerAddress,
-    category: r.category,
+    category: resolveAgentCategory(r),
     role: r.description,
     avatar: r.avatar,
     status: r.status,

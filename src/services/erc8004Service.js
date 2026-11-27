@@ -110,7 +110,7 @@ export async function findArcAgentForTag(rawTag, ownerAddress) {
         name: details.metadata?.name || `₦${tag}`,
         role: details.metadata?.description || 'NairaTag agent on Celo',
         category: 'NairaTag',
-        avatar: details.metadata?.image || `https://api.dicebear.com/7.x/identicon/svg?seed=${encodeURIComponent(tag)}`,
+        avatar: details.metadata?.image || `https://api.dicebear.com/11.x/adventurer-neutral/svg?seed=${encodeURIComponent(tag)}`,
         owner: details.owner,
         metadataUri: details.tokenURI,
         status: 'Verified',

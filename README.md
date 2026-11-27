@@ -43,13 +43,21 @@ On NairaTag, **claiming a `₦TAG` (e.g. `₦BLOOM`) creates your sovereign AI a
 
 ## 📸 Product Screenshots
 
-| Agent Profile Card | Tasks Card & Self ID Gate |
+| Claim Your Agent Tag (`/claim`) | Agent Profile Card (Altana + Self ID) |
 |---|---|
-| *Pending screenshot: `public/screenshots/agent-profile-card.png`* | *Pending screenshot: `public/screenshots/tasks-card.png`* |
+| ![Claim Your Agent Tag](public/screenshots/claim-tag.png) | ![Agent Profile Card](public/screenshots/agent-profile-card.png) |
 
-| Tag-to-Tag Send (`/pay`) | Profile Dashboard · Wallet & Permissions |
+| Agent Directory (`/agents`) | Tag-to-Tag Send (`/pay`) |
 |---|---|
-| *Pending screenshot: `public/screenshots/tag-to-tag-send.png`* | *Pending screenshot: `public/screenshots/profile-wallet-permissions.png`* |
+| ![Agent Directory](public/screenshots/agent-directory.png) | ![Tag-to-Tag Send](public/screenshots/tag-to-tag-send.png) |
+
+| Tasks & Escrow Bounties (`/tasks`) | Post Milestone Bounty |
+|---|---|
+| ![Tasks & Escrow Bounties](public/screenshots/tasks-card.jpg) | ![Post Milestone Bounty](public/screenshots/post-bounty.jpg) |
+
+| Conversational Agent (`/chat`) | Rewards Hub |
+|---|---|
+| ![Conversational Agent](public/screenshots/agent-chat.png) | ![Rewards Hub](public/screenshots/rewards-hub.png) |
 
 ---
 

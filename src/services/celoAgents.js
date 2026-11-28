@@ -79,16 +79,41 @@ export async function fetchCeloAgentDirectory({ signal } = {}) {
     console.warn('[fetchCeloAgentDirectory] Network fetch error, fallback to durable lifecycle:', err.message);
   }
 
-  // Enrich with local/durable lifecycle records
+  // Enrich with local/durable lifecycle records (PostgreSQL nairatag_agent_identities)
   const lifecycleRecords = await listAllAgentLifecycleRecords().catch(() => []);
-  const lifecycleMap = new Map(lifecycleRecords.map((r) => [r.tag.toLowerCase(), r]));
+  const cleanLifecycle = lifecycleRecords.filter((r) => r?.tag && !/^track\d*test_/i.test(r.tag));
+  const lifecycleMap = new Map(cleanLifecycle.map((r) => [r.tag.toLowerCase(), r]));
+
+  const mapLifecycleToDirectoryAgent = (r) => ({
+    id: r.erc8004?.tokenId || r.self?.agentId || r.tag,
+    tag: r.tag,
+    canonicalTag: r.canonicalTag || `₦${r.tag}`,
+    name: r.name || `₦${String(r.tag || '').toUpperCase()}`,
+    owner: r.ownerAddress,
+    category: resolveAgentCategory(r),
+    role: r.bio || r.description || 'Sovereign NairaTag agent on Celo Mainnet',
+    avatar: r.avatarUrl || r.avatar || `https://api.dicebear.com/11.x/adventurer-neutral/svg?seed=${encodeURIComponent(r.tag)}`,
+    status: r.status || 'active',
+    self: r.self,
+    altana: r.altana,
+    erc8004: r.erc8004,
+    points: r.points || 0,
+    earnings: r.earnings || 0,
+    earningsCurrency: 'cNGN',
+    capabilities: r.capabilities || ['booking', 'tasks', 'x402_settlement'],
+    callableTools: ['booking', 'task_escrow', 'x402_pay'],
+    createdAt: r.createdAt || r.updatedAt || 0,
+  });
 
   if (networkAgents.length > 0) {
-    return networkAgents.map((agent) => {
+    const networkTagSet = new Set(networkAgents.map((a) => String(a.tag || '').toLowerCase()));
+    const enrichedNetwork = networkAgents.map((agent) => {
       const enriched = lifecycleMap.get(agent.tag.toLowerCase());
       if (enriched) {
         return {
           ...agent,
+          avatar: enriched.avatarUrl || agent.avatar,
+          role: enriched.bio || agent.role,
           self: enriched.self,
           altana: enriched.altana,
           erc8004: enriched.erc8004,
@@ -97,28 +122,18 @@ export async function fetchCeloAgentDirectory({ signal } = {}) {
       }
       return agent;
     });
+
+    // Include newly claimed DB agents (e.g., agentzues) that are not yet in the legacy network list
+    const newlyClaimedDbAgents = cleanLifecycle
+      .filter((r) => !networkTagSet.has(r.tag.toLowerCase()))
+      .sort((a, b) => Number(b.createdAt || b.updatedAt || 0) - Number(a.createdAt || a.updatedAt || 0))
+      .map(mapLifecycleToDirectoryAgent);
+
+    return [...newlyClaimedDbAgents, ...enrichedNetwork];
   }
 
-  // Fallback to seeded lifecycle records
-  return lifecycleRecords.map((r) => ({
-    id: r.erc8004?.tokenId || '1',
-    tag: r.tag,
-    canonicalTag: r.canonicalTag,
-    name: r.name,
-    owner: r.ownerAddress,
-    category: resolveAgentCategory(r),
-    role: r.description,
-    avatar: r.avatar,
-    status: r.status,
-    self: r.self,
-    altana: r.altana,
-    erc8004: r.erc8004,
-    points: 100,
-    earnings: 0,
-    earningsCurrency: 'cNGN',
-    capabilities: r.capabilities || ['booking', 'tasks', 'x402_settlement'],
-    callableTools: ['booking', 'task_escrow', 'x402_pay'],
-  }));
+  // Fallback to lifecycle records
+  return cleanLifecycle.map(mapLifecycleToDirectoryAgent);
 }
 
 async function signAdminPayload({ walletAddress, action, payload }) {

@@ -46,7 +46,7 @@ import {
 import { resolveTag } from '../services/nairatagResolver.js';
 import { getEthereumProvider } from '../services/celoPayment.js';
 import { checkSelfHumanGate, enforceSharedHumanRewardQuota } from '../services/selfAgentIdService.js';
-import { getAgentControlStatus } from '../services/agentLifecycleService.js';
+import { getAgentControlStatus, listAllAgentLifecycleRecords } from '../services/agentLifecycleService.js';
 import SelfAgentIdBadge, { SelfIcon } from './SelfAgentIdBadge.jsx';
 import './swap/SwapWidget.css';
 
@@ -158,6 +158,22 @@ export default function TagToTagSendCard({
   const [selfGate, setSelfGate] = useState({ checking: false, allowed: true, reason: null, agentId: null });
   const [recipientSelfGate, setRecipientSelfGate] = useState({ checking: false, allowed: false, agentId: null });
   const [altanaGate, setAltanaGate] = useState({ hasWallet: false, hasActiveSession: true, sessionStatus: 'unprovisioned' });
+  const [recentAgents, setRecentAgents] = useState([]);
+
+  useEffect(() => {
+    let active = true;
+    listAllAgentLifecycleRecords()
+      .then((records) => {
+        if (!active || !Array.isArray(records)) return;
+        const latest = records
+          .filter((r) => r?.tag && !/^track\d*test_/i.test(r.tag))
+          .sort((a, b) => Number(b.createdAt || b.updatedAt || 0) - Number(a.createdAt || a.updatedAt || 0))
+          .slice(0, 3);
+        setRecentAgents(latest);
+      })
+      .catch(() => {});
+    return () => { active = false; };
+  }, [walletAddress]);
 
   useEffect(() => {
     let active = true;
@@ -765,55 +781,62 @@ export default function TagToTagSendCard({
           )}
         </div>
 
-        {/* Suggestion Chips with DiceBear avatar & top-left Self ID badge */}
-        {!recipientInput && (
+        {/* Latest 3 real claimed agents from PostgreSQL */}
+        {!recipientInput && recentAgents.length > 0 && (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginTop: '6px', flexWrap: 'wrap' }}>
-            {['segun', 'bloom', 'alice'].map((tag) => (
-              <button
-                key={tag}
-                type="button"
-                className="swap-slippage-chip"
-                style={{
-                  position: 'relative',
-                  overflow: 'visible',
-                  padding: '4px 10px 4px 8px',
-                  fontSize: '11px',
-                  borderRadius: '9999px',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '5px',
-                }}
-                onClick={() => setRecipientInput(`₦${tag}`)}
-                title={`Send to ₦${tag} (Self Agent ID)`}
-              >
-                <span
+            {recentAgents.map((agent) => {
+              const cleanTag = String(agent.tag || '').replace(/^[₦$@#]/, '').toLowerCase();
+              const isSelfVerified = Boolean(agent.self?.verified);
+              const avatarSrc = agent.avatarUrl || agent.avatar || `https://api.dicebear.com/11.x/adventurer-neutral/svg?seed=${encodeURIComponent(cleanTag)}`;
+              return (
+                <button
+                  key={cleanTag}
+                  type="button"
+                  className="swap-slippage-chip"
                   style={{
-                    position: 'absolute',
-                    top: '-5px',
-                    right: '-5px',
-                    left: 'auto',
-                    zIndex: 2,
-                    width: '15px',
-                    height: '15px',
-                    borderRadius: '50%',
-                    background: '#ffffff',
-                    border: '1px solid rgba(5, 150, 105, 0.25)',
+                    position: 'relative',
+                    overflow: 'visible',
+                    padding: '4px 10px 4px 8px',
+                    fontSize: '11px',
+                    borderRadius: '9999px',
                     display: 'inline-flex',
                     alignItems: 'center',
-                    justifyContent: 'center',
-                    boxShadow: '0 1px 2px rgba(0,0,0,0.12)',
+                    gap: '5px',
                   }}
+                  onClick={() => setRecipientInput(`₦${cleanTag}`)}
+                  title={isSelfVerified ? `Send to ₦${cleanTag} (Self Agent ID)` : `Send to ₦${cleanTag}`}
                 >
-                  <SelfIcon size={9} color="#059669" />
-                </span>
-                <img
-                  src={`https://api.dicebear.com/11.x/adventurer-neutral/svg?seed=${encodeURIComponent(tag)}`}
-                  alt=""
-                  style={{ width: 16, height: 16, borderRadius: '50%', objectFit: 'cover', flexShrink: 0, display: 'block' }}
-                />
-                <span>₦{tag}</span>
-              </button>
-            ))}
+                  {isSelfVerified && (
+                    <span
+                      style={{
+                        position: 'absolute',
+                        top: '-5px',
+                        right: '-5px',
+                        left: 'auto',
+                        zIndex: 2,
+                        width: '15px',
+                        height: '15px',
+                        borderRadius: '50%',
+                        background: '#ffffff',
+                        border: '1px solid rgba(5, 150, 105, 0.25)',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        boxShadow: '0 1px 2px rgba(0,0,0,0.12)',
+                      }}
+                    >
+                      <SelfIcon size={9} color="#059669" />
+                    </span>
+                  )}
+                  <img
+                    src={avatarSrc}
+                    alt=""
+                    style={{ width: 16, height: 16, borderRadius: '50%', objectFit: 'cover', flexShrink: 0, display: 'block' }}
+                  />
+                  <span>₦{cleanTag}</span>
+                </button>
+              );
+            })}
           </div>
         )}
 

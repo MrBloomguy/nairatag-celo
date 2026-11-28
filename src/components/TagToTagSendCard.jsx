@@ -207,8 +207,14 @@ export default function TagToTagSendCard({
       .then((c) => {
         if (!active) return;
         if (c) setAltanaGate(c);
-        if (c?.selfVerified) {
-          setSelfGate({ checking: false, allowed: true, agentId: c.selfAgentId ?? null, status: 'verified' });
+        if (c?.selfVerified && c?.selfNullifier) {
+          setSelfGate({
+            checking: false,
+            allowed: true,
+            agentId: c.selfAgentId ?? null,
+            nullifier: c.selfNullifier,
+            status: 'verified',
+          });
           return;
         }
         return checkSelfHumanGate({ agentAddress: c?.selfAgentAddress || walletAddress, chainId: c?.selfChainId || 42220 })
@@ -608,7 +614,7 @@ export default function TagToTagSendCard({
 
     const quota = enforceSharedHumanRewardQuota({
       agentAddress: walletAddress,
-      nullifier: selfGate.nullifier,
+      nullifier: selfGate.nullifier || altanaGate.selfNullifier,
       action: 'send_swap',
       dailyLimit: 20,
     });

@@ -354,6 +354,7 @@ export async function getAgentControlStatus(tagOrAddress) {
     selfAgentId,
     selfChainId: targetSelfChainId,
     selfAgentAddress: targetSelfAddress || null,
+    selfNullifier: verification?.humanNullifier || verification?.nullifier || agent.self?.nullifierHash || null,
     selfCheckError: verification?.error || null,
     hasActiveSession,
     sessionStatus,

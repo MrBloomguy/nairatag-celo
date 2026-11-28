@@ -1,4 +1,4 @@
-import { createWalletClient, custom, decodeEventLog, isAddress, parseAbiItem } from 'viem';
+import { decodeEventLog, encodeFunctionData, isAddress, parseAbiItem } from 'viem';
 import { CELO_NAIRATAG_REGISTRY_ADDRESS, CELO_NAIRATAG_RESOLVER_ADDRESS } from '../config/celo.js';
 import { activeCeloChain, getEthereumProvider, publicClient, switchOrAddCeloNetwork } from './celoPayment.js';
 import { createAgentDraft } from './agentLifecycleService.js';
@@ -91,13 +91,36 @@ export async function claimCeloNairaTag({ rawTag, walletAddress }) {
   const status = await checkCeloTagAvailability(cleanTag, walletAddress);
   if (!status.available) throw new Error(status.reason || 'This NairaTag cannot be claimed.');
 
-  const walletClient = createWalletClient({ chain: activeCeloChain, transport: custom(provider) });
-  const hash = await walletClient.writeContract({
-    account: walletAddress,
-    address: CELO_NAIRATAG_REGISTRY_ADDRESS,
+  const data = encodeFunctionData({
     abi: CELO_NAIRATAG_ABI,
     functionName: 'claim',
     args: [cleanTag, CELO_NAIRATAG_RESOLVER_ADDRESS],
+  });
+
+  // Pre-fetch gas & gasPrice via publicClient (forno.celo.org) so the browser wallet's RPC isn't rate-limited on eth_getBlockByNumber
+  const [estimatedGas, gasPrice] = await Promise.all([
+    publicClient.estimateGas({
+      account: walletAddress,
+      to: CELO_NAIRATAG_REGISTRY_ADDRESS,
+      data,
+    }).catch(() => 320000n),
+    publicClient.getGasPrice().catch(() => null),
+  ]);
+  const gasLimit = estimatedGas ? (estimatedGas * 120n) / 100n : 320000n;
+
+  const txParams = {
+    from: walletAddress,
+    to: CELO_NAIRATAG_REGISTRY_ADDRESS,
+    data,
+    gas: `0x${gasLimit.toString(16)}`,
+  };
+  if (gasPrice) {
+    txParams.gasPrice = `0x${gasPrice.toString(16)}`;
+  }
+
+  const hash = await provider.request({
+    method: 'eth_sendTransaction',
+    params: [txParams],
   });
   const receipt = await publicClient.waitForTransactionReceipt({ hash, confirmations: 1, timeout: 30000 });
   if (receipt.status !== 'success') throw new Error(`Celo tag claim failed. Transaction: ${hash}`);

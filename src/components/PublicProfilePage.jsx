@@ -21,6 +21,7 @@ import { resolveTagProfile, generateAvatarSvg } from '../services/tagAvatar.js';
 import { resolveTag } from '../services/nairatagResolver.js';
 import { getAgentControlStatus } from '../services/agentLifecycleService.js';
 import { CELO_NAIRATAG_RESOLVER_ADDRESS } from '../config/celo.js';
+import { SelfIcon } from './SelfAgentIdBadge.jsx';
 import { IS_CONCORDIUM_SITE, CONCORDIUM_SITE } from '../config/siteMode.js';
 import confetti from 'canvas-confetti';
 
@@ -330,18 +331,24 @@ export default function PublicProfilePage({ rawHandle }) {
               />
             )}
             <span
-              title={selfVerified ? 'Self Agent ID Verified' : 'Active NairaTag'}
+              title={selfVerified ? `Verified with Self Agent ID${selfAgentId ? ` #${selfAgentId}` : ''}` : 'Active NairaTag'}
               style={{
                 position: 'absolute',
-                right: '2px',
-                bottom: '2px',
-                width: '16px',
-                height: '16px',
+                right: '-2px',
+                bottom: '-2px',
+                width: selfVerified ? '24px' : '16px',
+                height: selfVerified ? '24px' : '16px',
                 borderRadius: '50%',
-                backgroundColor: selfVerified ? '#10b981' : '#f59e0b',
-                border: `3px solid ${bgCard}`,
+                backgroundColor: selfVerified ? '#ffffff' : '#f59e0b',
+                border: selfVerified ? `2px solid ${bgCard}` : `3px solid ${bgCard}`,
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: selfVerified ? '0 2px 6px rgba(0,0,0,0.2)' : 'none',
               }}
-            />
+            >
+              {selfVerified && <SelfIcon size={17} />}
+            </span>
           </div>
 
           {/* Name + Verified Badge */}

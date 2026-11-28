@@ -3894,7 +3894,14 @@ function ArcAppShell() {
               title="Open your profile dashboard"
               aria-label="Open your profile dashboard"
             >
-              <ProfileAvatar tag={myTag?.tag || walletAddress} email={accountEmail} avatarUrl={myAgentControlStatus?.avatarUrl} size={26} />
+              <ProfileAvatar
+                tag={myTag?.tag || walletAddress}
+                email={accountEmail}
+                avatarUrl={myAgentControlStatus?.avatarUrl}
+                selfVerified={Boolean(myAgentControlStatus?.selfVerified)}
+                selfAgentId={myAgentControlStatus?.selfAgentId}
+                size={26}
+              />
               <span className="wallet-connected-handle">{displayAccountName || (walletAddress ? `₦${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}` : 'Wallet')}</span>
               <span className="wallet-connected-sep desktop-only">|</span>
               <span className="wallet-connected-bal desktop-only">{usdcBalance.formatted} USDC</span>
@@ -4298,7 +4305,15 @@ function ArcAppShell() {
                             style={{ width: '48px', height: '48px', borderRadius: '50%', objectFit: 'cover' }}
                           />
                         ) : (
-                          <ProfileAvatar tag={myTag?.tag || walletAddress} email={accountEmail} size={48} className="account-avatar" />
+                          <ProfileAvatar
+                            tag={myTag?.tag || walletAddress}
+                            email={accountEmail}
+                            selfVerified={Boolean(myAgentControlStatus?.selfVerified)}
+                            selfAgentId={myAgentControlStatus?.selfAgentId}
+                            badgePosition="top-right"
+                            size={48}
+                            className="account-avatar"
+                          />
                         )}
                         {cleanOwnedTag && (
                           <span style={{
@@ -4429,70 +4444,64 @@ function ArcAppShell() {
 
                   {/* ── Dark Self ID Banner Card ── */}
                   {!IS_CONCORDIUM_SITE && (
-                    <div style={{
-                      borderRadius: '18px',
-                      padding: '16px',
-                      background: 'linear-gradient(135deg, #181a20 0%, #242731 100%)',
-                      color: '#ffffff',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      gap: '12px',
-                    }}>
+                    <div
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => setIsSelfDemoModalOpen(true)}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setIsSelfDemoModalOpen(true); }}
+                      style={{
+                        borderRadius: '18px',
+                        padding: '16px',
+                        background: selfOk
+                          ? 'linear-gradient(135deg, #064e3b 0%, #0f172a 100%)'
+                          : 'linear-gradient(135deg, #181a20 0%, #242731 100%)',
+                        border: selfOk ? '1px solid rgba(52, 211, 153, 0.35)' : 'none',
+                        color: '#ffffff',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: '12px',
+                        cursor: 'pointer',
+                      }}
+                    >
                       <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
-                        <div style={{ width: '38px', height: '38px', borderRadius: '10px', background: 'rgba(255, 255, 255, 0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: selfOk ? '#34d399' : '#ffffff' }}>
+                        <div style={{ width: '38px', height: '38px', borderRadius: '10px', background: selfOk ? 'rgba(16, 185, 129, 0.25)' : 'rgba(255, 255, 255, 0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: selfOk ? '#34d399' : '#ffffff' }}>
                           <SelfIcon size={22} />
                         </div>
                         <div style={{ minWidth: 0 }}>
-                          <div style={{ fontSize: '14.5px', fontWeight: 700 }}>
-                            {isLoadingSelf ? 'Checking Self ID…' : selfOk ? `Self Verified #${selfId || 'Active'}` : 'Verify with Self ID'}
+                          <div style={{ fontSize: '14.5px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                            <span>{isLoadingSelf ? 'Checking Self ID…' : selfOk ? `Self Verified${selfId ? ` · #${selfId}` : ''}` : 'Verify with Self ID'}</span>
+                            {selfOk && (
+                              <span style={{ fontSize: '10px', fontWeight: 700, padding: '2px 7px', borderRadius: '999px', background: 'rgba(52, 211, 153, 0.2)', color: '#34d399' }}>
+                                Active
+                              </span>
+                            )}
                           </div>
-                          <div style={{ fontSize: '12px', opacity: 0.72, marginTop: '2px' }}>
+                          <div style={{ fontSize: '12px', opacity: 0.78, marginTop: '2px' }}>
                             {selfOk
-                              ? 'Proof-of-Human active on Celo Mainnet.'
+                              ? 'Human-backed agent verified · Tap to view Self ID details.'
                               : 'Unlock tag payments, task escrow & agent session keys.'}
                           </div>
                         </div>
                       </div>
-                      {selfOk && selfId ? (
-                        <a
-                          href={`https://agent-api.self.xyz/api/agent/info/42220/${selfId}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          style={{
-                            padding: '6px 12px',
-                            borderRadius: '999px',
-                            border: '1px solid rgba(255,255,255,0.22)',
-                            color: '#ffffff',
-                            fontSize: '12px',
-                            fontWeight: 600,
-                            textDecoration: 'none',
-                            whiteSpace: 'nowrap',
-                            flexShrink: 0,
-                          }}
-                        >
-                          View &gt;
-                        </a>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => setIsSelfDemoModalOpen(true)}
-                          style={{
-                            padding: '6px 12px',
-                            borderRadius: '999px',
-                            border: '1px solid rgba(255,255,255,0.22)',
-                            background: 'rgba(255,255,255,0.08)',
-                            color: '#ffffff',
-                            fontSize: '12px',
-                            fontWeight: 600,
-                            cursor: 'pointer',
-                            whiteSpace: 'nowrap',
-                            flexShrink: 0,
-                          }}
-                        >
-                          Verify &gt;
-                        </button>
-                      )}
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); setIsSelfDemoModalOpen(true); }}
+                        style={{
+                          padding: '6px 12px',
+                          borderRadius: '999px',
+                          border: selfOk ? '1px solid rgba(52, 211, 153, 0.4)' : '1px solid rgba(255,255,255,0.22)',
+                          background: selfOk ? 'rgba(16, 185, 129, 0.22)' : 'rgba(255,255,255,0.08)',
+                          color: '#ffffff',
+                          fontSize: '12px',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          whiteSpace: 'nowrap',
+                          flexShrink: 0,
+                        }}
+                      >
+                        {selfOk ? 'Details >' : 'Verify >'}
+                      </button>
                     </div>
                   )}
 
@@ -5153,6 +5162,14 @@ function ArcAppShell() {
                     <div className="milestone-badge-stage">
                       <div className="agent-directory-avatar-wrap">
                         <img className="agent-circle-avatar-img" src={agent.avatar} alt="" aria-hidden="true" />
+                        {!IS_CONCORDIUM_SITE && Boolean(agent.self?.verified) && (
+                          <span
+                            title={`Verified with Self Agent ID${agent.self?.agentId ? ` #${agent.self.agentId}` : ''}`}
+                            style={{ position: 'absolute', top: '-2px', right: '-2px', width: '18px', height: '18px', borderRadius: '50%', background: '#ffffff', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 1px 4px rgba(0,0,0,0.2)' }}
+                          >
+                            <SelfIcon size={14} />
+                          </span>
+                        )}
                         <span className={`agent-directory-rank ${agent.leaderboardRank <= 3 ? `rank-top${agent.leaderboardRank}` : ''}`}>#{agent.leaderboardRank}</span>
                       </div>
                     </div>
@@ -5204,6 +5221,14 @@ function ArcAppShell() {
                     <div className="agent-circle-left">
                       <div className="agent-circle-avatar-wrap agent-directory-avatar-wrap">
                         <img src={agent.avatar} alt="" aria-hidden="true" className="agent-circle-avatar-img" />
+                        {!IS_CONCORDIUM_SITE && Boolean(agent.self?.verified) && (
+                          <span
+                            title={`Verified with Self Agent ID${agent.self?.agentId ? ` #${agent.self.agentId}` : ''}`}
+                            style={{ position: 'absolute', top: '-2px', right: '-2px', width: '17px', height: '17px', borderRadius: '50%', background: '#ffffff', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 1px 4px rgba(0,0,0,0.2)' }}
+                          >
+                            <SelfIcon size={13} />
+                          </span>
+                        )}
                         <span className={`agent-directory-rank ${agent.leaderboardRank <= 3 ? `rank-top${agent.leaderboardRank}` : ''}`}>#{agent.leaderboardRank}</span>
                       </div>
                       <div className="agent-circle-meta">
@@ -8030,6 +8055,14 @@ function ArcAppShell() {
               onConnectWallet={() => setIsConnectModalOpen(true)}
               initialAgentTag={myTag?.tag ? `₦${myTag.tag.replace(/^₦/, '')}` : undefined}
               initialAgentAddress={walletAddress || undefined}
+              onVerified={(data) => {
+                setMyAgentControlStatus((prev) => ({
+                  ...(prev || {}),
+                  selfVerified: true,
+                  selfAgentId: data?.agentId || prev?.selfAgentId || null,
+                  selfStatus: 'verified',
+                }));
+              }}
             />
           </div>
         </div>

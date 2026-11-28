@@ -317,9 +317,34 @@ export function updateTaskState(taskId, updates = {}) {
     }
   }
 
+  pendingTaskPatches.set(taskId, {
+    ...updates,
+    status: nextStatus,
+    escrowStatus: updatedTask.escrowStatus,
+    _patchedAt: Date.now(),
+  });
   notifyTaskUpdate(updatedTask);
-  syncTaskPatchToRemote(taskId, updates);
+  syncTaskPatchToRemote(taskId, updates).finally(() => {
+    setTimeout(() => {
+      const entry = pendingTaskPatches.get(taskId);
+      if (entry && Date.now() - entry._patchedAt >= 2500) {
+        pendingTaskPatches.delete(taskId);
+      }
+    }, 2500);
+  });
   return updatedTask;
+}
+
+const pendingTaskPatches = new Map();
+
+export function getPendingTaskPatch(taskId) {
+  const entry = pendingTaskPatches.get(taskId);
+  if (!entry) return null;
+  if (Date.now() - entry._patchedAt > 15000) {
+    pendingTaskPatches.delete(taskId);
+    return null;
+  }
+  return entry;
 }
 
 const SUPABASE_REST_URL = 'https://bbpdupijsgdghemfpijr.supabase.co/rest/v1/celo_tasks';

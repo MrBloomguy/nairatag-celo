@@ -1,5 +1,5 @@
 import { broadcastCeloPaidTaskToTelegram, broadcastCeloTaskToTelegram } from './celoSocialBroadcast.js';
-import { getDurableTasks, saveDurableTask, updateTaskState, getTaskById } from './durableTaskStore.js';
+import { getDurableTasks, saveDurableTask, updateTaskState, getTaskById, getPendingTaskPatch } from './durableTaskStore.js';
 
 const CELO_TASKS_API = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_CELO_TASKS_API)
   || '/api/tasks';
@@ -121,7 +121,11 @@ export async function listCeloTasks(walletAddress = '') {
     }
 
     if (remoteRows && remoteRows.length > 0) {
-      const remoteTasks = remoteRows.map(mapTask);
+      const remoteTasks = remoteRows.map((row) => {
+        const mapped = mapTask(row);
+        const pending = getPendingTaskPatch(mapped.id);
+        return pending ? { ...mapped, ...pending } : mapped;
+      });
       const remoteIds = new Set(remoteTasks.map((t) => t.id));
 
       // Merge remote tasks with local tasks, prioritizing remote persistent updates

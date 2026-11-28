@@ -684,7 +684,7 @@ export function resetSharedHumanQuotaStore() {
  * Checks whether an agent/wallet holds an active, fresh Self Agent ID on Celo Mainnet.
  * Used to gate Send, Swap, and cNGN/NTAG rewards.
  */
-export async function checkSelfHumanGate({ agentAddress } = {}) {
+export async function checkSelfHumanGate({ agentAddress, chainId = 42220 } = {}) {
   if (!agentAddress || !isAddress(agentAddress)) {
     return {
       allowed: false,
@@ -696,7 +696,7 @@ export async function checkSelfHumanGate({ agentAddress } = {}) {
     };
   }
 
-  const verification = await getAgentVerificationStatus({ agentAddress });
+  const verification = await getAgentVerificationStatus({ agentAddress, chainId });
   const allowed = Boolean(
     verification.status === VERIFICATION_STATUS.VERIFIED &&
     verification.isVerified &&

@@ -168,11 +168,21 @@ export default function TagToTagSendCard({
     }
     setSelfGate((prev) => ({ ...prev, checking: true }));
     getAgentControlStatus(walletAddress)
-      .then((c) => { if (active && c) setAltanaGate(c); })
-      .catch(() => {});
-    checkSelfHumanGate({ agentAddress: walletAddress })
-      .then((res) => { if (active) setSelfGate({ checking: false, ...res }); })
-      .catch(() => { if (active) setSelfGate({ checking: false, allowed: false, reason: 'Self Agent ID check failed.', agentId: null }); });
+      .then((c) => {
+        if (!active) return;
+        if (c) setAltanaGate(c);
+        if (c?.selfVerified) {
+          setSelfGate({ checking: false, allowed: true, agentId: c.selfAgentId ?? null, status: 'verified' });
+          return;
+        }
+        return checkSelfHumanGate({ agentAddress: c?.selfAgentAddress || walletAddress, chainId: c?.selfChainId || 42220 })
+          .then((res) => { if (active) setSelfGate({ checking: false, ...res }); });
+      })
+      .catch(() => {
+        checkSelfHumanGate({ agentAddress: walletAddress })
+          .then((res) => { if (active) setSelfGate({ checking: false, ...res }); })
+          .catch(() => { if (active) setSelfGate({ checking: false, allowed: false, reason: 'Self Agent ID check failed.', agentId: null }); });
+      });
     return () => { active = false; };
   }, [walletAddress]);
   // ── Form State ──
@@ -203,9 +213,21 @@ export default function TagToTagSendCard({
       return () => { active = false; };
     }
     setRecipientSelfGate((prev) => ({ ...prev, checking: true }));
-    checkSelfHumanGate({ agentAddress: resolvedRecipient.address })
-      .then((res) => { if (active) setRecipientSelfGate({ checking: false, allowed: Boolean(res.allowed), agentId: res.agentId ?? null }); })
-      .catch(() => { if (active) setRecipientSelfGate({ checking: false, allowed: false, agentId: null }); });
+    getAgentControlStatus(resolvedRecipient.tag || resolvedRecipient.address)
+      .then((c) => {
+        if (!active) return;
+        if (c?.selfVerified) {
+          setRecipientSelfGate({ checking: false, allowed: true, agentId: c.selfAgentId ?? null });
+          return;
+        }
+        return checkSelfHumanGate({ agentAddress: c?.selfAgentAddress || resolvedRecipient.address, chainId: c?.selfChainId || 42220 })
+          .then((res) => { if (active) setRecipientSelfGate({ checking: false, allowed: Boolean(res.allowed), agentId: res.agentId ?? null }); });
+      })
+      .catch(() => {
+        checkSelfHumanGate({ agentAddress: resolvedRecipient.address })
+          .then((res) => { if (active) setRecipientSelfGate({ checking: false, allowed: Boolean(res.allowed), agentId: res.agentId ?? null }); })
+          .catch(() => { if (active) setRecipientSelfGate({ checking: false, allowed: false, agentId: null }); });
+      });
     return () => { active = false; };
   }, [resolvedRecipient?.address]);
 

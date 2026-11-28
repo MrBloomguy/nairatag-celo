@@ -24,13 +24,22 @@ import {
   encodeFunctionData,
   keccak256,
   stringToHex,
+  createPublicClient,
+  http,
 } from 'viem';
 import { generateRegistrationJSON } from '@selfxyz/agent-sdk';
 import { publicClient, getEthereumProvider } from './celoPayment.js';
 import {
-  OFFICIAL_AGENT_WALLET,
   CELO_ERC8004_IDENTITY_REGISTRY,
 } from '../config/celo.js';
+
+const celoSepoliaPublicClient = createPublicClient({
+  transport: http('https://forno.celo-sepolia.celo-testnet.org'),
+});
+
+function getReadClient(chainId) {
+  return Number(chainId) === 11142220 ? celoSepoliaPublicClient : publicClient;
+}
 
 /**
  * Official Self Protocol Registry addresses on Celo
@@ -149,16 +158,17 @@ export async function getAgentVerificationStatus({
 
   const registryAddress = chainId === 42220 ? SELF_REGISTRY_CELO_MAINNET : SELF_REGISTRY_CELO_TESTNET;
   const agentPubKeyBytes = padHex(cleanAddr.toLowerCase(), { size: 32 });
+  const readClient = getReadClient(chainId);
 
   try {
     const [isVerified, agentId] = await Promise.all([
-      publicClient.readContract({
+      readClient.readContract({
         address: registryAddress,
         abi: SELF_REGISTRY_ABI,
         functionName: 'isVerifiedAgent',
         args: [agentPubKeyBytes],
       }).catch(() => false),
-      publicClient.readContract({
+      readClient.readContract({
         address: registryAddress,
         abi: SELF_REGISTRY_ABI,
         functionName: 'getAgentId',
@@ -174,25 +184,25 @@ export async function getAgentVerificationStatus({
 
     if (agentId && agentId > 0n) {
       const [humanProof, fresh, expiresAt, nullifierVal] = await Promise.all([
-        publicClient.readContract({
+        readClient.readContract({
           address: registryAddress,
           abi: SELF_REGISTRY_ABI,
           functionName: 'hasHumanProof',
           args: [agentId],
         }).catch(() => false),
-        publicClient.readContract({
+        readClient.readContract({
           address: registryAddress,
           abi: SELF_REGISTRY_ABI,
           functionName: 'isProofFresh',
           args: [agentId],
         }).catch(() => false),
-        publicClient.readContract({
+        readClient.readContract({
           address: registryAddress,
           abi: SELF_REGISTRY_ABI,
           functionName: 'proofExpiresAt',
           args: [agentId],
         }).catch(() => 0n),
-        publicClient.readContract({
+        readClient.readContract({
           address: registryAddress,
           abi: SELF_REGISTRY_ABI,
           functionName: 'getHumanNullifier',
@@ -207,7 +217,7 @@ export async function getAgentVerificationStatus({
 
       let agentCount = 1n;
       if (nullifierVal && nullifierVal > 0n) {
-        agentCount = await publicClient.readContract({
+        agentCount = await readClient.readContract({
           address: registryAddress,
           abi: SELF_REGISTRY_ABI,
           functionName: 'getAgentCountForHuman',
@@ -227,19 +237,6 @@ export async function getAgentVerificationStatus({
       status = VERIFICATION_STATUS.EXPIRED;
     } else if (agentId > 0n && !hasHumanProof) {
       status = VERIFICATION_STATUS.REVOKED;
-    } else {
-      // Check official platform agent / verified seed identity
-      const isOfficial = cleanAddr.toLowerCase() === OFFICIAL_AGENT_WALLET.toLowerCase() ||
-        cleanAddr.toLowerCase() === '0x653f773c9062e71a6554b42a9525fcd47fcc1693' ||
-        cleanAddr.toLowerCase() === '0x7c264210d5c992b8ea3224eb6b39f477a493af26';
-      if (isOfficial) {
-        status = VERIFICATION_STATUS.VERIFIED;
-        hasHumanProof = true;
-        isProofFresh = true;
-        nullifier = nullifier || '0x44e39f7d0c916fe1be55ac17a3748f3df5fda5be09e7f85b592043c37cce4afb';
-        proofExpiresAt = BigInt(Math.floor((Date.now() + 86400000 * 365) / 1000));
-        resultAgentCount = 1;
-      }
     }
 
     const result = {
@@ -298,20 +295,20 @@ export async function initiateAgentRegistrationSession({
   const cleanAgent = getAddress(agentAddress);
   const cleanHuman = humanAddress && isAddress(humanAddress) ? getAddress(humanAddress) : cleanAgent;
 
-  // Real Self registration payload structure
+  // Real Self registration payload structure (POST /api/agent/register)
+  const normalizedNetwork = network === 'testnet' ? 'testnet' : 'mainnet';
   const registrationPayload = {
-    mode: 'smartwallet',
-    network,
+    mode: 'linked',
+    network: normalizedNetwork,
     humanAddress: cleanHuman,
     disclosures: {
       minimumAge: disclosures.minimumAge || 18,
       ofac: disclosures.ofac !== false,
-      nationality: !!disclosures.nationality,
     },
   };
 
   try {
-    const res = await fetch(`${SELF_API_BASE}/registration/request`, {
+    const res = await fetch(`${SELF_API_BASE}/api/agent/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
       body: JSON.stringify(registrationPayload),
@@ -319,18 +316,24 @@ export async function initiateAgentRegistrationSession({
 
     if (res && res.ok) {
       const apiSession = await res.json();
+      const deepLink = apiSession.deepLink || apiSession.qrData || '';
+      const scanUrl = apiSession.scanUrl
+        || (deepLink ? `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(deepLink)}` : '');
       return {
         ok: true,
+        isLiveSession: true,
         sessionToken: apiSession.sessionToken,
         stage: apiSession.stage || 'pending',
-        deepLink: apiSession.deepLink,
-        scanUrl: apiSession.scanUrl,
-        agentAddress: cleanAgent,
+        deepLink,
+        scanUrl,
+        agentAddress: apiSession.agentAddress || cleanAgent,
         humanAddress: cleanHuman,
         expiresAt: apiSession.expiresAt,
         humanInstructions: apiSession.humanInstructions || [
           'Scan this QR code with the Self app on iOS or Android.',
-          'Hold your NFC passport to the back of your phone.',
+          normalizedNetwork === 'testnet'
+            ? 'Approve using your Mock Document in the Self app.'
+            : 'Hold your NFC passport to the back of your phone.',
           'Self generates a zero-knowledge proof of uniqueness directly on your device.',
         ],
       };
@@ -340,7 +343,8 @@ export async function initiateAgentRegistrationSession({
   }
 
   // Fallback: Deterministic Self App Deep Link
-  const fallbackDeepLink = `selfid://register?agent=${cleanAgent}&chain=42220&minAge=18&ofac=1`;
+  const targetChainId = network === 'testnet' ? 11142220 : 42220;
+  const fallbackDeepLink = `selfid://register?agent=${cleanAgent}&chain=${targetChainId}&minAge=18&ofac=1`;
   const fallbackScanUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(fallbackDeepLink)}`;
 
   return {
@@ -479,21 +483,26 @@ export const checkAgentVerificationOnChain = getAgentVerificationStatus;
  * - OFAC screening
  */
 export async function createSelfAgentVerifier({
+  network = 'mainnet',
   sybilLimit = SELF_MAX_AGENTS_PER_HUMAN,
   requireAge = 18,
   requireOFAC = true,
-  registryAddress = SELF_REGISTRY_CELO_MAINNET,
-  rpcUrl = 'https://forno.celo.org',
+  registryAddress = network === 'testnet' ? SELF_REGISTRY_CELO_TESTNET : SELF_REGISTRY_CELO_MAINNET,
+  rpcUrl = network === 'testnet' ? 'https://forno.celo-sepolia.celo-testnet.org' : 'https://forno.celo.org',
 } = {}) {
+  const normalizedNetwork = network === 'testnet' ? 'testnet' : 'mainnet';
+  const chainId = normalizedNetwork === 'testnet' ? 11142220 : SELF_CELO_CHAIN_ID;
+  const effectiveSybilLimit = Number.isFinite(Number(sybilLimit)) ? Number(sybilLimit) : SELF_MAX_AGENTS_PER_HUMAN;
+
   try {
     const sdk = await import(/* @vite-ignore */ '@selfxyz/agent-sdk');
     const SelfAgentVerifier = sdk?.SelfAgentVerifier || sdk?.default?.SelfAgentVerifier;
     if (SelfAgentVerifier && typeof SelfAgentVerifier.create === 'function') {
       const builder = SelfAgentVerifier.create()
-        .network('mainnet')
-        .registryAddress(registryAddress)
-        .rpcUrl(rpcUrl)
-        .sybilLimit(sybilLimit);
+        .network(normalizedNetwork)
+        .registry(registryAddress)
+        .rpc(rpcUrl)
+        .sybilLimit(effectiveSybilLimit);
 
       if (requireAge) builder.requireAge(requireAge);
       if (requireOFAC) builder.requireOFAC();
@@ -511,7 +520,7 @@ export async function createSelfAgentVerifier({
       if (!address || !isAddress(address)) {
         return { valid: false, error: 'Missing or invalid x-self-agent-address header' };
       }
-      const status = await getAgentVerificationStatus({ agentAddress: address, skipCache: true });
+      const status = await getAgentVerificationStatus({ agentAddress: address, chainId, skipCache: true });
       return {
         valid: status.isVerified,
         agentAddress: address,

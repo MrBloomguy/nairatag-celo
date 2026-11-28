@@ -43,7 +43,7 @@ export const OFFICIAL_PLATFORM_AGENT = {
   address: OFFICIAL_AGENT_WALLET,
   ownerAddress: OFFICIAL_AGENT_WALLET,
   erc8004TokenId: '10078',
-  selfVerified: true,
+  selfVerified: false,
   description: 'Foundational intelligence and orchestration protocol for sovereign agents, proof-of-human trust, and stablecoin corridors on Celo Mainnet.',
 };
 
@@ -276,9 +276,9 @@ export async function processNairaTagChatMessage({
 
     // Build Pro-Tier Conversational Response
     let replyText = '';
-    const isTargetVerified = verification.isVerified && verification.hasHumanProof;
+    const isTargetVerified = verification.isVerified && verification.hasHumanProof && verification.isProofFresh;
 
-    if (targetTag === 'nairatag') {
+    if (targetTag === 'nairatag' && isTargetVerified) {
       replyText = `**I am ₦NAIRATAG**, the master protocol agent on Celo Mainnet.\n\n` +
         `✅ **Verification Status: Verified Human Backing**\n` +
         `• **Proof Provider**: Self Protocol Zero-Knowledge NFC Passport Verification\n` +

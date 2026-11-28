@@ -88,10 +88,11 @@ test('3. Pending Verification Session Flow', async () => {
   });
 
   assert.ok(session.ok);
-  assert.equal(session.stage, 'pending');
-  assert.ok(session.deepLink.includes('register'));
+  assert.ok(['pending', 'qr-ready'].includes(session.stage));
+  assert.ok(session.deepLink.includes('redirect.self.xyz') || session.deepLink.includes('register'));
   assert.ok(session.scanUrl);
-  assert.equal(session.agentAddress.toLowerCase(), OFFICIAL_AGENT_WALLET.toLowerCase());
+  assert.equal(session.humanAddress.toLowerCase(), OFFICIAL_AGENT_WALLET.toLowerCase());
+  assert.ok(/^0x[a-fA-F0-9]{40}$/.test(session.agentAddress));
 });
 
 test('4. Expired Verification Detection', async () => {
@@ -1009,4 +1010,42 @@ test('34. Combined ERC-8004 & A2A Registration JSON + setAgentURI ABI', async ()
   assert.ok(SELF_REGISTRY_ABI.some((item) => item.type === 'function' && item.name === 'setAgentURI'));
   assert.ok(SELF_REGISTRY_ABI.some((item) => item.type === 'function' && item.name === 'tokenURI'));
 });
+
+test('35. createSelfAgentVerifier supports sybilLimit(0) and testnet (Celo Sepolia) for 1-account multi-agent testing', async () => {
+  const mainnetZeroLimit = await createSelfAgentVerifier({
+    network: 'mainnet',
+    sybilLimit: 0,
+    requireAge: 18,
+    requireOFAC: true,
+  });
+  assert.ok(mainnetZeroLimit);
+  assert.equal(typeof mainnetZeroLimit.verify, 'function');
+
+  const testnetZeroLimit = await createSelfAgentVerifier({
+    network: 'testnet',
+    sybilLimit: 0,
+    requireAge: 18,
+    requireOFAC: false,
+  });
+  assert.ok(testnetZeroLimit);
+  assert.equal(typeof testnetZeroLimit.verify, 'function');
+});
+
+test('36. readRawRequestBody preserves exact raw JSON bytes without re-serialisation', async () => {
+  const { readRawRequestBody } = await import('../api/self-gated-service.js');
+
+  // Whitespace & key order must remain untouched for signature verification
+  const exactRaw = '{  "z": 1, "a": "hello"  }';
+  const asyncStreamReq = {
+    async *[Symbol.asyncIterator]() {
+      yield Buffer.from(exactRaw.slice(0, 10));
+      yield Buffer.from(exactRaw.slice(10));
+    },
+  };
+
+  const result = await readRawRequestBody(asyncStreamReq);
+  assert.equal(result, exactRaw);
+  assert.notEqual(result, JSON.stringify(JSON.parse(exactRaw)));
+});
+
 

@@ -37,6 +37,7 @@ import {
   Copy,
   ExternalLink,
   ArrowRight,
+  ArrowDownLeft,
   Shield,
   ShieldCheck,
   Key,
@@ -63,6 +64,10 @@ import {
   FileText,
   Cpu,
   Layers,
+  LogOut,
+  Settings,
+  Pencil,
+  Camera,
   SlidersHorizontal,
   Flame,
   QrCode,
@@ -157,6 +162,7 @@ import {
   claimAndProvisionAgent,
   getAgentControlStatus,
   grantAgentSessionPolicy,
+  updateAgentProfileMetadata,
 } from './services/agentLifecycleService.js';
 import {
   buildNairaTagAgentMetadataUri,
@@ -1739,9 +1745,17 @@ function ArcAppShell() {
   const [isProfileShareMenuOpen, setIsProfileShareMenuOpen] = useState(false);
   const [agentControlStatus, setAgentControlStatus] = useState(null);
   const [myAgentControlStatus, setMyAgentControlStatus] = useState(null);
+  const [isProfileAltanaOpen, setIsProfileAltanaOpen] = useState(false);
+  const [isProfileSettingsOpen, setIsProfileSettingsOpen] = useState(false);
+  const [isProfileEditOpen, setIsProfileEditOpen] = useState(false);
+  const [profileAvatarDraft, setProfileAvatarDraft] = useState('');
+  const [profileBioDraft, setProfileBioDraft] = useState('');
+  const [isSavingProfileMeta, setIsSavingProfileMeta] = useState(false);
   const [sessionExpiryHoursChoice, setSessionExpiryHoursChoice] = useState(24);
+  const [ownerPerTxUsdLimit, setOwnerPerTxUsdLimit] = useState('50');
   const [ownerDailyUsdtLimit, setOwnerDailyUsdtLimit] = useState('50');
   const [ownerDailyCngnLimit, setOwnerDailyCngnLimit] = useState('100000');
+  const [ownerDailyCeloLimit, setOwnerDailyCeloLimit] = useState('10');
   const [ownerCapabilityToggles, setOwnerCapabilityToggles] = useState({ send: true, swap: true, protocols: true });
   const [isUpdatingAgentSession, setIsUpdatingAgentSession] = useState(false);
 
@@ -1768,9 +1782,13 @@ function ArcAppShell() {
       .then((status) => {
         if (!active) return;
         setMyAgentControlStatus(status);
+        setProfileAvatarDraft(status?.avatarUrl || '');
+        setProfileBioDraft(status?.bio || '');
         if (status?.spendingLimits) {
+          setOwnerPerTxUsdLimit(String(status.spendingLimits.perTxUsd || '50'));
           setOwnerDailyUsdtLimit(String(status.spendingLimits.dailyUsdt || '50'));
           setOwnerDailyCngnLimit(String(status.spendingLimits.dailyCngn || '100000'));
+          setOwnerDailyCeloLimit(String(status.spendingLimits.dailyCelo || '10'));
         }
         if (status?.allowedActions && status.hasActiveSession) {
           setOwnerCapabilityToggles({
@@ -3876,7 +3894,7 @@ function ArcAppShell() {
               title="Open your profile dashboard"
               aria-label="Open your profile dashboard"
             >
-              <ProfileAvatar tag={myTag?.tag} email={accountEmail} size={26} />
+              <ProfileAvatar tag={myTag?.tag || walletAddress} email={accountEmail} avatarUrl={myAgentControlStatus?.avatarUrl} size={26} />
               <span className="wallet-connected-handle">{displayAccountName || (walletAddress ? `₦${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}` : 'Wallet')}</span>
               <span className="wallet-connected-sep desktop-only">|</span>
               <span className="wallet-connected-bal desktop-only">{usdcBalance.formatted} USDC</span>
@@ -4202,253 +4220,586 @@ function ArcAppShell() {
 
       {/* ─── Main Application Body ─── */}
       <main className={`main-content-wrapper ${mainTab === 'claim' ? 'claim-active' : ''} ${mainTab === 'chat' ? 'chat-mode' : ''}`}>
-        {mainTab === 'profile' && (
-          <section className="account-dashboard">
-            <div className="account-dashboard-heading">
-              <div>
-                <span className="account-dashboard-eyebrow">ACCOUNT</span>
-                <h1>Profile dashboard</h1>
-                <p>{IS_CONCORDIUM_SITE ? 'Your NairaTag identity and agent profile in one place.' : 'Your NairaTag identity, Celo wallet, and rewards in one place.'}</p>
+        {mainTab === 'profile' && (() => {
+          const cleanOwnedTag = myTag?.tag ? myTag.tag.replace(/^[$₦]/, '').toLowerCase() : '';
+          const isLoadingSelf = Boolean(cleanOwnedTag && myAgentControlStatus === null);
+          const selfOk = Boolean(myAgentControlStatus?.selfVerified);
+          const selfId = myAgentControlStatus?.selfAgentId;
+
+          const rowBtnStyle = {
+            width: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '12px',
+            padding: '14px 16px',
+            background: 'transparent',
+            border: 'none',
+            borderBottom: '1px solid var(--border, rgba(15, 23, 42, 0.08))',
+            color: 'inherit',
+            fontSize: '14px',
+            fontWeight: 500,
+            cursor: 'pointer',
+            textAlign: 'left',
+          };
+
+          const groupCardStyle = {
+            borderRadius: '18px',
+            background: 'var(--surface1, #ffffff)',
+            border: '1px solid var(--border, rgba(15, 23, 42, 0.08))',
+            overflow: 'hidden',
+          };
+
+          return (
+            <section className="account-dashboard" style={{ maxWidth: '500px', gap: '14px' }}>
+              {/* ── Top Bar ── */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 0' }}>
+                <button
+                  type="button"
+                  onClick={() => setMainTab('chat')}
+                  aria-label="Back to chat"
+                  style={{ width: '36px', height: '36px', borderRadius: '50%', border: '1px solid var(--border, rgba(15, 23, 42, 0.1))', background: 'var(--surface1, #fff)', color: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+                >
+                  <ArrowLeft size={16} />
+                </button>
+                <span style={{ fontSize: '16px', fontWeight: 700 }}>Profile</span>
+                <button
+                  type="button"
+                  onClick={() => setMainTab('agents')}
+                  aria-label="Search agents"
+                  style={{ width: '36px', height: '36px', borderRadius: '50%', border: '1px solid var(--border, rgba(15, 23, 42, 0.1))', background: 'var(--surface1, #fff)', color: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+                >
+                  <Search size={16} />
+                </button>
               </div>
-              <button type="button" className="quick-chip-btn" onClick={() => setMainTab('chat')}><ArrowLeft size={14} /> Back to chat</button>
-            </div>
 
-            {walletAddress ? (
-              <>
-                <article className="account-identity-card">
-                  <ProfileAvatar tag={myTag?.tag} email={accountEmail} size={52} className="account-avatar" />
-                  <div className="account-identity-copy">
-                    <span>{authProvider === 'circle' ? 'Circle email account' : 'Connected wallet account'}</span>
-                    <h2>{displayAccountName || (IS_CONCORDIUM_SITE ? 'Your NairaTag account' : 'Your Celo account')}</h2>
-                    <p>{accountEmail || (myTag?.tag ? (IS_CONCORDIUM_SITE ? 'Your NairaTag identity is ready to link to an agent profile.' : 'Your NairaTag is connected to your Celo wallet.') : 'Claim a NairaTag to create your readable payment identity.')}</p>
-                  </div>
-                  <span className="account-network-pill"><span /> {activeSiteNetworkLabel}</span>
-                </article>
-
-                {!IS_CONCORDIUM_SITE && <div className="account-stats-grid">
-                  <article className="account-stat-card"><span>USDC balance</span><strong>{usdcBalance.formatted}</strong><small>≈ ₦{(parseFloat(usdcBalance.formatted || '0') * 1485).toLocaleString('en-NG', { maximumFractionDigits: 2 })} NGN</small></article>
-                  <article className="account-stat-card"><span>Protocol Points</span><strong>{Number(userPoints || 0).toLocaleString()}</strong><small>Earned across NairaTag rewards</small></article>
-                </div>}
-
-                <article className="account-wallet-card">
-                  <div className="account-wallet-heading"><div><span className="account-dashboard-eyebrow">YOUR WALLET</span><h2>{IS_CONCORDIUM_SITE ? 'NairaTag owner wallet' : authProvider === 'circle' ? 'Circle Programmable Wallet' : 'Browser wallet'}</h2></div><span className="account-network-pill"><span /> Connected</span></div>
-                  <div className="account-wallet-address"><span>{walletAddress}</span><button type="button" className="quick-chip-btn" onClick={() => triggerCopy('profile_wallet_copy', walletAddress)}><Copy size={13} />{copiedKey === 'profile_wallet_copy' ? 'Copied' : 'Copy'}</button></div>
-                  <div className="account-dashboard-actions">
-                    {!IS_CONCORDIUM_SITE && <button type="button" className="btn-action-primary" onClick={() => setMainTab('pay')}><Send size={15} /> Send USDC</button>}
-                    {!IS_CONCORDIUM_SITE && <button type="button" className="quick-chip-btn" onClick={() => { setWalletTab('overview'); setIsWalletModalOpen(true); }}><Wallet size={15} /> Wallet details</button>}
-                    {!IS_CONCORDIUM_SITE && <button type="button" className="quick-chip-btn" onClick={() => setMainTab('rewards')}><Gift size={15} /> Rewards</button>}
-                    {IS_CONCORDIUM_SITE && <button type="button" className="quick-chip-btn" onClick={() => setMainTab('agents')}><Bot size={15} /> Agent profiles</button>}
-                    {myTag?.tag ? <button type="button" className="quick-chip-btn" onClick={() => setIsPersonalAgentOpen(true)}><Brain size={15} /> Personal agent</button> : <button type="button" className="quick-chip-btn" onClick={() => setMainTab('claim')}><Tag size={15} /> Claim a NairaTag</button>}
-                  </div>
-                </article>
-
-                {!IS_CONCORDIUM_SITE && myTag?.tag && (() => {
-                  const cleanOwnedTag = myTag.tag.replace(/^[$₦]/, '').toLowerCase();
-                  return (
-                    <article className="account-wallet-card" style={{ marginTop: '14px' }}>
-                      <div className="account-wallet-heading">
-                        <div>
-                          <span className="account-dashboard-eyebrow">SETTINGS · ALTANA AGENTIC WALLET</span>
-                          <h2>₦{cleanOwnedTag.toUpperCase()} Wallet &amp; Permissions</h2>
-                        </div>
-                        <span className="account-network-pill">
-                          <span /> {myAgentControlStatus?.hasActiveSession ? 'Session Active' : myAgentControlStatus?.sessionStatus === 'revoked' ? 'Session Revoked' : 'Not Authorized'}
-                        </span>
-                      </div>
-
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '6px 12px', fontSize: '13px', marginBottom: '12px' }}>
-                        <span style={{ opacity: 0.72 }}>Altana Smart Wallet</span>
-                        <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>
-                          {myAgentControlStatus?.walletAddress
-                            ? `${myAgentControlStatus.walletAddress.slice(0, 6)}...${myAgentControlStatus.walletAddress.slice(-4)} (Active)`
-                            : 'Provisioned on claim'}
-                        </span>
-                        <span style={{ opacity: 0.72 }}>Self ID Owner Gate</span>
-                        <span style={{ fontWeight: 600, color: myAgentControlStatus?.selfVerified ? '#059669' : '#b45309', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                          {myAgentControlStatus?.selfVerified ? 'Verified Human' : 'Verification Pending'}
-                          {myAgentControlStatus?.selfAgentId && (
-                            <a
-                              href={`https://agent-api.self.xyz/api/agent/info/42220/${myAgentControlStatus.selfAgentId}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              style={{ fontFamily: 'monospace', fontSize: '12px', textDecoration: 'underline', color: 'inherit' }}
-                            >
-                              #{myAgentControlStatus.selfAgentId} ↗
-                            </a>
-                          )}
-                        </span>
-                      </div>
-
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', padding: '12px', borderRadius: '12px', background: 'var(--bg-secondary, rgba(15, 23, 42, 0.03))', border: '1px solid var(--border-color, rgba(15, 23, 42, 0.08))' }}>
-                        <div style={{ fontSize: '12px', fontWeight: 700, opacity: 0.8 }}>CAPABILITY TOGGLES</div>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', fontSize: '13px' }}>
-                          <label style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
-                            <input
-                              type="checkbox"
-                              checked={ownerCapabilityToggles.send}
-                              onChange={(e) => setOwnerCapabilityToggles((p) => ({ ...p, send: e.target.checked }))}
-                            />
-                            Send payments
-                          </label>
-                          <label style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
-                            <input
-                              type="checkbox"
-                              checked={ownerCapabilityToggles.swap}
-                              onChange={(e) => setOwnerCapabilityToggles((p) => ({ ...p, swap: e.target.checked }))}
-                            />
-                            Swap tokens
-                          </label>
-                          <span style={{ fontSize: '12px', opacity: 0.65 }}>· Unlimited spending: Not allowed</span>
-                        </div>
-
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '10px', marginTop: '4px' }}>
-                          <label style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '12px' }}>
-                            <span style={{ opacity: 0.72 }}>Daily USD₮ cap</span>
-                            <input
-                              type="number"
-                              min="1"
-                              value={ownerDailyUsdtLimit}
-                              onChange={(e) => setOwnerDailyUsdtLimit(e.target.value)}
-                              style={{ padding: '6px 8px', borderRadius: '8px', border: '1px solid var(--border-color, rgba(15, 23, 42, 0.15))', fontSize: '13px' }}
-                            />
-                          </label>
-                          <label style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '12px' }}>
-                            <span style={{ opacity: 0.72 }}>Daily cNGN cap</span>
-                            <input
-                              type="number"
-                              min="100"
-                              value={ownerDailyCngnLimit}
-                              onChange={(e) => setOwnerDailyCngnLimit(e.target.value)}
-                              style={{ padding: '6px 8px', borderRadius: '8px', border: '1px solid var(--border-color, rgba(15, 23, 42, 0.15))', fontSize: '13px' }}
-                            />
-                          </label>
-                          <label style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '12px' }}>
-                            <span style={{ opacity: 0.72 }}>Session expiry</span>
-                            <select
-                              value={sessionExpiryHoursChoice}
-                              onChange={(e) => setSessionExpiryHoursChoice(Number(e.target.value))}
-                              style={{ padding: '6px 8px', borderRadius: '8px', border: '1px solid var(--border-color, rgba(15, 23, 42, 0.15))', fontSize: '13px' }}
-                            >
-                              <option value={1}>1 hour</option>
-                              <option value={24}>24 hours</option>
-                              <option value={168}>7 days</option>
-                            </select>
-                          </label>
-                        </div>
-                      </div>
-
-                      <div className="account-dashboard-actions" style={{ marginTop: '12px' }}>
-                        {!myAgentControlStatus?.selfVerified && (
-                          <button type="button" className="btn-action-primary" onClick={() => setIsSelfDemoModalOpen(true)}>
-                            <ShieldCheck size={15} /> Verify Self ID First
-                          </button>
+              {walletAddress ? (
+                <>
+                  {/* ── User Identity Row Card + Edit Avatar & Bio ── */}
+                  <div style={groupCardStyle}>
+                    <div
+                      style={{
+                        padding: '14px 16px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '12px',
+                      }}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => { if (cleanOwnedTag) setIsProfileEditOpen((v) => !v); }}
+                        title={cleanOwnedTag ? 'Edit avatar & bio' : 'Claim a NairaTag first'}
+                        style={{ position: 'relative', padding: 0, border: 'none', background: 'transparent', cursor: cleanOwnedTag ? 'pointer' : 'default', flexShrink: 0 }}
+                      >
+                        {myAgentControlStatus?.avatarUrl ? (
+                          <img
+                            src={myAgentControlStatus.avatarUrl}
+                            alt={cleanOwnedTag || 'Avatar'}
+                            style={{ width: '48px', height: '48px', borderRadius: '50%', objectFit: 'cover' }}
+                          />
+                        ) : (
+                          <ProfileAvatar tag={myTag?.tag || walletAddress} email={accountEmail} size={48} className="account-avatar" />
                         )}
-                        <button
-                          type="button"
-                          className="btn-action-primary"
-                          disabled={isUpdatingAgentSession || !myAgentControlStatus?.selfVerified}
-                          onClick={async () => {
-                            setIsUpdatingAgentSession(true);
-                            try {
-                              await grantAgentSessionPolicy({
-                                tag: cleanOwnedTag,
-                                sessionDurationSeconds: Number(sessionExpiryHoursChoice) * 3600,
-                                dailyUsdtLimit: String(ownerDailyUsdtLimit || '50'),
-                                dailyCngnLimit: String(ownerDailyCngnLimit || '100000'),
-                                allowedActions: ownerCapabilityToggles,
-                              });
-                              setMyAgentControlStatus(await getAgentControlStatus(cleanOwnedTag));
-                              showStatus?.(`Updated Altana session permissions for ₦${cleanOwnedTag.toUpperCase()}`, 'success');
-                            } catch (err) {
-                              showStatus?.(err?.message || 'Failed to update Altana session key', 'error');
-                            } finally {
-                              setIsUpdatingAgentSession(false);
-                            }
-                          }}
-                        >
-                          <Shield size={15} /> {isUpdatingAgentSession ? 'Saving...' : myAgentControlStatus?.hasActiveSession ? 'Update Session Permissions' : 'Grant Altana Session Key'}
-                        </button>
-                        {myAgentControlStatus?.hasActiveSession && (
+                        {cleanOwnedTag && (
+                          <span style={{
+                            position: 'absolute',
+                            right: '-2px',
+                            bottom: '-2px',
+                            width: '20px',
+                            height: '20px',
+                            borderRadius: '50%',
+                            background: 'var(--primary, #059669)',
+                            color: '#ffffff',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            border: '2px solid var(--surface1, #ffffff)',
+                          }}>
+                            <Camera size={10} />
+                          </span>
+                        )}
+                      </button>
+
+                      <div
+                        role={cleanOwnedTag ? 'button' : undefined}
+                        tabIndex={cleanOwnedTag ? 0 : undefined}
+                        onClick={() => { if (cleanOwnedTag) window.location.href = `/${encodeURIComponent(cleanOwnedTag)}`; }}
+                        onKeyDown={(e) => { if (cleanOwnedTag && (e.key === 'Enter' || e.key === ' ')) window.location.href = `/${encodeURIComponent(cleanOwnedTag)}`; }}
+                        style={{ flex: 1, minWidth: 0, cursor: cleanOwnedTag ? 'pointer' : 'default' }}
+                      >
+                        <div style={{ fontSize: '16px', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {cleanOwnedTag ? `₦${cleanOwnedTag.toUpperCase()}` : (accountEmail || 'Celo Wallet Account')}
+                        </div>
+                        <div style={{ fontSize: '12.5px', opacity: 0.65, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {myAgentControlStatus?.bio || (cleanOwnedTag ? `celo.nairatag.ng/${cleanOwnedTag}` : `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}`)}
+                        </div>
+                      </div>
+
+                      {cleanOwnedTag && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
                           <button
                             type="button"
                             className="quick-chip-btn"
-                            disabled={isUpdatingAgentSession}
-                            style={{ color: '#dc2626', borderColor: 'rgba(239, 68, 68, 0.35)' }}
+                            onClick={() => setIsProfileEditOpen((v) => !v)}
+                            title="Edit avatar & bio"
+                            style={{ padding: '6px 10px', fontSize: '12px' }}
+                          >
+                            <Pencil size={12} /> Edit
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => { window.location.href = `/${encodeURIComponent(cleanOwnedTag)}`; }}
+                            title="View public profile"
+                            style={{ background: 'transparent', border: 'none', color: 'inherit', opacity: 0.55, cursor: 'pointer', padding: '4px', display: 'flex' }}
+                          >
+                            <ChevronRight size={17} />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    {isProfileEditOpen && cleanOwnedTag && (
+                      <div style={{ padding: '14px 16px', borderTop: '1px solid var(--border, rgba(15, 23, 42, 0.08))', background: 'var(--bg-secondary, rgba(15, 23, 42, 0.025))', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                          <input
+                            type="url"
+                            placeholder="Avatar image URL (https://...)"
+                            value={profileAvatarDraft}
+                            onChange={(e) => setProfileAvatarDraft(e.target.value)}
+                            style={{ flex: 1, padding: '7px 10px', borderRadius: '8px', border: '1px solid var(--border, rgba(15, 23, 42, 0.15))', fontSize: '12.5px' }}
+                          />
+                          <label className="quick-chip-btn" style={{ cursor: 'pointer', padding: '7px 10px', fontSize: '12px' }}>
+                            <Camera size={12} /> Upload
+                            <input
+                              type="file"
+                              accept="image/*"
+                              style={{ display: 'none' }}
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (!file) return;
+                                const reader = new FileReader();
+                                reader.onload = () => {
+                                  if (typeof reader.result === 'string') setProfileAvatarDraft(reader.result);
+                                };
+                                reader.readAsDataURL(file);
+                              }}
+                            />
+                          </label>
+                        </div>
+                        <textarea
+                          rows={2}
+                          maxLength={180}
+                          placeholder="Write a short bio for your NairaTag & agent..."
+                          value={profileBioDraft}
+                          onChange={(e) => setProfileBioDraft(e.target.value)}
+                          style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid var(--border, rgba(15, 23, 42, 0.15))', fontSize: '12.5px', resize: 'vertical' }}
+                        />
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                          <button type="button" className="quick-chip-btn" onClick={() => setIsProfileEditOpen(false)}>Cancel</button>
+                          <button
+                            type="button"
+                            className="btn-action-primary"
+                            disabled={isSavingProfileMeta}
+                            style={{ padding: '7px 14px', fontSize: '12.5px' }}
                             onClick={async () => {
-                              setIsUpdatingAgentSession(true);
+                              setIsSavingProfileMeta(true);
                               try {
-                                await revokeAgentSession({ tag: cleanOwnedTag, reason: 'Owner revoked from Profile Dashboard Settings' });
+                                await updateAgentProfileMetadata({
+                                  tag: cleanOwnedTag,
+                                  ownerAddress: walletAddress,
+                                  avatarUrl: profileAvatarDraft.trim() || null,
+                                  bio: profileBioDraft.trim(),
+                                });
                                 setMyAgentControlStatus(await getAgentControlStatus(cleanOwnedTag));
-                                showStatus?.(`Revoked Altana session key for ₦${cleanOwnedTag.toUpperCase()}`, 'info');
+                                setIsProfileEditOpen(false);
+                                showStatus?.('Profile avatar & bio saved to database', 'success');
                               } catch (err) {
-                                showStatus?.(err?.message || 'Failed to revoke session key', 'error');
+                                showStatus?.(err?.message || 'Failed to save profile', 'error');
                               } finally {
-                                setIsUpdatingAgentSession(false);
+                                setIsSavingProfileMeta(false);
                               }
                             }}
                           >
-                            Revoke Agent Permissions
+                            {isSavingProfileMeta ? 'Saving…' : 'Save Profile'}
                           </button>
-                        )}
+                        </div>
                       </div>
+                    )}
+                  </div>
 
-                      <div style={{ marginTop: '12px', paddingTop: '10px', borderTop: '1px solid var(--border-color, rgba(15, 23, 42, 0.08))', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap', fontSize: '12px' }}>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 }}>
-                          <span style={{ fontWeight: 700 }}>ERC-8004 / A2A Registration JSON (agentURI)</span>
-                          <a
-                            href={`/api/agent-card?tag=${encodeURIComponent(cleanOwnedTag)}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            style={{ fontFamily: 'monospace', fontSize: '11px', opacity: 0.8, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
-                          >
-                            https://celo.nairatag.ng/api/agent-card?tag={cleanOwnedTag}
-                          </a>
+                  {/* ── Dark Self ID Banner Card ── */}
+                  {!IS_CONCORDIUM_SITE && (
+                    <div style={{
+                      borderRadius: '18px',
+                      padding: '16px',
+                      background: 'linear-gradient(135deg, #181a20 0%, #242731 100%)',
+                      color: '#ffffff',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: '12px',
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
+                        <div style={{ width: '38px', height: '38px', borderRadius: '10px', background: 'rgba(255, 255, 255, 0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: selfOk ? '#34d399' : '#ffffff' }}>
+                          <SelfIcon size={22} />
                         </div>
-                        <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
-                          <button
-                            type="button"
-                            className="quick-chip-btn"
-                            onClick={() => triggerCopy(`agent_uri_${cleanOwnedTag}`, `https://celo.nairatag.ng/api/agent-card?tag=${cleanOwnedTag}`)}
-                          >
-                            <Copy size={12} /> {copiedKey === `agent_uri_${cleanOwnedTag}` ? 'Copied' : 'Copy URI'}
-                          </button>
-                          {myAgentControlStatus?.selfVerified && (
-                            <button
-                              type="button"
-                              className="quick-chip-btn"
-                              disabled={isUpdatingAgentSession}
-                              onClick={async () => {
-                                const agentId = myAgentControlStatus?.selfAgentId || myTag?.agentId;
-                                if (!agentId) {
-                                  showToast('Link or mint your Self Agent ID first to set agentURI on-chain.', 'info');
-                                  return;
-                                }
-                                setIsUpdatingAgentSession(true);
-                                try {
-                                  const uri = `https://celo.nairatag.ng/api/agent-card?tag=${encodeURIComponent(cleanOwnedTag)}`;
-                                  const res = await setSelfAgentURI({ agentId, agentURI: uri, fromAddress: walletAddress });
-                                  showToast(`Published agentURI on Celo Mainnet (${shorten(res.txHash)})`, 'success', 4500);
-                                } catch (err) {
-                                  showToast(err?.message || 'Failed to set agentURI on-chain', 'error', 4500);
-                                } finally {
-                                  setIsUpdatingAgentSession(false);
-                                }
-                              }}
-                            >
-                              <ExternalLink size={12} /> Set agentURI On-Chain
-                            </button>
-                          )}
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ fontSize: '14.5px', fontWeight: 700 }}>
+                            {isLoadingSelf ? 'Checking Self ID…' : selfOk ? `Self Verified #${selfId || 'Active'}` : 'Verify with Self ID'}
+                          </div>
+                          <div style={{ fontSize: '12px', opacity: 0.72, marginTop: '2px' }}>
+                            {selfOk
+                              ? 'Proof-of-Human active on Celo Mainnet.'
+                              : 'Unlock tag payments, task escrow & agent session keys.'}
+                          </div>
                         </div>
                       </div>
-                    </article>
-                  );
-                })()}
-              </>
-            ) : (
-              <article className="account-wallet-card account-profile-empty"><User size={24} /><h2>Sign in to view your profile</h2><p>Your account details and rewards will appear here after sign in.</p><button type="button" className="btn-action-primary" onClick={() => setIsConnectModalOpen(true)}>Sign in</button></article>
-            )}
-          </section>
-        )}
+                      {selfOk && selfId ? (
+                        <a
+                          href={`https://agent-api.self.xyz/api/agent/info/42220/${selfId}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{
+                            padding: '6px 12px',
+                            borderRadius: '999px',
+                            border: '1px solid rgba(255,255,255,0.22)',
+                            color: '#ffffff',
+                            fontSize: '12px',
+                            fontWeight: 600,
+                            textDecoration: 'none',
+                            whiteSpace: 'nowrap',
+                            flexShrink: 0,
+                          }}
+                        >
+                          View &gt;
+                        </a>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setIsSelfDemoModalOpen(true)}
+                          style={{
+                            padding: '6px 12px',
+                            borderRadius: '999px',
+                            border: '1px solid rgba(255,255,255,0.22)',
+                            background: 'rgba(255,255,255,0.08)',
+                            color: '#ffffff',
+                            fontSize: '12px',
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            whiteSpace: 'nowrap',
+                            flexShrink: 0,
+                          }}
+                        >
+                          Verify &gt;
+                        </button>
+                      )}
+                    </div>
+                  )}
+
+                  {/* ── Wallet Stats Card (placed right after Verify section) ── */}
+                  {!IS_CONCORDIUM_SITE && (
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                      <div
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => setMainTab('pay')}
+                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setMainTab('pay'); }}
+                        style={{
+                          ...groupCardStyle,
+                          padding: '14px 16px',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '5px',
+                          background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.12) 0%, rgba(5, 150, 105, 0.04) 100%)',
+                          border: '1px solid rgba(16, 185, 129, 0.28)',
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <span style={{ fontSize: '12px', fontWeight: 600, color: '#059669' }}>USDC Balance</span>
+                          <Send size={13} color="#059669" />
+                        </div>
+                        <strong style={{ fontSize: '21px', fontWeight: 800, letterSpacing: '-0.02em' }}>{usdcBalance.formatted}</strong>
+                        <span style={{ fontSize: '11.5px', opacity: 0.72 }}>≈ ₦{(parseFloat(usdcBalance.formatted || '0') * 1485).toLocaleString('en-NG', { maximumFractionDigits: 0 })} NGN</span>
+                      </div>
+                      <div
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => setMainTab('rewards')}
+                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setMainTab('rewards'); }}
+                        style={{
+                          ...groupCardStyle,
+                          padding: '14px 16px',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '5px',
+                          background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.12) 0%, rgba(245, 158, 11, 0.06) 100%)',
+                          border: '1px solid rgba(99, 102, 241, 0.28)',
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <span style={{ fontSize: '12px', fontWeight: 600, color: '#6366f1' }}>Protocol Points</span>
+                          <Sparkles size={13} color="#f59e0b" />
+                        </div>
+                        <strong style={{ fontSize: '21px', fontWeight: 800, letterSpacing: '-0.02em' }}>{Number(userPoints || 0).toLocaleString()}</strong>
+                        <span style={{ fontSize: '11.5px', opacity: 0.72 }}>Rewards &amp; Badges</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* ── Wallet Details Card (not a menu item) ── */}
+                  <div style={{ ...groupCardStyle, padding: '14px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontSize: '11px', fontWeight: 700, opacity: 0.55, letterSpacing: '0.04em' }}>WALLET DETAILS</div>
+                      <div style={{ fontSize: '13.5px', fontWeight: 600, fontFamily: 'monospace', marginTop: '3px', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {walletAddress.slice(0, 10)}...{walletAddress.slice(-8)}
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', gap: '6px', flexShrink: 0, flexWrap: 'wrap' }}>
+                      {!IS_CONCORDIUM_SITE && (
+                        <button type="button" className="quick-chip-btn" style={{ color: '#059669', borderColor: 'rgba(16, 185, 129, 0.35)' }} onClick={() => { setWalletTab('qr'); setIsWalletModalOpen(true); }}>
+                          <ArrowDownLeft size={12} /> Receive
+                        </button>
+                      )}
+                      <button type="button" className="quick-chip-btn" onClick={() => triggerCopy('profile_wallet_copy', walletAddress)}>
+                        <Copy size={12} /> {copiedKey === 'profile_wallet_copy' ? 'Copied' : 'Copy'}
+                      </button>
+                      {!IS_CONCORDIUM_SITE && (
+                        <button type="button" className="quick-chip-btn" onClick={() => { setWalletTab('overview'); setIsWalletModalOpen(true); }}>
+                          <Wallet size={12} /> Details
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* ── Group 1: Agent Controls ── */}
+                  <div style={groupCardStyle}>
+                    {!IS_CONCORDIUM_SITE && cleanOwnedTag && (
+                      <>
+                        <button
+                          type="button"
+                          style={{ ...rowBtnStyle, borderBottom: isProfileAltanaOpen ? '1px solid var(--border, rgba(15, 23, 42, 0.08))' : rowBtnStyle.borderBottom }}
+                          onClick={() => setIsProfileAltanaOpen((v) => !v)}
+                        >
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '10px' }}>
+                            <img src="/altana-icon.svg" alt="Altana" style={{ width: '16px', height: '16px', objectFit: 'contain' }} />
+                            Altana Agent Wallet &amp; Caps
+                          </span>
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '12.5px', color: myAgentControlStatus?.hasActiveSession ? '#059669' : 'inherit', opacity: myAgentControlStatus?.hasActiveSession ? 1 : 0.65 }}>
+                            {myAgentControlStatus?.hasActiveSession ? 'Active' : 'Configure'} <ChevronRight size={15} style={{ transform: isProfileAltanaOpen ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s' }} />
+                          </span>
+                        </button>
+
+                        {isProfileAltanaOpen && (
+                          <div style={{ padding: '14px 16px', background: 'var(--bg-secondary, rgba(15, 23, 42, 0.025))', borderBottom: '1px solid var(--border, rgba(15, 23, 42, 0.08))', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                            {myAgentControlStatus?.walletAddress && (
+                              <div style={{ fontSize: '12px', fontFamily: 'monospace', opacity: 0.72 }}>
+                                Smart Wallet: {myAgentControlStatus.walletAddress}
+                              </div>
+                            )}
+                            {!selfOk ? (
+                              <div style={{ fontSize: '12.5px', opacity: 0.7 }}>
+                                Verify your Self ID above to grant or update Altana session permissions.
+                              </div>
+                            ) : (
+                              <>
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', fontSize: '13px' }}>
+                                  <label style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                                    <input type="checkbox" checked={ownerCapabilityToggles.send} onChange={(e) => setOwnerCapabilityToggles((p) => ({ ...p, send: e.target.checked }))} />
+                                    Send
+                                  </label>
+                                  <label style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                                    <input type="checkbox" checked={ownerCapabilityToggles.swap} onChange={(e) => setOwnerCapabilityToggles((p) => ({ ...p, swap: e.target.checked }))} />
+                                    Swap
+                                  </label>
+                                  <label style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                                    <input type="checkbox" checked={ownerCapabilityToggles.protocols} onChange={(e) => setOwnerCapabilityToggles((p) => ({ ...p, protocols: e.target.checked }))} />
+                                    Protocols / x402
+                                  </label>
+                                </div>
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '8px' }}>
+                                  <label style={{ display: 'flex', flexDirection: 'column', gap: '3px', fontSize: '11.5px' }}>
+                                    <span style={{ opacity: 0.7 }}>Per-tx USD cap</span>
+                                    <input type="number" min="1" value={ownerPerTxUsdLimit} onChange={(e) => setOwnerPerTxUsdLimit(e.target.value)} style={{ padding: '6px 8px', borderRadius: '8px', border: '1px solid var(--border, rgba(15, 23, 42, 0.15))', fontSize: '12.5px' }} />
+                                  </label>
+                                  <label style={{ display: 'flex', flexDirection: 'column', gap: '3px', fontSize: '11.5px' }}>
+                                    <span style={{ opacity: 0.7 }}>USDC / day</span>
+                                    <input type="number" min="1" value={ownerDailyUsdtLimit} onChange={(e) => setOwnerDailyUsdtLimit(e.target.value)} style={{ padding: '6px 8px', borderRadius: '8px', border: '1px solid var(--border, rgba(15, 23, 42, 0.15))', fontSize: '12.5px' }} />
+                                  </label>
+                                  <label style={{ display: 'flex', flexDirection: 'column', gap: '3px', fontSize: '11.5px' }}>
+                                    <span style={{ opacity: 0.7 }}>cNGN / day</span>
+                                    <input type="number" min="100" value={ownerDailyCngnLimit} onChange={(e) => setOwnerDailyCngnLimit(e.target.value)} style={{ padding: '6px 8px', borderRadius: '8px', border: '1px solid var(--border, rgba(15, 23, 42, 0.15))', fontSize: '12.5px' }} />
+                                  </label>
+                                  <label style={{ display: 'flex', flexDirection: 'column', gap: '3px', fontSize: '11.5px' }}>
+                                    <span style={{ opacity: 0.7 }}>CELO / day</span>
+                                    <input type="number" min="1" value={ownerDailyCeloLimit} onChange={(e) => setOwnerDailyCeloLimit(e.target.value)} style={{ padding: '6px 8px', borderRadius: '8px', border: '1px solid var(--border, rgba(15, 23, 42, 0.15))', fontSize: '12.5px' }} />
+                                  </label>
+                                </div>
+                                <label style={{ display: 'flex', flexDirection: 'column', gap: '3px', fontSize: '11.5px' }}>
+                                  <span style={{ opacity: 0.7 }}>Session expiry</span>
+                                  <select value={sessionExpiryHoursChoice} onChange={(e) => setSessionExpiryHoursChoice(Number(e.target.value))} style={{ padding: '6px 8px', borderRadius: '8px', border: '1px solid var(--border, rgba(15, 23, 42, 0.15))', fontSize: '12.5px' }}>
+                                    <option value={1}>1 hour</option>
+                                    <option value={24}>24 hours</option>
+                                    <option value={168}>7 days</option>
+                                  </select>
+                                </label>
+                                <div style={{ display: 'flex', gap: '8px' }}>
+                                  <button
+                                    type="button"
+                                    className="btn-action-primary"
+                                    disabled={isUpdatingAgentSession}
+                                    style={{ flex: 1, fontSize: '13px', padding: '8px 12px' }}
+                                    onClick={async () => {
+                                      setIsUpdatingAgentSession(true);
+                                      try {
+                                        await grantAgentSessionPolicy({
+                                          tag: cleanOwnedTag,
+                                          sessionDurationSeconds: Number(sessionExpiryHoursChoice) * 3600,
+                                          perTxUsd: String(ownerPerTxUsdLimit || '50'),
+                                          dailyUsdtLimit: String(ownerDailyUsdtLimit || '50'),
+                                          dailyCngnLimit: String(ownerDailyCngnLimit || '100000'),
+                                          dailyCeloLimit: String(ownerDailyCeloLimit || '10'),
+                                          allowedActions: ownerCapabilityToggles,
+                                        });
+                                        setMyAgentControlStatus(await getAgentControlStatus(cleanOwnedTag));
+                                        showStatus?.(`Saved Altana capabilities for ₦${cleanOwnedTag.toUpperCase()} to database`, 'success');
+                                      } catch (err) {
+                                        showStatus?.(err?.message || 'Failed to update Altana session key', 'error');
+                                      } finally {
+                                        setIsUpdatingAgentSession(false);
+                                      }
+                                    }}
+                                  >
+                                    {isUpdatingAgentSession ? 'Saving…' : myAgentControlStatus?.hasActiveSession ? 'Save Capabilities' : 'Grant Session Key'}
+                                  </button>
+                                  {myAgentControlStatus?.hasActiveSession && (
+                                    <button
+                                      type="button"
+                                      className="quick-chip-btn"
+                                      disabled={isUpdatingAgentSession}
+                                      style={{ color: '#dc2626', borderColor: 'rgba(239, 68, 68, 0.35)' }}
+                                      onClick={async () => {
+                                        setIsUpdatingAgentSession(true);
+                                        try {
+                                          await revokeAgentSession({ tag: cleanOwnedTag, reason: 'Owner revoked from Profile Dashboard Settings' });
+                                          setMyAgentControlStatus(await getAgentControlStatus(cleanOwnedTag));
+                                          showStatus?.(`Revoked Altana session key for ₦${cleanOwnedTag.toUpperCase()}`, 'info');
+                                        } catch (err) {
+                                          showStatus?.(err?.message || 'Failed to revoke session key', 'error');
+                                        } finally {
+                                          setIsUpdatingAgentSession(false);
+                                        }
+                                      }}
+                                    >
+                                      Revoke
+                                    </button>
+                                  )}
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        )}
+                      </>
+                    )}
+
+                    {cleanOwnedTag && (
+                      <button
+                        type="button"
+                        style={{ ...rowBtnStyle, borderBottom: 'none' }}
+                        onClick={() => { window.location.href = `/${encodeURIComponent(cleanOwnedTag)}`; }}
+                      >
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '10px' }}><ExternalLink size={16} style={{ opacity: 0.7 }} /> Public Profile</span>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '12.5px', opacity: 0.65 }}>/{cleanOwnedTag} <ChevronRight size={15} /></span>
+                      </button>
+                    )}
+                  </div>
+
+                  {/* ── Group 2: Agent Identity, Settings & Logout ── */}
+                  <div style={groupCardStyle}>
+                    {myTag?.tag ? (
+                      <button type="button" style={rowBtnStyle} onClick={() => setIsPersonalAgentOpen(true)}>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '10px' }}><Brain size={16} style={{ opacity: 0.7 }} /> Personal Agent</span>
+                        <ChevronRight size={15} style={{ opacity: 0.45 }} />
+                      </button>
+                    ) : (
+                      <button type="button" style={rowBtnStyle} onClick={() => setMainTab('claim')}>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '10px' }}><Tag size={16} style={{ opacity: 0.7 }} /> Claim a NairaTag</span>
+                        <ChevronRight size={15} style={{ opacity: 0.45 }} />
+                      </button>
+                    )}
+
+                    {!IS_CONCORDIUM_SITE && cleanOwnedTag && (
+                      <button
+                        type="button"
+                        style={rowBtnStyle}
+                        onClick={() => triggerCopy(`agent_uri_${cleanOwnedTag}`, `https://celo.nairatag.ng/api/agent-card?tag=${cleanOwnedTag}`)}
+                      >
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '10px' }}><Copy size={16} style={{ opacity: 0.7 }} /> ERC-8004 Agent URI</span>
+                        <span style={{ fontSize: '12px', opacity: 0.65 }}>{copiedKey === `agent_uri_${cleanOwnedTag}` ? 'Copied!' : 'Copy URI'}</span>
+                      </button>
+                    )}
+
+                    <button type="button" style={rowBtnStyle} onClick={() => setMainTab('agents')}>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '10px' }}><Bot size={16} style={{ opacity: 0.7 }} /> Browse Agents</span>
+                      <ChevronRight size={15} style={{ opacity: 0.45 }} />
+                    </button>
+
+                    {!IS_CONCORDIUM_SITE && (
+                      <button type="button" style={rowBtnStyle} onClick={() => setMainTab('rewards')}>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '10px' }}><Gift size={16} style={{ opacity: 0.7 }} /> Rewards</span>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '12.5px', opacity: 0.65 }}>{Number(userPoints || 0).toLocaleString()} Pts <ChevronRight size={15} /></span>
+                      </button>
+                    )}
+
+                    {!IS_CONCORDIUM_SITE && (
+                      <button type="button" style={rowBtnStyle} onClick={() => setIsReferralOpen(true)}>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '10px' }}><Users size={16} style={{ opacity: 0.7 }} /> Referrals</span>
+                        <ChevronRight size={15} style={{ opacity: 0.45 }} />
+                      </button>
+                    )}
+
+                    <button type="button" style={rowBtnStyle} onClick={() => setIsProfileSettingsOpen((v) => !v)}>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '10px' }}><Settings size={16} style={{ opacity: 0.7 }} /> Settings</span>
+                      <ChevronRight size={15} style={{ opacity: 0.45, transform: isProfileSettingsOpen ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s' }} />
+                    </button>
+
+                    {isProfileSettingsOpen && (
+                      <div style={{ padding: '12px 16px', background: 'var(--bg-secondary, rgba(15, 23, 42, 0.025))', borderBottom: '1px solid var(--border, rgba(15, 23, 42, 0.08))', display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '13px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <span>Appearance</span>
+                          <button type="button" className="quick-chip-btn" onClick={toggleTheme}>
+                            {theme === 'dark' ? 'Dark Mode' : 'Light Mode'}
+                          </button>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', opacity: 0.75 }}>
+                          <span>Network</span>
+                          <span style={{ fontFamily: 'monospace', fontSize: '12px' }}>{activeSiteNetworkLabel}</span>
+                        </div>
+                      </div>
+                    )}
+
+                    <button
+                      type="button"
+                      style={{ ...rowBtnStyle, borderBottom: 'none', color: '#dc2626' }}
+                      onClick={handleDisconnect}
+                    >
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '10px' }}><LogOut size={16} /> Log out</span>
+                      <ChevronRight size={15} style={{ opacity: 0.45 }} />
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <article className="account-wallet-card account-profile-empty">
+                  <User size={24} />
+                  <h2>Sign in to view your profile</h2>
+                  <p>Your account details and rewards will appear here after sign in.</p>
+                  <button type="button" className="btn-action-primary" onClick={() => setIsConnectModalOpen(true)}>Sign in</button>
+                </article>
+              )}
+            </section>
+          );
+        })()}
 
         {/* ───────────────────────────────────────────────────────────────────
             TAB 1: TAG-TO-TAG SEND TERMINAL (POWERED BY TEXTILE FX CORRIDORS)
@@ -7676,7 +8027,7 @@ function ArcAppShell() {
             </div>
             <SelfAgentVerificationCard
               walletAddress={walletAddress}
-              onConnectWallet={openAuthModal}
+              onConnectWallet={() => setIsConnectModalOpen(true)}
               initialAgentTag={myTag?.tag ? `₦${myTag.tag.replace(/^₦/, '')}` : undefined}
               initialAgentAddress={walletAddress || undefined}
             />
@@ -8128,6 +8479,16 @@ export default function App() {
 
   if (tagMatch) {
     return <PublicProfilePage rawHandle={tagMatch[1]} type="tag" />;
+  }
+
+  // Instagram-style public profile URLs: celo.nairatag.ng/<handle> (e.g. /agent858)
+  const rootHandleMatch = pathname.match(/^\/([a-zA-Z0-9_-]{2,32})$/);
+  const RESERVED_APP_ROUTES = new Set([
+    'pay', 'tasks', 'agents', 'chat', 'claim', 'rewards', 'profile', 'faq',
+    'bookings', 'services', 'admin', 'api', 'assets', 'agent', 'tag', 'cards',
+  ]);
+  if (rootHandleMatch && !RESERVED_APP_ROUTES.has(rootHandleMatch[1].toLowerCase())) {
+    return <PublicProfilePage rawHandle={rootHandleMatch[1]} type="agent" />;
   }
 
   return <ArcAppShell />;

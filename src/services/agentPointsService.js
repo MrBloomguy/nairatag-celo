@@ -277,7 +277,6 @@ export async function awardVerificationPoints(tag, verificationDetails = {}) {
       await saveAgentRecord(cleanTag, {
         ...existingRecord,
         points: entry.totalPoints,
-        selfVerified: true,
         selfBonusClaimed: true,
         selfBonusClaimedAt: timestamp,
       });

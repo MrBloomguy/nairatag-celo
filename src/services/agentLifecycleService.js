@@ -51,7 +51,6 @@ import {
   CELO_ATTRIBUTION_TAG,
   CELO_USDT_ADDRESS,
   CELO_CNGN_ADDRESS,
-  OFFICIAL_AGENT_WALLET,
 } from '../config/celo.js';
 
 export const LIFECYCLE_STATUS = {
@@ -197,6 +196,8 @@ export async function submitSelfVerification({
   return await saveAgentRecord(cleanTag, agent);
 }
 
+
+
 /**
  * Provisions a non-custodial Altana smart agent wallet for the verified agent.
  */
@@ -244,6 +245,8 @@ export async function provisionAltanaWallet({
     : LIFECYCLE_STATUS.VERIFICATION_REQUIRED;
   return await saveAgentRecord(cleanTag, agent);
 }
+
+
 
 /**
  * Unified Claim-to-Wallet Flow:
@@ -307,12 +310,26 @@ export async function getAgentControlStatus(tagOrAddress) {
 
   if (!agent) return null;
 
+  // Stored identity flags are display/cache data only. Self status must be proven by the Celo registry.
+  const verification = agent.ownerAddress
+    ? await getAgentVerificationStatus({ agentAddress: agent.ownerAddress }).catch((error) => ({
+      status: VERIFICATION_STATUS.FAILED,
+      isVerified: false,
+      hasHumanProof: false,
+      isProofFresh: false,
+      error: error?.message || 'Self registry lookup failed.',
+    }))
+    : null;
+  const selfVerified = Boolean(verification?.isVerified && verification?.hasHumanProof && verification?.isProofFresh);
+  const selfStatus = verification?.status || VERIFICATION_STATUS.FAILED;
+  const selfAgentId = selfVerified && Number(verification?.agentId) > 0 ? Number(verification.agentId) : null;
+
   const nowSec = Math.floor(Date.now() / 1000);
   const expiry = agent.altana?.sessionExpiry ? Number(agent.altana.sessionExpiry) : null;
   const isExpired = Boolean(expiry && expiry <= nowSec);
   const rawSessionStatus = agent.altana?.sessionStatus || 'none';
   const sessionStatus = rawSessionStatus === 'active' && isExpired ? 'expired' : rawSessionStatus;
-  const hasActiveSession = sessionStatus === 'active' && Boolean(agent.altana?.activeSessionId);
+  const hasActiveSession = selfVerified && sessionStatus === 'active' && Boolean(agent.altana?.activeSessionId);
 
   const limits = Array.isArray(agent.altana?.spendLimits) ? agent.altana.spendLimits : [];
   const usdtLimit = limits.find((l) => l.token === 'USDT')?.amount || DEFAULT_DAILY_LIMITS.USDT;
@@ -323,13 +340,17 @@ export async function getAgentControlStatus(tagOrAddress) {
     tag: agent.tag,
     canonicalTag: agent.canonicalTag,
     ownerAddress: agent.ownerAddress,
+    avatarUrl: agent.avatarUrl || agent.metadata?.avatarUrl || null,
+    bio: agent.bio || agent.description || agent.metadata?.bio || '',
+    displayName: agent.displayName || agent.metadata?.displayName || null,
     hasWallet: Boolean(agent.altana?.walletAddress),
     walletAddress: agent.altana?.walletAddress || null,
     provisioningStatus: agent.altana?.walletAddress ? (agent.altana.provisioningStatus || 'active') : 'unprovisioned',
     keystoreAddress: ALTANA_CELO_KEYSTORE,
-    selfVerified: Boolean(agent.self?.verified),
-    selfStatus: agent.self?.status || VERIFICATION_STATUS.UNVERIFIED,
-    selfAgentId: agent.self?.agentId ?? agent.erc8004?.tokenId ?? null,
+    selfVerified,
+    selfStatus,
+    selfAgentId,
+    selfCheckError: verification?.error || null,
     hasActiveSession,
     sessionStatus,
     sessionExpiry: expiry,
@@ -345,11 +366,10 @@ export async function getAgentControlStatus(tagOrAddress) {
       protocols: hasActiveSession && (agent.altana?.allowedActions?.protocols ?? true),
       unlimited: false,
     },
-    canSendOrSwap: Boolean(agent.altana?.walletAddress && agent.self?.verified && hasActiveSession),
+    canSendOrSwap: Boolean(agent.altana?.walletAddress && selfVerified && hasActiveSession),
     canReceive: Boolean(agent.altana?.walletAddress),
   };
 }
-
 /**
  * Grants an Altana session delegation policy for the agent.
  */
@@ -408,6 +428,8 @@ export async function grantAgentSessionPolicy({
   return await saveAgentRecord(cleanTag, agent);
 }
 
+
+
 /**
  * Links/registers the agent on the official Celo Mainnet ERC-8004 registry.
  */
@@ -430,6 +452,8 @@ export async function linkERC8004Identity({
 
   return await saveAgentRecord(cleanTag, agent);
 }
+
+
 
 /**
  * Revokes an agent's Altana session key (monotonic 1-transaction on-chain revocation).
@@ -462,6 +486,8 @@ export async function revokeAgentSession({
 
   return await saveAgentRecord(cleanTag, agent);
 }
+
+
 
 /**
  * Comprehensive authorization check before an agent can spend or execute protected actions.
@@ -579,113 +605,9 @@ export async function checkAgentExecutionPermission({
 }
 
 /**
- * Seeds default platform agents on Celo Mainnet.
+ * Legacy compatibility: return persisted agents without inventing Self proofs or wallet sessions.
  */
 export async function seedDefaultAgents() {
-  const DEFAULT_AGENTS = [
-    {
-      tag: 'nairatag',
-      name: '₦NAIRATAG Platform Orchestrator',
-      description: 'Master protocol orchestrator for tag resolution, escrow routing, and cross-agent settlements on Celo Mainnet.',
-      category: 'infrastructure',
-      ownerAddress: OFFICIAL_AGENT_WALLET,
-      altanaWallet: '0x653f773C9062e71A6554b42a9525fcD47fCC1693',
-      erc8004TokenId: '1',
-    },
-    {
-      tag: 'bloom',
-      name: '₦BLOOM Studio',
-      description: 'Design, software engineering and smart contract auditing specialist.',
-      category: 'engineering',
-      ownerAddress: '0x7c264210D5C992b8ea3224eb6B39F477a493AF26',
-      altanaWallet: '0x7c264210D5C992b8ea3224eb6B39F477a493AF26',
-      erc8004TokenId: '2',
-    },
-    {
-      tag: 'music',
-      name: '₦MUSIC Production Hub',
-      description: 'Two-hour recording, beat engineering, production and master mixing studio.',
-      category: 'music',
-      ownerAddress: '0xa1b2c3d4e5f60718293a4b5c6d7e8f901a2b3c4d',
-      altanaWallet: '0xa1b2c3d4e5f60718293a4b5c6d7e8f901a2b3c4d',
-      erc8004TokenId: '3',
-    },
-    {
-      tag: 'video',
-      name: '₦VIDEO Production',
-      description: 'Video shoot planning, cinematography and commercial post-production.',
-      category: 'video',
-      ownerAddress: '0xb2c3d4e5f60718293a4b5c6d7e8f901a2b3c4d50',
-      altanaWallet: '0xb2c3d4e5f60718293a4b5c6d7e8f901a2b3c4d50',
-      erc8004TokenId: '4',
-    },
-    {
-      tag: 'meteo',
-      name: '₦METEO Logistics',
-      description: 'Hyper-local weather risk indexing and supply chain logistics oracle.',
-      category: 'data',
-      ownerAddress: '0x235d64821815b3c37eeB7A755D96B9b671a5ae36',
-      altanaWallet: '0x235d64821815b3c37eeB7A755D96B9b671a5ae36',
-      erc8004TokenId: '5',
-    },
-    {
-      tag: 'defillama',
-      name: '₦DEFILLAMA Feed',
-      description: 'DeFi TVL, yield aggregations and cross-chain liquidity metrics on Celo.',
-      category: 'defi',
-      ownerAddress: '0xbfA115E28aE09eBf5a11484C2161A4E45B956Ce6',
-      altanaWallet: '0xbfA115E28aE09eBf5a11484C2161A4E45B956Ce6',
-      erc8004TokenId: '6',
-    },
-    {
-      tag: 'coingecko',
-      name: '₦COINGECKO Price Feed',
-      description: 'Real-time cryptocurrency pricing and market intelligence feeds.',
-      category: 'defi',
-      ownerAddress: '0x1abfD1865F9a7Eb23C02aBEf113a07Fa8A690Ef8',
-      altanaWallet: '0x1abfD1865F9a7Eb23C02aBEf113a07Fa8A690Ef8',
-      erc8004TokenId: '7',
-    },
-  ];
-
-  for (const def of DEFAULT_AGENTS) {
-    const existing = await getAgentRecord(def.tag);
-    if (!existing || existing.status !== LIFECYCLE_STATUS.ACTIVE) {
-      await createAgentDraft({
-        tag: def.tag,
-        name: def.name,
-        description: def.description,
-        ownerAddress: def.ownerAddress,
-        category: def.category,
-      });
-
-      await submitSelfVerification({
-        tag: def.tag,
-        skipOnChainCheck: true,
-        proofData: {
-          nullifierHash: keccak256(stringToHex(`self-verified-${def.tag}`)),
-        },
-      });
-
-      await provisionAltanaWallet({
-        tag: def.tag,
-        targetWalletAddress: def.altanaWallet,
-      });
-
-      await grantAgentSessionPolicy({
-        tag: def.tag,
-        sessionDurationSeconds: 86400 * 365, // 1 year default for platform agents
-        dailyCngnLimit: '500000',
-        dailyUsdtLimit: '250',
-      });
-
-      await linkERC8004Identity({
-        tag: def.tag,
-        tokenId: def.erc8004TokenId,
-      });
-    }
-  }
-
   return await listAgentRecords();
 }
 
@@ -700,9 +622,43 @@ export async function getAgentLifecycleRecord(tag) {
  * Lists all agent lifecycle records.
  */
 export async function listAllAgentLifecycleRecords() {
-  const records = await listAgentRecords();
-  if (records.length === 0) {
-    return await seedDefaultAgents();
+  return await listAgentRecords();
+}
+
+/**
+ * Updates and persists an agent/user's public avatarUrl, bio, and displayName in PostgreSQL.
+ */
+export async function updateAgentProfileMetadata({
+  tag,
+  ownerAddress = null,
+  avatarUrl = null,
+  bio = '',
+  displayName = null,
+}) {
+  if (!tag) throw new Error('NairaTag is required to save profile.');
+  const cleanTag = String(tag).trim().replace(/^[₦$@#]/, '').toLowerCase();
+  let agent = await getAgentRecord(cleanTag);
+  if (!agent) {
+    agent = {
+      tag: cleanTag,
+      canonicalTag: `₦${cleanTag}`,
+      ownerAddress: ownerAddress || null,
+      status: LIFECYCLE_STATUS.VERIFICATION_REQUIRED,
+      self: { verified: false, status: VERIFICATION_STATUS.UNVERIFIED },
+      altana: {},
+      erc8004: {},
+      createdAt: Date.now(),
+    };
   }
-  return records;
+
+  const next = {
+    ...agent,
+    avatarUrl: avatarUrl || null,
+    bio: String(bio || '').trim(),
+    description: String(bio || '').trim() || agent.description || '',
+    displayName: displayName ? String(displayName).trim() : (agent.displayName || null),
+    updatedAt: Date.now(),
+  };
+
+  return await saveAgentRecord(cleanTag, next);
 }

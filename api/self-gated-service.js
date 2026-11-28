@@ -11,9 +11,38 @@
 
 import {
   getAgentVerificationStatus,
+  createSelfAgentVerifier,
   VERIFICATION_STATUS,
   SELF_REGISTRY_CELO_MAINNET,
+  SELF_REGISTRY_CELO_TESTNET,
 } from '../src/services/selfAgentIdService.js';
+
+export const config = {
+  api: {
+    bodyParser: false,
+  },
+};
+
+/**
+ * Reads the exact raw request body string without re-serialising parsed JSON.
+ * Preserves byte-for-byte payload for SelfAgentVerifier signature checks.
+ */
+export async function readRawRequestBody(req) {
+  if (typeof req?.rawBody === 'string') return req.rawBody;
+  if (Buffer.isBuffer(req?.rawBody)) return req.rawBody.toString('utf8');
+  if (typeof req?.body === 'string') return req.body;
+  if (Buffer.isBuffer(req?.body)) return req.body.toString('utf8');
+
+  if (req && typeof req[Symbol.asyncIterator] === 'function') {
+    const chunks = [];
+    for await (const chunk of req) {
+      chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk);
+    }
+    return Buffer.concat(chunks).toString('utf8');
+  }
+
+  return '';
+}
 import {
   createX402PaymentRequirement,
   verifyX402PaymentProof,
@@ -36,7 +65,7 @@ export default async function handler(req, res) {
   // CORS configuration
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-self-agent-address, x-self-agent-signature, x-self-agent-timestamp, x-402-payment-proof');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-self-agent-address, x-self-agent-signature, x-self-agent-timestamp, x-self-agent-keytype, x-self-agent-key, x-402-payment-proof');
 
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
@@ -51,7 +80,10 @@ export default async function handler(req, res) {
   }
 
   try {
-    const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
+    const rawBody = await readRawRequestBody(req);
+    const body = rawBody
+      ? JSON.parse(rawBody)
+      : (typeof req.body === 'object' && req.body !== null ? req.body : {});
     const {
       agentTag = '₦nairatag',
       agentAddress,
@@ -61,8 +93,59 @@ export default async function handler(req, res) {
       asset = CELO_USDT_ADDRESS,
     } = body;
 
+    const network = process.env.SELF_NETWORK === 'testnet' ? 'testnet' : 'mainnet';
+    const chainId = network === 'testnet' ? 11142220 : 42220;
+    const registryAddress = network === 'testnet' ? SELF_REGISTRY_CELO_TESTNET : SELF_REGISTRY_CELO_MAINNET;
+    const sybilLimit = process.env.SELF_SYBIL_LIMIT !== undefined
+      ? Number(process.env.SELF_SYBIL_LIMIT)
+      : 1;
+
     // Resolve caller agent address from header or body
-    const callerAddress = req.headers['x-self-agent-address'] || agentAddress;
+    let callerAddress = req.headers?.['x-self-agent-address'] || agentAddress;
+    const signature = req.headers?.['x-self-agent-signature'];
+    const timestamp = req.headers?.['x-self-agent-timestamp'];
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // STEP 0 (Signed Requests): Verify raw request body with SelfAgentVerifier
+    // ──────────────────────────────────────────────────────────────────────────
+    let signedVerification = null;
+    if (signature && timestamp) {
+      const verifier = await createSelfAgentVerifier({
+        network,
+        sybilLimit,
+        registryAddress,
+      });
+      signedVerification = await verifier.verify({
+        signature: String(signature),
+        timestamp: String(timestamp),
+        method: req.method,
+        url: req.url || '/api/self-gated-service',
+        body: rawBody,
+        keytype: req.headers?.['x-self-agent-keytype'],
+        agentKey: req.headers?.['x-self-agent-key'],
+      });
+
+      if (!signedVerification?.valid) {
+        return res.status(403).json({
+          ok: false,
+          scenario: 'SCENARIO_A_ACCESS_DENIED',
+          status: 403,
+          error: 'Self Human Proof Required',
+          reason: signedVerification?.error || 'SelfAgentVerifier signature or human-proof check failed.',
+          verification: {
+            agentAddress: signedVerification?.agentAddress || callerAddress || null,
+            sybilLimit,
+            network,
+            registry: registryAddress,
+            chainId,
+          },
+        });
+      }
+
+      if (signedVerification.agentAddress) {
+        callerAddress = signedVerification.agentAddress;
+      }
+    }
 
     if (!callerAddress) {
       return res.status(400).json({
@@ -75,10 +158,21 @@ export default async function handler(req, res) {
     // ──────────────────────────────────────────────────────────────────────────
     // STEP 1: Authoritative Self Agent ID On-Chain Verification Gate
     // ──────────────────────────────────────────────────────────────────────────
-    const verification = await getAgentVerificationStatus({
-      agentAddress: callerAddress,
-      skipCache: true,
-    });
+    const verification = signedVerification?.valid
+      ? {
+          isVerified: true,
+          isProofFresh: true,
+          hasHumanProof: true,
+          status: VERIFICATION_STATUS.VERIFIED,
+          agentId: Number(signedVerification.agentId || 0),
+          agentCount: Number(signedVerification.agentCount || 1),
+          nullifier: signedVerification.nullifier || null,
+        }
+      : await getAgentVerificationStatus({
+          agentAddress: callerAddress,
+          chainId,
+          skipCache: true,
+        });
 
     // SCENARIO A: Unverified or Expired Agent -> Access Denied (HTTP 403)
     if (!verification.isVerified || !verification.isProofFresh) {
@@ -89,14 +183,14 @@ export default async function handler(req, res) {
         error: 'Self Human Proof Required',
         reason: verification.status === VERIFICATION_STATUS.EXPIRED
           ? `Self proof expired on ${verification.proofExpiresAtIso}. Please re-authenticate via Self App.`
-          : `Agent ${callerAddress} has no valid on-chain human proof in SelfAgentRegistry (${SELF_REGISTRY_CELO_MAINNET}) on Celo Mainnet.`,
+          : `Agent ${callerAddress} has no valid on-chain human proof in SelfAgentRegistry (${registryAddress}) on ${network === 'testnet' ? 'Celo Sepolia' : 'Celo Mainnet'}.`,
         verification: {
           agentAddress: callerAddress,
           status: verification.status,
           hasHumanProof: verification.hasHumanProof,
           isProofFresh: verification.isProofFresh,
-          registry: SELF_REGISTRY_CELO_MAINNET,
-          chainId: 42220,
+          registry: registryAddress,
+          chainId,
         },
       });
     }

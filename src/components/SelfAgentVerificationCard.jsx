@@ -29,6 +29,8 @@ import {
   initiateAgentRegistrationSession,
   validateEvidenceIdentityBinding,
   SELF_CELO_REGISTRY_ADDRESS,
+  SELF_REGISTRY_CELO_MAINNET,
+  SELF_REGISTRY_CELO_TESTNET,
   SELF_CELO_PROOF_PROVIDER,
   VERIFICATION_STATUS,
   VERIFICATION_POLICIES,
@@ -63,6 +65,9 @@ export default function SelfAgentVerificationCard({
   }, [initialAgentTag, initialAgentAddress]);
 
   // ─── Verification State ───
+  const [selfNetwork, setSelfNetwork] = useState('mainnet'); // 'mainnet' (42220) | 'testnet' (11142220 Mock)
+  const activeChainId = selfNetwork === 'testnet' ? 11142220 : 42220;
+  const activeRegistryAddress = selfNetwork === 'testnet' ? SELF_REGISTRY_CELO_TESTNET : SELF_REGISTRY_CELO_MAINNET;
   const [verificationData, setVerificationData] = useState(null);
   const [isLoadingVerification, setIsLoadingVerification] = useState(false);
   const [verificationError, setVerificationError] = useState('');
@@ -92,12 +97,17 @@ export default function SelfAgentVerificationCard({
   };
 
   // ─── Check On-Chain Verification ───
-  const handleCheckVerification = useCallback(async () => {
-    if (!agentAddress) return;
+  const handleCheckVerification = useCallback(async (overrideAddress = null) => {
+    const targetAddr = typeof overrideAddress === 'string' && overrideAddress ? overrideAddress : agentAddress;
+    if (!targetAddr) return;
     setIsLoadingVerification(true);
     setVerificationError('');
     try {
-      const data = await checkAgentVerificationOnChain({ agentAddress });
+      const data = await checkAgentVerificationOnChain({
+        agentAddress: targetAddr,
+        chainId: activeChainId,
+        skipCache: true,
+      });
       setVerificationData(data);
     } catch (err) {
       console.warn('[SelfVerificationCheck]', err);
@@ -105,7 +115,7 @@ export default function SelfAgentVerificationCard({
     } finally {
       setIsLoadingVerification(false);
     }
-  }, [agentAddress]);
+  }, [agentAddress, activeChainId]);
 
   useEffect(() => {
     handleCheckVerification();
@@ -120,8 +130,12 @@ export default function SelfAgentVerificationCard({
         agentAddress,
         agentTag: selectedTag,
         scope: 'nairatag:agent:human-passport',
+        network: selfNetwork,
       });
       setRegistrationSession(session);
+      if (session?.agentAddress && session.isLiveSession) {
+        setAgentAddress(session.agentAddress);
+      }
     } catch (err) {
       setVerificationError(`Failed to initiate Self session: ${err.message}`);
     } finally {
@@ -282,17 +296,53 @@ export default function SelfAgentVerificationCard({
           <Fingerprint size={16} color="#0D9488" />
           <span>Self Agent ID</span>
         </span>
-        <div className="card-header-actions">
+        <div className="card-header-actions" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <div style={{ display: 'inline-flex', borderRadius: '999px', padding: '2px', background: 'rgba(15, 23, 42, 0.06)', border: '1px solid rgba(15, 23, 42, 0.08)' }}>
+            <button
+              type="button"
+              onClick={() => { setSelfNetwork('mainnet'); setRegistrationSession(null); }}
+              style={{
+                padding: '3px 8px',
+                borderRadius: '999px',
+                border: 'none',
+                fontSize: '10px',
+                fontWeight: 700,
+                cursor: 'pointer',
+                background: selfNetwork === 'mainnet' ? '#0D9488' : 'transparent',
+                color: selfNetwork === 'mainnet' ? '#ffffff' : 'var(--text-secondary, #64748b)',
+              }}
+            >
+              Mainnet (Real)
+            </button>
+            <button
+              type="button"
+              onClick={() => { setSelfNetwork('testnet'); setRegistrationSession(null); }}
+              style={{
+                padding: '3px 8px',
+                borderRadius: '999px',
+                border: 'none',
+                fontSize: '10px',
+                fontWeight: 700,
+                cursor: 'pointer',
+                background: selfNetwork === 'testnet' ? '#7c3aed' : 'transparent',
+                color: selfNetwork === 'testnet' ? '#ffffff' : 'var(--text-secondary, #64748b)',
+              }}
+            >
+              Sepolia (Mock)
+            </button>
+          </div>
           <span className="slippage-pill">
-            <ShieldCheck size={11} color="#0D9488" />
-            <span>Celo 42220</span>
+            <ShieldCheck size={11} color={selfNetwork === 'testnet' ? '#7c3aed' : '#0D9488'} />
+            <span>{selfNetwork === 'testnet' ? 'Sepolia 11142220' : 'Celo 42220'}</span>
           </span>
         </div>
       </div>
 
       <div style={{ padding: '4px 0 12px 0' }}>
         <p style={{ margin: 0, fontSize: '12px', color: 'var(--text-secondary, #6b7280)', lineHeight: '1.4' }}>
-          Zero-knowledge identity & x402 micropayments on Celo Mainnet.
+          {selfNetwork === 'testnet'
+            ? 'Celo Sepolia Testnet mode: accepts Mock Passports from the Self app for multi-agent testing.'
+            : 'Zero-knowledge identity & x402 micropayments on Celo Mainnet (Real NFC Passport).'}
         </p>
       </div>
 
@@ -399,7 +449,9 @@ export default function SelfAgentVerificationCard({
           </span>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <a
-              href={`https://celoscan.io/address/${SELF_CELO_REGISTRY_ADDRESS}`}
+              href={selfNetwork === 'testnet'
+                ? `https://celo-sepolia.blockscout.com/address/${activeRegistryAddress}`
+                : `https://celoscan.io/address/${activeRegistryAddress}`}
               target="_blank"
               rel="noreferrer"
               style={{ color: '#0D9488', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '2px' }}
@@ -420,6 +472,16 @@ export default function SelfAgentVerificationCard({
                 <>
                   <CheckCircle2 size={12} color="#0D9488" />
                   <span>ZK Verified</span>
+                  {verificationData?.agentId > 0 && (
+                    <a
+                      href={`https://agent-api.self.xyz/api/agent/info/${activeChainId}/${verificationData.agentId}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      style={{ color: '#0D9488', fontFamily: 'monospace', textDecoration: 'underline', marginLeft: '2px' }}
+                    >
+                      #{verificationData.agentId} ↗
+                    </a>
+                  )}
                 </>
               ) : (
                 <>
@@ -457,7 +519,7 @@ export default function SelfAgentVerificationCard({
           }}
         >
           <Fingerprint size={14} />
-          <span>{isInitiatingSession ? 'Generating Session...' : 'Verify with Self App (NFC Passport)'}</span>
+          <span>{isInitiatingSession ? 'Generating Session...' : selfNetwork === 'testnet' ? 'Verify with Self App (Mock Passport)' : 'Verify with Self App (NFC Passport)'}</span>
         </button>
       )}
 
@@ -487,26 +549,78 @@ export default function SelfAgentVerificationCard({
           <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginBottom: '10px' }}>
             <div
               style={{
-                width: '80px',
-                height: '80px',
+                width: '128px',
+                height: '128px',
                 background: '#ffffff',
                 border: '1px solid #d1d5db',
-                borderRadius: '8px',
+                borderRadius: '10px',
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
                 justifyContent: 'center',
                 padding: '6px',
-                textAlign: 'center',
+                flexShrink: 0,
+                overflow: 'hidden',
               }}
             >
-              <QrCode size={52} color="#0D9488" />
-              <span style={{ fontSize: '8px', fontWeight: 700, color: '#0D9488' }}>SELF APP</span>
+              {registrationSession.scanUrl ? (
+                <img
+                  src={registrationSession.scanUrl}
+                  alt="Scan with Self App"
+                  style={{ width: '116px', height: '116px', objectFit: 'contain', display: 'block' }}
+                />
+              ) : (
+                <>
+                  <QrCode size={52} color="#0D9488" />
+                  <span style={{ fontSize: '8px', fontWeight: 700, color: '#0D9488' }}>SELF APP</span>
+                </>
+              )}
             </div>
-            <div style={{ flex: 1, fontSize: '11px', color: 'var(--privy-color-foreground-2, #4b5563)', lineHeight: '1.4' }}>
-              <p style={{ margin: '0 0 4px 0', fontWeight: 600 }}>1. Open Self App</p>
-              <p style={{ margin: '0 0 4px 0' }}>2. Scan Passport RFID via NFC</p>
-              <p style={{ margin: 0 }}>3. ZK Proof minted on Celo</p>
+            <div style={{ flex: 1, fontSize: '11.5px', color: 'var(--privy-color-foreground-2, #4b5563)', lineHeight: '1.45' }}>
+              <p style={{ margin: '0 0 4px 0', fontWeight: 700 }}>1. Open Self App</p>
+              <p style={{ margin: '0 0 4px 0' }}>
+                {selfNetwork === 'testnet' ? '2. Scan QR with your Mock Document' : '2. Scan QR & tap NFC Passport'}
+              </p>
+              <p style={{ margin: '0 0 8px 0' }}>3. Approve proof on {selfNetwork === 'testnet' ? 'Celo Sepolia' : 'Celo Mainnet'}</p>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                {registrationSession.deepLink && (
+                  <a
+                    href={registrationSession.deepLink}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{
+                      padding: '4px 8px',
+                      borderRadius: '6px',
+                      background: '#0D9488',
+                      color: '#ffffff',
+                      fontSize: '11px',
+                      fontWeight: 600,
+                      textDecoration: 'none',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                    }}
+                  >
+                    Open in Self App <ExternalLink size={10} />
+                  </a>
+                )}
+                <button
+                  type="button"
+                  onClick={handleCheckVerification}
+                  style={{
+                    padding: '4px 8px',
+                    borderRadius: '6px',
+                    border: '1px solid #d1d5db',
+                    background: '#ffffff',
+                    color: '#111827',
+                    fontSize: '11px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                  }}
+                >
+                  {isLoadingVerification ? 'Checking...' : 'Check Status'}
+                </button>
+              </div>
             </div>
           </div>
 

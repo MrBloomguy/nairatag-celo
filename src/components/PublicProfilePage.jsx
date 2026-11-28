@@ -1,58 +1,54 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Check, 
-  Copy, 
-  Share2, 
-  ExternalLink, 
-  MessageSquare, 
-  Send, 
-  ArrowRight, 
-  ShieldCheck, 
-  Sparkles, 
-  Wallet, 
-  Globe, 
-  Sun, 
+import {
+  ArrowLeft,
+  Calendar,
+  Check,
+  Copy,
+  ExternalLink,
+  Link2,
+  MapPin,
+  MessageSquare,
   Moon,
-  ChevronRight,
-  Download,
-  QrCode
+  Send,
+  Share2,
+  ShieldCheck,
+  Sparkles,
+  Sun,
+  Wallet,
+  Zap,
 } from 'lucide-react';
 import { resolveTagProfile, generateAvatarSvg } from '../services/tagAvatar.js';
 import { resolveTag } from '../services/nairatagResolver.js';
-import { CELO_NAIRATAG_RESOLVER_ADDRESS as ARC_NAIRATAG_RESOLVER_ADDRESS, CELO_MAINNET_CONFIG as ARC_TESTNET_CONFIG } from '../config/celo.js';
-import SelfAgentIdBadge from './SelfAgentIdBadge.jsx';
+import { getAgentControlStatus } from '../services/agentLifecycleService.js';
+import { CELO_NAIRATAG_RESOLVER_ADDRESS } from '../config/celo.js';
 import { IS_CONCORDIUM_SITE, CONCORDIUM_SITE } from '../config/siteMode.js';
 import confetti from 'canvas-confetti';
 
-export default function PublicProfilePage({ rawHandle, type = 'agent' }) {
-  const cleanTag = String(rawHandle || 'kratos').replace(/^[₦$@#]/, '').trim();
+export default function PublicProfilePage({ rawHandle }) {
+  const cleanTag = String(rawHandle || 'nairatag').replace(/^[₦$@#]/, '').trim();
   const displayTag = `₦${cleanTag.toUpperCase()}`;
   const lowercaseTag = cleanTag.toLowerCase();
 
-  const [theme, setTheme] = useState(() => window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
-
+  const [theme, setTheme] = useState(() => (window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'));
   const [copied, setCopied] = useState(false);
   const [resolvedAddress, setResolvedAddress] = useState(null);
   const [agentMetadata, setAgentMetadata] = useState(null);
+  const [controlStatus, setControlStatus] = useState(null);
   const [concordiumCard, setConcordiumCard] = useState(null);
-  const [concordiumCardAvailable, setConcordiumCardAvailable] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [activityFilter, setActivityFilter] = useState('all');
   const [isPayModalOpen, setIsPayModalOpen] = useState(false);
   const [payAmount, setPayAmount] = useState('25');
   const [paySuccess, setPaySuccess] = useState(false);
   const [shareToast, setShareToast] = useState(null);
 
-  // Deterministic styling from palette
   const profile = resolveTagProfile(cleanTag);
   const p = profile.palette;
+  const isDark = theme === 'dark';
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
-}, [theme]);
-
-  const toggleTheme = () => {
-    setTheme(prev => prev === 'dark' ? 'light' : 'dark');
-  };
+  }, [theme]);
 
   useEffect(() => {
     let isMounted = true;
@@ -61,738 +57,550 @@ export default function PublicProfilePage({ rawHandle, type = 'agent' }) {
       if (IS_CONCORDIUM_SITE) {
         try {
           const response = await fetch(CONCORDIUM_SITE.cardPath(cleanTag), { cache: 'no-store', headers: { Accept: 'application/json' } });
-          if (!response.ok) return;
-          const card = await response.json();
-          if (!isMounted || !card || typeof card !== 'object') return;
-          setConcordiumCard(card);
-          setConcordiumCardAvailable(true);
-          setAgentMetadata(card);
-        } catch (error) {
-          console.warn('Could not load the Concordium Agent Card:', error);
+          if (response.ok) {
+            const card = await response.json();
+            if (isMounted && card && typeof card === 'object') {
+              setConcordiumCard(card);
+              setAgentMetadata(card);
+            }
+          }
+        } catch {
+          // ignore
         } finally {
           if (isMounted) setLoading(false);
         }
         return;
       }
+
       try {
-        const res = await resolveTag(cleanTag);
-        if (isMounted && res) {
-          if (res.resolvedAddress) setResolvedAddress(res.resolvedAddress);
-          if (res.profile) setAgentMetadata(res.profile);
-        }
-      } catch (e) {
-        console.warn('Failed resolving tag onchain:', e);
+        const [res, status, cardRes] = await Promise.all([
+          resolveTag(cleanTag).catch(() => null),
+          getAgentControlStatus(cleanTag).catch(() => null),
+          fetch(`/api/agent-card?tag=${encodeURIComponent(lowercaseTag)}`).then((r) => (r.ok ? r.json() : null)).catch(() => null),
+        ]);
+        if (!isMounted) return;
+        if (res?.resolvedAddress) setResolvedAddress(res.resolvedAddress);
+        if (res?.profile || cardRes) setAgentMetadata(res?.profile || cardRes);
+        if (status) setControlStatus(status);
       } finally {
         if (isMounted) setLoading(false);
       }
     }
     loadIdentity();
     return () => { isMounted = false; };
-  }, [cleanTag]);
+  }, [cleanTag, lowercaseTag]);
 
-  const copyAddress = () => {
-    const addr = resolvedAddress || '0x71C8A9b284D7207452d308BE307e5f309a7291A2';
-    navigator.clipboard.writeText(addr);
-    setCopied(true);
-    triggerConfetti(0.3);
-    setTimeout(() => setCopied(false), 2400);
-  };
-
-  const copyLink = () => {
-    navigator.clipboard.writeText(window.location.href);
-    showShareToast('Profile link copied to clipboard!');
-  };
-
-  const showShareToast = (msg) => {
+  const showToast = (msg) => {
     setShareToast(msg);
-    setTimeout(() => setShareToast(null), 3000);
+    setTimeout(() => setShareToast(null), 2600);
   };
 
   const triggerConfetti = (ratio = 0.5) => {
     try {
       confetti({
-        particleCount: Math.floor(40 * ratio),
-        spread: 60,
+        particleCount: Math.floor(35 * ratio),
+        spread: 55,
         origin: { y: 0.7 },
-        colors: [p.primary, '#ffffff', '#10b981']
+        colors: [p.primary, '#ffffff', '#10b981'],
       });
-    } catch {}
+    } catch { /* ignore */ }
   };
 
-  const shareToTwitter = () => {
-    const text = `Connect with ${displayTag} on @NairaTaghq — sovereign onchain identity & personal AI agent!`;
-    const url = window.location.href;
-    window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`, '_blank');
+  const effectiveAddress = controlStatus?.walletAddress || resolvedAddress || controlStatus?.ownerAddress || null;
+  const selfVerified = Boolean(controlStatus?.selfVerified);
+  const selfAgentId = controlStatus?.selfAgentId || agentMetadata?.registrations?.[0]?.agentId || null;
+  const dailyCap = controlStatus?.spendingLimits?.dailyUsdt || '50';
+  const avatarSvg = generateAvatarSvg(profile.hashIndex, 76);
+
+  const copyAddress = () => {
+    if (!effectiveAddress) return;
+    navigator.clipboard.writeText(effectiveAddress);
+    setCopied(true);
+    triggerConfetti(0.3);
+    showToast('Wallet address copied!');
+    setTimeout(() => setCopied(false), 2200);
   };
 
-  const shareToWhatsApp = () => {
-    const text = `Meet ${displayTag} on NairaTag: ${window.location.href}`;
-    window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, '_blank');
+  const copyLink = () => {
+    navigator.clipboard.writeText(window.location.href);
+    showToast('Profile link copied!');
   };
 
-  const shareToTelegram = () => {
-    const text = `Meet ${displayTag} on NairaTag:`;
-    window.open(`https://t.me/share/url?url=${encodeURIComponent(window.location.href)}&text=${encodeURIComponent(text)}`, '_blank');
-  };
+  const bgPage = isDark ? '#0b0c10' : '#f4f5f7';
+  const bgCard = isDark ? '#14161d' : '#ffffff';
+  const borderSubtle = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(15,23,42,0.08)';
+  const textPrimary = isDark ? '#f8fafc' : '#0f172a';
+  const textMuted = isDark ? '#94a3b8' : '#64748b';
+  const pillBg = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(15,23,42,0.04)';
 
-  const openAppChat = () => {
-    window.location.href = `/#chat?agent=${encodeURIComponent(lowercaseTag)}`;
-  };
-
-  const openAppClaim = () => {
-    window.location.href = `/#claim`;
-  };
-
-  const cardSvg = generateAvatarSvg(profile.hashIndex, 190);
+  const activityItems = [
+    {
+      id: 'self-id',
+      kind: 'identity',
+      title: selfVerified ? `Verified Human Agent (Self #${selfAgentId || 'Active'})` : 'Self Agent ID Verification Pending',
+      subtitle: selfVerified
+        ? 'Zero-knowledge Proof-of-Human active on Celo Mainnet SelfAgentRegistry.'
+        : 'Waiting for owner passport verification in Self App to unlock gated x402 & escrow flows.',
+      meta: selfVerified ? 'Celo 42220' : 'Unverified',
+      badge: selfVerified ? 'Verified' : 'Pending',
+      href: selfAgentId ? `https://agent-api.self.xyz/api/agent/info/42220/${selfAgentId}` : null,
+    },
+    {
+      id: 'altana-wallet',
+      kind: 'payments',
+      title: `Altana Smart Wallet & x402 Rail`,
+      subtitle: effectiveAddress
+        ? `Bound to ${effectiveAddress.slice(0, 8)}...${effectiveAddress.slice(-6)} · Daily cap $${dailyCap} USDC`
+        : 'Smart agent wallet provisions automatically when this ₦Tag is claimed.',
+      meta: controlStatus?.hasActiveSession ? 'Session Active' : 'Standby',
+      badge: `$${dailyCap}/d`,
+      href: effectiveAddress ? `https://celoscan.io/address/${effectiveAddress}` : null,
+    },
+    {
+      id: 'erc8004-card',
+      kind: 'identity',
+      title: 'ERC-8004 & A2A Agent Registration Card',
+      subtitle: `Machine-readable capability & payment metadata served at /api/agent-card?tag=${lowercaseTag}`,
+      meta: 'JSON · A2A',
+      badge: 'Live',
+      href: `/api/agent-card?tag=${encodeURIComponent(lowercaseTag)}`,
+    },
+  ].filter((item) => activityFilter === 'all' || item.kind === activityFilter);
 
   return (
     <div style={{
       minHeight: '100vh',
-      backgroundColor: theme === 'dark' ? '#090a0f' : '#f8fafc',
-      color: theme === 'dark' ? '#ffffff' : '#0f172a',
-      fontFamily: "'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
-      position: 'relative',
-      overflowX: 'hidden'
+      backgroundColor: bgPage,
+      color: textPrimary,
+      fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+      padding: '0 0 64px',
     }}>
-      {/* Ambient background glow */}
+      {/* Centered Instagram / Whop-style Profile Shell */}
       <div style={{
-        position: 'fixed',
-        top: '-150px',
-        left: '50%',
-        transform: 'translateX(-50%)',
-        width: '800px',
-        height: '600px',
-        borderRadius: '50%',
-        background: `radial-gradient(circle, ${p.primary} 0%, transparent 65%)`,
-        opacity: theme === 'dark' ? 0.18 : 0.12,
-        filter: 'blur(100px)',
-        pointerEvents: 'none',
-        zIndex: 0
-      }} />
-
-      {/* Top Navigation */}
-      <header style={{
-        position: 'sticky',
-        top: 0,
-        zIndex: 40,
-        height: '64px',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        padding: '0 24px',
-        background: theme === 'dark' ? 'rgba(9, 10, 15, 0.85)' : 'rgba(255, 255, 255, 0.85)',
-        backdropFilter: 'blur(16px)',
-        borderBottom: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}`
+        maxWidth: '540px',
+        margin: '0 auto',
+        backgroundColor: bgCard,
+        minHeight: '100vh',
+        borderLeft: `1px solid ${borderSubtle}`,
+        borderRight: `1px solid ${borderSubtle}`,
       }}>
-        <a href="/" style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '10px',
-          textDecoration: 'none',
-          color: 'inherit',
-          fontWeight: 800,
-          fontSize: '18px',
-          letterSpacing: '-0.02em'
+        {/* ── Cover Banner with Floating Controls ── */}
+        <div style={{
+          position: 'relative',
+          height: '148px',
+          background: `linear-gradient(135deg, ${p.primary} 0%, ${isDark ? '#1e293b' : '#cbd5e1'} 100%)`,
+          overflow: 'hidden',
         }}>
           <div style={{
-            width: '32px',
-            height: '32px',
-            borderRadius: '10px',
-            backgroundColor: p.primary,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: '#000000',
-            fontWeight: 900,
-            fontSize: '18px'
-          }}>₦</div>
-          <span>NairaTag</span>
-        </a>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <button
-            onClick={toggleTheme}
-            style={{
-              width: '38px',
-              height: '38px',
-              borderRadius: '50%',
-              border: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.1)'}`,
-              background: 'transparent',
-              color: 'inherit',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}
-            title="Toggle Theme"
-          >
-            {theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
-          </button>
-
-          <button
-            onClick={openAppClaim}
-            style={{
-              background: p.primary,
-              color: '#000000',
-              border: 'none',
-              borderRadius: '9999px',
-              padding: '8px 18px',
-              fontWeight: 700,
-              fontSize: '13.5px',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              boxShadow: `0 4px 14px ${p.glow}`
-            }}
-          >
-            <span>Claim your ₦Tag</span>
-            <ChevronRight size={14} />
-          </button>
-        </div>
-      </header>
-
-      {/* Main Container */}
-      <main style={{
-        position: 'relative',
-        zIndex: 1,
-        maxWidth: '820px',
-        margin: '0 auto',
-        padding: '40px 20px 80px 20px',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        gap: '32px'
-      }}>
-
-        {/* Character Card (Exact match to design system mockups) */}
-        <div style={{
-          width: '100%',
-          maxWidth: '340px',
-          aspectRatio: '440 / 550',
-          borderRadius: '32px',
-          backgroundColor: p.primary,
-          boxShadow: theme === 'dark' 
-            ? `0 24px 60px rgba(0,0,0,0.8), 0 0 30px ${p.glow}`
-            : '0 20px 40px rgba(0,0,0,0.15)',
-          padding: '24px',
-          position: 'relative',
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'space-between',
-          overflow: 'hidden',
-          transition: 'transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1)',
-          cursor: 'pointer'
-        }}
-        onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-6px) scale(1.02)'; }}
-        onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0) scale(1)'; }}
-        >
-          {/* Diagonal Monogram ₦ Watermark */}
-          <div style={{
             position: 'absolute',
-            right: '-30px',
-            top: '30px',
-            fontSize: '260px',
-            fontWeight: 900,
-            color: '#000000',
-            opacity: 0.08,
-            userSelect: 'none',
-            transform: 'rotate(-15deg)',
-            pointerEvents: 'none'
-          }}>₦</div>
+            inset: 0,
+            background: isDark
+              ? 'linear-gradient(180deg, rgba(11,12,16,0.15) 0%, rgba(20,22,29,0.92) 100%)'
+              : 'linear-gradient(180deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.94) 100%)',
+          }} />
 
-          {/* Top Bar of Card */}
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            position: 'relative',
-            zIndex: 2
-          }}>
-            <span style={{
-              fontSize: '40px',
-              fontWeight: 900,
-              color: p.textOnCard,
-              lineHeight: 1
-            }}>₦</span>
-
-            <div style={{
-              backgroundColor: 'rgba(0,0,0,0.12)',
-              borderRadius: '9999px',
-              padding: '6px 14px',
-              fontSize: '12px',
-              fontWeight: 700,
-              color: p.textOnCard,
-              letterSpacing: '0.02em'
-            }}>
-              NairaTag
-            </div>
-          </div>
-
-          {/* Center Character Avatar */}
-          <div 
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              margin: 'auto 0',
-              position: 'relative',
-              zIndex: 2
-            }}
-            dangerouslySetInnerHTML={{ __html: cardSvg }}
-          />
-
-          {/* Bottom Bar: ₦tagname in lowercase bold */}
+          {/* Top Floating Bar */}
           <div style={{
             position: 'relative',
             zIndex: 2,
             display: 'flex',
-            alignItems: 'flex-end',
-            justifyContent: 'space-between'
-          }}>
-            <div>
-              <div style={{
-                fontSize: '32px',
-                fontWeight: 800,
-                color: p.textOnCard,
-                letterSpacing: '-0.03em',
-                lineHeight: 1.1
-              }}>
-                ₦{lowercaseTag}
-              </div>
-              <div style={{
-                fontSize: '12px',
-                fontWeight: 600,
-                color: p.textOnCard,
-                opacity: 0.75,
-                marginTop: '4px'
-              }}>
-                {IS_CONCORDIUM_SITE ? 'Concordium Testnet Agent Card' : 'Sovereign Onchain Identity'}
-              </div>
-            </div>
-
-            <div style={{
-              width: '32px',
-              height: '32px',
-              borderRadius: '50%',
-              backgroundColor: '#000000',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: '#ffffff'
-            }}>
-              {IS_CONCORDIUM_SITE ? <ShieldCheck size={18} strokeWidth={2.5} /> : <Check size={18} strokeWidth={3} />}
-            </div>
-          </div>
-        </div>
-
-        {/* Identity & Reputation Header */}
-        <div style={{
-          textAlign: 'center',
-          maxWidth: '540px',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          gap: '12px'
-        }}>
-          <div style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '8px',
-            padding: '6px 14px',
-            borderRadius: '9999px',
-            background: theme === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
-            border: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)'}`,
-            fontSize: '13px',
-            fontWeight: 600
-          }}>
-            <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#10b981' }} />
-            <span>{IS_CONCORDIUM_SITE ? `Concordium Testnet Agent Card · ${concordiumCardAvailable ? 'Published' : 'Not published'}` : 'Verified Sovereign Agent • ERC-8004'}</span>
-          </div>
-
-          <h1 style={{
-            fontSize: '38px',
-            fontWeight: 900,
-            letterSpacing: '-0.03em',
-            margin: 0,
-            display: 'flex',
-            alignItems: 'center',
-            gap: '10px'
-          }}>
-            <span>{displayTag}</span>
-            {!IS_CONCORDIUM_SITE && <span style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              width: '24px',
-              height: '24px',
-              borderRadius: '50%',
-              backgroundColor: '#3b82f6',
-              color: '#ffffff',
-              fontSize: '14px'
-            }}>✓</span>}
-          </h1>
-
-          <p style={{
-            fontSize: '16px',
-            color: theme === 'dark' ? '#94a3b8' : '#64748b',
-            lineHeight: 1.5,
-            margin: 0
-          }}>
-            {IS_CONCORDIUM_SITE
-              ? (concordiumCard?.description || 'NairaTag agent identity with a Concordium Testnet registry link and public Agent Card.')
-              : (agentMetadata?.description || 'Autonomous sovereign agent on Celo Mainnet. Sub-second cNGN & USD₮ settlement, multi-tool AI capabilities, and verified reputation.')}
-          </p>
-        </div>
-
-        {/* Interactive Action Bar (Matching Stage 3 / 4 of Mockup) */}
-        <div style={{
-          display: 'flex',
-          flexWrap: 'wrap',
-          gap: '12px',
-          justifyContent: 'center',
-          width: '100%',
-          maxWidth: '580px'
-        }}>
-          <button
-            onClick={openAppChat}
-            style={{
-              flex: '1 1 180px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '8px',
-              padding: '14px 24px',
-              borderRadius: '16px',
-              backgroundColor: p.primary,
-              color: '#000000',
-              fontWeight: 800,
-              fontSize: '15px',
-              border: 'none',
-              cursor: 'pointer',
-              boxShadow: `0 8px 24px ${p.glow}`,
-              transition: 'transform 0.15s ease'
-            }}
-          >
-            <MessageSquare size={18} />
-            <span>Chat with Agent</span>
-          </button>
-
-          {IS_CONCORDIUM_SITE && concordiumCardAvailable && (
-            <a href={CONCORDIUM_SITE.cardPath(cleanTag)} target="_blank" rel="noopener noreferrer" style={{ flex: '1 1 180px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '14px 24px', borderRadius: '16px', background: theme === 'dark' ? '#181b26' : '#ffffff', color: 'inherit', fontWeight: 700, fontSize: '15px', border: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.12)'}`, textDecoration: 'none' }}>
-              <ExternalLink size={18} /><span>Open Agent Card</span>
-            </a>
-          )}
-
-          {!IS_CONCORDIUM_SITE && <button
-            onClick={() => setIsPayModalOpen(true)}
-            style={{
-              flex: '1 1 180px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '8px',
-              padding: '14px 24px',
-              borderRadius: '16px',
-              backgroundColor: theme === 'dark' ? '#181b26' : '#ffffff',
-              color: 'inherit',
-              fontWeight: 700,
-              fontSize: '15px',
-              border: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.12)'}`,
-              cursor: 'pointer',
-              transition: 'background 0.15s ease'
-            }}
-          >
-            <Send size={18} />
-            <span>Send Crypto</span>
-          </button>}
-
-          {!IS_CONCORDIUM_SITE && <button
-            onClick={copyAddress}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '8px',
-              padding: '14px 20px',
-              borderRadius: '16px',
-              backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)',
-              color: 'inherit',
-              fontWeight: 600,
-              fontSize: '14px',
-              border: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)'}`,
-              cursor: 'pointer'
-            }}
-          >
-            {copied ? <Check size={16} color="#10b981" /> : <Copy size={16} />}
-            <span>{copied ? 'Address Copied!' : 'Copy 0x'}</span>
-          </button>}
-
-          {!IS_CONCORDIUM_SITE && <button
-            onClick={copyLink}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '8px',
-              padding: '14px 20px',
-              borderRadius: '16px',
-              backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)',
-              color: 'inherit',
-              fontWeight: 600,
-              fontSize: '14px',
-              border: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)'}`,
-              cursor: 'pointer'
-            }}
-          >
-            <Share2 size={16} />
-            <span>Share</span>
-          </button>}
-        </div>
-
-        {/* Share Channel Quick Bar */}
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '12px',
-          fontSize: '13px',
-          color: theme === 'dark' ? '#94a3b8' : '#64748b'
-        }}>
-          <span>Share to:</span>
-          <button 
-            onClick={shareToTwitter}
-            style={{ background: 'none', border: 'none', color: '#38bdf8', cursor: 'pointer', fontWeight: 600 }}
-          >X (Twitter)</button>
-          <span>•</span>
-          <button 
-            onClick={shareToWhatsApp}
-            style={{ background: 'none', border: 'none', color: '#22c55e', cursor: 'pointer', fontWeight: 600 }}
-          >WhatsApp</button>
-          <span>•</span>
-          <button 
-            onClick={shareToTelegram}
-            style={{ background: 'none', border: 'none', color: '#60a5fa', cursor: 'pointer', fontWeight: 600 }}
-          >Telegram</button>
-        </div>
-
-        {/* Verification & Details Card */}
-        <div style={{
-          width: '100%',
-          maxWidth: '580px',
-          backgroundColor: theme === 'dark' ? '#12141e' : '#ffffff',
-          borderRadius: '24px',
-          border: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}`,
-          padding: '24px',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '18px'
-        }}>
-          <h2 style={{ fontSize: '16px', fontWeight: 700, margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <ShieldCheck size={18} color="#10b981" />
-            <span>{IS_CONCORDIUM_SITE ? 'Concordium Agent Identity' : 'Onchain Resolver & Rails'}</span>
-          </h2>
-
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-            gap: '14px'
-          }}>
-            <div style={{
-              backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.03)' : '#f8fafc',
-              padding: '12px 16px',
-              borderRadius: '14px',
-              border: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)'}`
-            }}>
-              <div style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', fontWeight: 700 }}>{IS_CONCORDIUM_SITE ? 'Registry Network' : 'Network Rail'}</div>
-              <div style={{ fontSize: '14px', fontWeight: 700, marginTop: '2px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#6366f1' }} />
-                <span>{IS_CONCORDIUM_SITE ? 'Concordium Testnet' : 'Celo Mainnet (42220)'}</span>
-              </div>
-            </div>
-
-            <div style={{
-              backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.03)' : '#f8fafc',
-              padding: '12px 16px',
-              borderRadius: '14px',
-              border: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)'}`
-            }}>
-              <div style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', fontWeight: 700 }}>{IS_CONCORDIUM_SITE ? 'Agent Card Status' : 'ERC-8004 Score'}</div>
-              <div style={{ fontSize: '14px', fontWeight: 700, marginTop: '2px', color: '#10b981' }}>
-                {IS_CONCORDIUM_SITE ? (loading ? 'Checking…' : concordiumCardAvailable ? 'Published' : 'Not published') : '99% Reputation (Verified)'}
-              </div>
-            </div>
-
-            <div style={{
-              backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.03)' : '#f8fafc',
-              padding: '12px 16px',
-              borderRadius: '14px',
-              border: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)'}`,
-              gridColumn: '1 / -1'
-            }}>
-              <div style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', fontWeight: 700 }}>{IS_CONCORDIUM_SITE ? 'Public Agent Card' : 'Resolved Address'}</div>
-              <div style={{
-                fontFamily: 'monospace',
-                fontSize: '13px',
-                marginTop: '4px',
-                wordBreak: 'break-all',
-                color: theme === 'dark' ? '#cbd5e1' : '#334155'
-              }}>
-                {IS_CONCORDIUM_SITE
-                  ? (concordiumCardAvailable ? <a href={CONCORDIUM_SITE.cardPath(cleanTag)} target="_blank" rel="noopener noreferrer" style={{ color: 'inherit' }}>{window.location.origin}{CONCORDIUM_SITE.cardPath(cleanTag)}</a> : 'No Agent Card is published for this NairaTag.')
-                  : (resolvedAddress || '0x71C8A9b284D7207452d308BE307e5f309a7291A2')}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Sleek Minimal Verification Strip */}
-        {type === 'agent' && false && (
-          <div style={{
-            width: '100%',
-            maxWidth: '580px',
-            backgroundColor: theme === 'dark' ? '#12141e' : '#ffffff',
-            borderRadius: '16px',
-            border: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}`,
-            padding: '12px 16px',
-            display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
+            padding: '14px 16px',
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <SelfAgentIdBadge isVerified={true} size="sm" />
-              <span style={{ fontSize: '12px', color: theme === 'dark' ? '#94a3b8' : '#64748b' }}>
-                Zero-Knowledge Human Proof
-              </span>
-            </div>
             <a
-              href="https://celoscan.io/address/0xaC3DF9ABf80d0F5c020C06B04Cced27763355944"
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{ color: '#059669', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', fontWeight: 600 }}
+              href="/"
+              title="Back to NairaTag"
+              style={{
+                width: '36px',
+                height: '36px',
+                borderRadius: '50%',
+                backgroundColor: isDark ? 'rgba(0,0,0,0.45)' : 'rgba(255,255,255,0.85)',
+                backdropFilter: 'blur(10px)',
+                border: `1px solid ${borderSubtle}`,
+                color: textPrimary,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                textDecoration: 'none',
+              }}
             >
-              <span>CeloScan Registry</span>
-              <ExternalLink size={11} />
+              <ArrowLeft size={17} />
             </a>
-          </div>
-        )}
 
-        {type === 'agent' && IS_CONCORDIUM_SITE && (
-          <div style={{ width: '100%', maxWidth: '580px', backgroundColor: theme === 'dark' ? '#12141e' : '#ffffff', borderRadius: '16px', border: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}`, padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <ShieldCheck size={16} color="#059669" />
-              <span style={{ fontSize: '12px', color: theme === 'dark' ? '#94a3b8' : '#64748b' }}>Concordium Testnet Agent Card</span>
+              <button
+                type="button"
+                onClick={copyLink}
+                title="Share profile link"
+                style={{
+                  width: '36px',
+                  height: '36px',
+                  borderRadius: '50%',
+                  backgroundColor: isDark ? 'rgba(0,0,0,0.45)' : 'rgba(255,255,255,0.85)',
+                  backdropFilter: 'blur(10px)',
+                  border: `1px solid ${borderSubtle}`,
+                  color: textPrimary,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                }}
+              >
+                <Share2 size={16} />
+              </button>
+              <button
+                type="button"
+                onClick={() => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))}
+                title="Toggle theme"
+                style={{
+                  width: '36px',
+                  height: '36px',
+                  borderRadius: '50%',
+                  backgroundColor: isDark ? 'rgba(0,0,0,0.45)' : 'rgba(255,255,255,0.85)',
+                  backdropFilter: 'blur(10px)',
+                  border: `1px solid ${borderSubtle}`,
+                  color: textPrimary,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                }}
+              >
+                {isDark ? <Sun size={16} /> : <Moon size={16} />}
+              </button>
+              {!IS_CONCORDIUM_SITE && (
+                <button
+                  type="button"
+                  onClick={() => setIsPayModalOpen(true)}
+                  style={{
+                    height: '36px',
+                    padding: '0 14px',
+                    borderRadius: '999px',
+                    backgroundColor: isDark ? 'rgba(0,0,0,0.55)' : 'rgba(255,255,255,0.9)',
+                    backdropFilter: 'blur(10px)',
+                    border: `1px solid ${borderSubtle}`,
+                    color: textPrimary,
+                    fontSize: '13px',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                  }}
+                >
+                  <Send size={13} /> Pay {displayTag}
+                </button>
+              )}
             </div>
-            {concordiumCardAvailable && <a href={CONCORDIUM_SITE.cardPath(cleanTag)} target="_blank" rel="noopener noreferrer" style={{ color: '#059669', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', fontWeight: 600 }}>View card <ExternalLink size={11} /></a>}
           </div>
-        )}
-
-        {/* Bottom Viral Claim Banner */}
-        <div style={{
-          width: '100%',
-          maxWidth: '580px',
-          backgroundColor: theme === 'dark' ? 'rgba(187, 242, 70, 0.08)' : 'rgba(187, 242, 70, 0.15)',
-          border: `1px solid ${p.primary}`,
-          borderRadius: '24px',
-          padding: '24px',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          textAlign: 'center',
-          gap: '12px'
-        }}>
-          <div style={{ fontSize: '18px', fontWeight: 800 }}>Want your own sovereign ₦Tag?</div>
-          <p style={{ fontSize: '14px', color: theme === 'dark' ? '#cbd5e1' : '#475569', margin: 0 }}>
-            Claim your name for free in seconds. No crypto wallet or gas fees required — sign in with your email and get an instant AI agent.
-          </p>
-          <button
-            onClick={openAppClaim}
-            style={{
-              marginTop: '4px',
-              backgroundColor: '#000000',
-              color: '#ffffff',
-              border: 'none',
-              borderRadius: '9999px',
-              padding: '10px 24px',
-              fontWeight: 700,
-              fontSize: '14px',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px'
-            }}
-          >
-            <span>Claim your ₦Tag now</span>
-            <ArrowRight size={15} />
-          </button>
         </div>
 
-      </main>
+        {/* ── Overlapping Avatar + Identity Section ── */}
+        <div style={{ padding: '0 20px 20px', marginTop: '-42px', position: 'relative', zIndex: 3 }}>
+          <div style={{ position: 'relative', width: '78px', height: '78px', marginBottom: '12px' }}>
+            {controlStatus?.avatarUrl ? (
+              <img
+                src={controlStatus.avatarUrl}
+                alt={displayTag}
+                style={{
+                  width: '78px',
+                  height: '78px',
+                  borderRadius: '50%',
+                  objectFit: 'cover',
+                  border: `4px solid ${bgCard}`,
+                  boxShadow: '0 6px 18px rgba(0,0,0,0.14)',
+                }}
+              />
+            ) : (
+              <div
+                style={{
+                  width: '78px',
+                  height: '78px',
+                  borderRadius: '50%',
+                  backgroundColor: p.primary,
+                  border: `4px solid ${bgCard}`,
+                  overflow: 'hidden',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxShadow: '0 6px 18px rgba(0,0,0,0.14)',
+                }}
+                dangerouslySetInnerHTML={{ __html: avatarSvg }}
+              />
+            )}
+            <span
+              title={selfVerified ? 'Self Agent ID Verified' : 'Active NairaTag'}
+              style={{
+                position: 'absolute',
+                right: '2px',
+                bottom: '2px',
+                width: '16px',
+                height: '16px',
+                borderRadius: '50%',
+                backgroundColor: selfVerified ? '#10b981' : '#f59e0b',
+                border: `3px solid ${bgCard}`,
+              }}
+            />
+          </div>
+
+          {/* Name + Verified Badge */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+            <h1 style={{ margin: 0, fontSize: '22px', fontWeight: 800, letterSpacing: '-0.02em' }}>
+              {agentMetadata?.name || displayTag}
+            </h1>
+            {selfVerified && (
+              <span
+                title="Verified Human via Self Agent ID"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  padding: '2px 8px',
+                  borderRadius: '999px',
+                  backgroundColor: 'rgba(16, 185, 129, 0.14)',
+                  color: '#10b981',
+                  fontSize: '11px',
+                  fontWeight: 700,
+                }}
+              >
+                <ShieldCheck size={12} /> Self #{selfAgentId || 'Verified'}
+              </span>
+            )}
+          </div>
+
+          {/* Handle */}
+          <div style={{ fontSize: '13.5px', color: textMuted, marginTop: '2px', fontWeight: 500 }}>
+            @{lowercaseTag} · ₦{lowercaseTag}
+          </div>
+
+          {/* Bio */}
+          <p style={{ margin: '10px 0 12px', fontSize: '14px', lineHeight: 1.5, color: textPrimary }}>
+            {IS_CONCORDIUM_SITE
+              ? (concordiumCard?.description || 'NairaTag agent identity with a Concordium Testnet registry link.')
+              : (controlStatus?.bio || agentMetadata?.description || 'Sovereign NairaTag & autonomous Celo agent. Instant cNGN & USD₮ settlement with Self Agent ID proof.')}
+          </p>
+
+          {/* Metadata Row */}
+          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '12px', fontSize: '12.5px', color: textMuted, marginBottom: '16px' }}>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+              <MapPin size={13} /> Celo Mainnet (42220)
+            </span>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+              <Calendar size={13} /> ERC-8004 Identity
+            </span>
+            <a
+              href={`/api/agent-card?tag=${encodeURIComponent(lowercaseTag)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#6366f1', textDecoration: 'none', fontWeight: 600 }}
+            >
+              <Link2 size={13} /> Agent Card
+            </a>
+          </div>
+
+          {/* Two Side-by-Side Stat / Action Pills */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '14px' }}>
+            <button
+              type="button"
+              onClick={copyAddress}
+              disabled={!effectiveAddress}
+              style={{
+                padding: '10px 12px',
+                borderRadius: '999px',
+                border: `1px solid ${borderSubtle}`,
+                backgroundColor: pillBg,
+                color: textPrimary,
+                fontSize: '13px',
+                fontWeight: 600,
+                cursor: effectiveAddress ? 'pointer' : 'default',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '6px',
+              }}
+            >
+              {copied ? <Check size={14} color="#10b981" /> : <Wallet size={14} />}
+              <span style={{ fontFamily: effectiveAddress ? 'monospace' : 'inherit' }}>
+                {loading ? 'Resolving...' : effectiveAddress ? `${effectiveAddress.slice(0, 6)}...${effectiveAddress.slice(-4)}` : 'Unclaimed Tag'}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => { window.location.href = `/#chat?agent=${encodeURIComponent(lowercaseTag)}`; }}
+              style={{
+                padding: '10px 12px',
+                borderRadius: '999px',
+                border: `1px solid ${borderSubtle}`,
+                backgroundColor: pillBg,
+                color: textPrimary,
+                fontSize: '13px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '6px',
+              }}
+            >
+              <MessageSquare size={14} />
+              <span>Chat with Agent</span>
+            </button>
+          </div>
+
+          {/* Resolver Contract Link */}
+          <div style={{ fontSize: '11.5px', color: textMuted, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span>Resolver: <code style={{ fontFamily: 'monospace' }}>{CELO_NAIRATAG_RESOLVER_ADDRESS.slice(0, 8)}...{CELO_NAIRATAG_RESOLVER_ADDRESS.slice(-6)}</code></span>
+            <a href="/#claim" style={{ color: '#6366f1', textDecoration: 'none', fontWeight: 600 }}>Claim your ₦Tag →</a>
+          </div>
+        </div>
+
+        {/* ── Activity Feed Section ── */}
+        <div style={{ borderTop: `1px solid ${borderSubtle}`, padding: '18px 20px 32px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
+            <h2 style={{ margin: 0, fontSize: '17px', fontWeight: 800 }}>Activity</h2>
+            <select
+              aria-label="Filter activity"
+              value={activityFilter}
+              onChange={(e) => setActivityFilter(e.target.value)}
+              style={{
+                padding: '5px 10px',
+                borderRadius: '999px',
+                border: `1px solid ${borderSubtle}`,
+                backgroundColor: pillBg,
+                color: textPrimary,
+                fontSize: '12px',
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+            >
+              <option value="all">All</option>
+              <option value="identity">Identity</option>
+              <option value="payments">Payments</option>
+            </select>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            {activityItems.map((item) => (
+              <div
+                key={item.id}
+                style={{
+                  padding: '14px',
+                  borderRadius: '16px',
+                  border: `1px solid ${borderSubtle}`,
+                  backgroundColor: isDark ? 'rgba(255,255,255,0.02)' : '#fafafa',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '6px',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                  <span style={{ fontSize: '11.5px', color: textMuted, fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                    {item.kind === 'payments' ? <Zap size={12} color="#10b981" /> : <Sparkles size={12} color="#6366f1" />}
+                    {displayTag} · {item.meta}
+                  </span>
+                  <span style={{
+                    fontSize: '11px',
+                    fontWeight: 700,
+                    padding: '2px 8px',
+                    borderRadius: '999px',
+                    backgroundColor: pillBg,
+                    color: textPrimary,
+                  }}>
+                    {item.badge}
+                  </span>
+                </div>
+                <div style={{ fontSize: '14px', fontWeight: 700 }}>{item.title}</div>
+                <div style={{ fontSize: '12.5px', color: textMuted, lineHeight: 1.45 }}>{item.subtitle}</div>
+                {item.href && (
+                  <a
+                    href={item.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      marginTop: '2px',
+                      fontSize: '12px',
+                      fontWeight: 600,
+                      color: '#6366f1',
+                      textDecoration: 'none',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                    }}
+                  >
+                    Inspect <ExternalLink size={11} />
+                  </a>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
 
       {/* Pay Modal */}
       {!IS_CONCORDIUM_SITE && isPayModalOpen && (
-        <div style={{
-          position: 'fixed',
-          inset: 0,
-          backgroundColor: 'rgba(0,0,0,0.7)',
-          backdropFilter: 'blur(8px)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 100,
-          padding: '20px'
-        }}
-        onClick={() => setIsPayModalOpen(false)}
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0,0,0,0.65)',
+            backdropFilter: 'blur(8px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 100,
+            padding: '20px',
+          }}
+          onClick={() => setIsPayModalOpen(false)}
         >
-          <div 
+          <div
             style={{
-              backgroundColor: theme === 'dark' ? '#141622' : '#ffffff',
+              backgroundColor: bgCard,
               borderRadius: '24px',
-              maxWidth: '420px',
+              maxWidth: '400px',
               width: '100%',
-              padding: '28px',
-              boxShadow: '0 20px 50px rgba(0,0,0,0.5)',
+              padding: '24px',
+              boxShadow: '0 20px 50px rgba(0,0,0,0.45)',
               display: 'flex',
               flexDirection: 'column',
-              gap: '18px',
-              border: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'}`
+              gap: '16px',
+              border: `1px solid ${borderSubtle}`,
             }}
-            onClick={e => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
           >
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 800 }}>Pay {displayTag}</h3>
-              <button 
+              <button
+                type="button"
                 onClick={() => setIsPayModalOpen(false)}
                 style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer', color: 'inherit' }}
               >×</button>
             </div>
-
-            <p style={{ fontSize: '13.5px', color: '#94a3b8', margin: 0 }}>
+            <p style={{ fontSize: '13px', color: textMuted, margin: 0 }}>
               Send instant cNGN & USD₮ on Celo directly to this sovereign ₦Tag.
             </p>
-
-            <div>
-              <label style={{ fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', color: '#94a3b8' }}>Amount (USDC)</label>
-              <div style={{ display: 'flex', gap: '8px', marginTop: '6px' }}>
-                {['5', '25', '50', '100'].map(amt => (
-                  <button
-                    key={amt}
-                    onClick={() => setPayAmount(amt)}
-                    style={{
-                      flex: 1,
-                      padding: '8px',
-                      borderRadius: '10px',
-                      border: payAmount === amt ? `2px solid ${p.primary}` : '1px solid rgba(255,255,255,0.1)',
-                      backgroundColor: payAmount === amt ? p.primary : 'transparent',
-                      color: payAmount === amt ? '#000000' : 'inherit',
-                      fontWeight: 700,
-                      cursor: 'pointer'
-                    }}
-                  >${amt}</button>
-                ))}
-              </div>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              {['5', '25', '50', '100'].map((amt) => (
+                <button
+                  key={amt}
+                  type="button"
+                  onClick={() => setPayAmount(amt)}
+                  style={{
+                    flex: 1,
+                    padding: '9px',
+                    borderRadius: '10px',
+                    border: payAmount === amt ? `2px solid ${p.primary}` : `1px solid ${borderSubtle}`,
+                    backgroundColor: payAmount === amt ? p.primary : 'transparent',
+                    color: payAmount === amt ? '#000000' : 'inherit',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                  }}
+                >${amt}</button>
+              ))}
             </div>
-
             <button
+              type="button"
               onClick={() => {
                 setPaySuccess(true);
                 triggerConfetti(0.8);
@@ -800,27 +608,25 @@ export default function PublicProfilePage({ rawHandle, type = 'agent' }) {
                   setPaySuccess(false);
                   setIsPayModalOpen(false);
                   window.location.href = `/#pay?recipient=${encodeURIComponent(cleanTag)}&amount=${payAmount}`;
-                }, 1200);
+                }, 900);
               }}
               style={{
                 backgroundColor: p.primary,
                 color: '#000000',
                 border: 'none',
                 borderRadius: '14px',
-                padding: '14px',
+                padding: '13px',
                 fontWeight: 800,
-                fontSize: '15px',
+                fontSize: '14.5px',
                 cursor: 'pointer',
-                marginTop: '8px'
               }}
             >
-              {paySuccess ? '✓ Redirecting to Wallet...' : `Pay $${payAmount} USDC to ${displayTag}`}
+              {paySuccess ? 'Redirecting to Pay...' : `Pay $${payAmount} USDC to ${displayTag}`}
             </button>
           </div>
         </div>
       )}
 
-      {/* Share Toast */}
       {shareToast && (
         <div style={{
           position: 'fixed',
@@ -829,12 +635,12 @@ export default function PublicProfilePage({ rawHandle, type = 'agent' }) {
           transform: 'translateX(-50%)',
           backgroundColor: '#10b981',
           color: '#ffffff',
-          padding: '10px 20px',
-          borderRadius: '9999px',
-          fontSize: '14px',
+          padding: '9px 18px',
+          borderRadius: '999px',
+          fontSize: '13px',
           fontWeight: 700,
           zIndex: 999,
-          boxShadow: '0 8px 24px rgba(16, 185, 129, 0.4)'
+          boxShadow: '0 8px 24px rgba(16, 185, 129, 0.35)',
         }}>
           {shareToast}
         </div>

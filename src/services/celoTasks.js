@@ -50,6 +50,7 @@ export function mapTask(row) {
     escrowStatus: row.escrow_status || row.escrowStatus || '🔒 Funded in Escrow',
     escrowContract: row.escrow_contract || null,
     escrowTxHash: row.escrow_tx_hash || row.escrowTxHash || null,
+    bannerUrl: row.banner_url || row.bannerUrl || null,
     assignedWorkerTag: workerTag,
     assignedWorkerAddress: workerAddress,
     submissionDeliverable: row.submission_deliverable || row.submissionDeliverable || null,

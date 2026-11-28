@@ -40,6 +40,7 @@ import {
 import {
   SELF_REGISTRY_CELO_MAINNET,
   SELF_PROOF_PROVIDER_CELO_MAINNET,
+  checkSelfHumanGate,
   getAgentVerificationStatus,
   validateEvidenceIdentityBinding,
   VERIFICATION_STATUS,
@@ -374,6 +375,31 @@ export async function getAgentControlStatus(tagOrAddress) {
     canSendOrSwap: Boolean(agent.altana?.walletAddress && selfVerified && hasActiveSession),
     canReceive: Boolean(agent.altana?.walletAddress),
   };
+}
+
+/**
+ * Resolves the Self human-verification gate for a wallet or tag using
+ * persisted agent identity metadata (including Sepolia/mock Self Agent IDs).
+ */
+export async function resolveSelfHumanGateForWallet(walletOrTag) {
+  if (!walletOrTag) {
+    return { allowed: false, reason: 'Connect wallet first.', agentId: null };
+  }
+  const c = await getAgentControlStatus(walletOrTag).catch(() => null);
+  if (c?.selfVerified) {
+    return {
+      allowed: true,
+      agentId: c.selfAgentId ?? null,
+      nullifier: c.selfNullifier || null,
+      status: 'verified',
+      controlStatus: c,
+    };
+  }
+  const res = await checkSelfHumanGate({
+    agentAddress: c?.selfAgentAddress || walletOrTag,
+    chainId: c?.selfChainId || 42220,
+  });
+  return { ...res, controlStatus: c };
 }
 /**
  * Grants an Altana session delegation policy for the agent.

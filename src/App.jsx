@@ -161,6 +161,7 @@ import {
   getAgentLifecycleRecord,
   claimAndProvisionAgent,
   getAgentControlStatus,
+  resolveSelfHumanGateForWallet,
   grantAgentSessionPolicy,
   updateAgentProfileMetadata,
   persistSelfVerificationLink,
@@ -2328,7 +2329,7 @@ function ArcAppShell() {
       return;
     }
     try {
-      const selfGateCheck = await checkSelfHumanGate({ agentAddress: walletAddress });
+      const selfGateCheck = await resolveSelfHumanGateForWallet(walletAddress);
       if (!selfGateCheck?.allowed) {
         showToast(selfGateCheck?.reason || 'Verify your agent with Self Agent ID before participating in a task.', 'info', 4500);
         setIsSelfDemoModalOpen(true);
@@ -2388,7 +2389,7 @@ function ArcAppShell() {
       setIsConnectModalOpen(true);
       return;
     }
-    const selfGateCheck = await checkSelfHumanGate({ agentAddress: walletAddress });
+    const selfGateCheck = await resolveSelfHumanGateForWallet(walletAddress);
     if (!selfGateCheck?.allowed) {
       showToast(selfGateCheck?.reason || 'Verify your agent with Self Agent ID before submitting task work.', 'info', 4500);
       setIsSelfDemoModalOpen(true);

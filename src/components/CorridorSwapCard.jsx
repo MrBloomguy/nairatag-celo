@@ -46,7 +46,7 @@ import {
 } from '../config/celo.js';
 import { getEthereumProvider } from '../services/celoPayment.js';
 import { checkSelfHumanGate, enforceSharedHumanRewardQuota } from '../services/selfAgentIdService.js';
-import { getAgentControlStatus } from '../services/agentLifecycleService.js';
+import { getAgentControlStatus, resolveSelfHumanGateForWallet } from '../services/agentLifecycleService.js';
 import './swap/SwapWidget.css';
 
 // ── High-Fidelity Official Token Icons ──
@@ -184,11 +184,12 @@ export default function CorridorSwapCard({
       return () => { active = false; };
     }
     setSelfGate((prev) => ({ ...prev, checking: true }));
-    getAgentControlStatus(walletAddress)
-      .then((c) => { if (active && c) setAltanaGate(c); })
-      .catch(() => {});
-    checkSelfHumanGate({ agentAddress: walletAddress })
-      .then((res) => { if (active) setSelfGate({ checking: false, ...res }); })
+    resolveSelfHumanGateForWallet(walletAddress)
+      .then((res) => {
+        if (!active) return;
+        if (res?.controlStatus) setAltanaGate(res.controlStatus);
+        setSelfGate({ checking: false, ...res });
+      })
       .catch(() => { if (active) setSelfGate({ checking: false, allowed: false, reason: 'Self Agent ID check failed.', agentId: null }); });
     return () => { active = false; };
   }, [walletAddress]);

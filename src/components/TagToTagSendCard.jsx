@@ -232,6 +232,9 @@ export default function TagToTagSendCard({
     getAgentControlStatus(resolvedRecipient.tag || resolvedRecipient.address)
       .then((c) => {
         if (!active) return;
+        if (c?.walletAddress && resolvedRecipient.tag && resolvedRecipient.address?.toLowerCase() !== c.walletAddress.toLowerCase()) {
+          setResolvedRecipient((prev) => (prev ? { ...prev, address: c.walletAddress, ownerAddress: prev.ownerAddress || prev.address, isAltanaWallet: true } : prev));
+        }
         if (c?.selfVerified) {
           setRecipientSelfGate({ checking: false, allowed: true, agentId: c.selfAgentId ?? null });
           return;

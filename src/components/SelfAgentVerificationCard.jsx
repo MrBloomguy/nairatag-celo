@@ -23,6 +23,7 @@ export default function SelfAgentVerificationCard({
   walletAddress,
   initialAgentTag,
   initialAgentAddress,
+  initialChainId = 42220,
   onVerified = null,
 }) {
   const [selectedTag, setSelectedTag] = useState(initialAgentTag || '₦nairatag');
@@ -33,7 +34,7 @@ export default function SelfAgentVerificationCard({
     if (initialAgentAddress) setAgentAddress(initialAgentAddress);
   }, [initialAgentTag, initialAgentAddress]);
 
-  const [selfNetwork, setSelfNetwork] = useState('mainnet'); // 'mainnet' (42220) | 'testnet' (11142220 Mock)
+  const [selfNetwork, setSelfNetwork] = useState(Number(initialChainId) === 11142220 ? 'testnet' : 'mainnet'); // 'mainnet' (42220) | 'testnet' (11142220 Mock)
   const activeChainId = selfNetwork === 'testnet' ? 11142220 : 42220;
   const activeRegistryAddress = selfNetwork === 'testnet' ? SELF_REGISTRY_CELO_TESTNET : SELF_REGISTRY_CELO_MAINNET;
   const [verificationData, setVerificationData] = useState(null);

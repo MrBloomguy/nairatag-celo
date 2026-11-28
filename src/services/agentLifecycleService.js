@@ -311,8 +311,10 @@ export async function getAgentControlStatus(tagOrAddress) {
   if (!agent) return null;
 
   // Stored identity flags are display/cache data only. Self status must be proven by the Celo registry.
-  const verification = agent.ownerAddress
-    ? await getAgentVerificationStatus({ agentAddress: agent.ownerAddress }).catch((error) => ({
+  const targetSelfAddress = agent.self?.agentAddress || agent.ownerAddress;
+  const targetSelfChainId = Number(agent.self?.chainId || 42220);
+  const verification = targetSelfAddress
+    ? await getAgentVerificationStatus({ agentAddress: targetSelfAddress, chainId: targetSelfChainId }).catch((error) => ({
       status: VERIFICATION_STATUS.FAILED,
       isVerified: false,
       hasHumanProof: false,
@@ -350,6 +352,8 @@ export async function getAgentControlStatus(tagOrAddress) {
     selfVerified,
     selfStatus,
     selfAgentId,
+    selfChainId: targetSelfChainId,
+    selfAgentAddress: targetSelfAddress || null,
     selfCheckError: verification?.error || null,
     hasActiveSession,
     sessionStatus,
@@ -657,6 +661,54 @@ export async function updateAgentProfileMetadata({
     bio: String(bio || '').trim(),
     description: String(bio || '').trim() || agent.description || '',
     displayName: displayName ? String(displayName).trim() : (agent.displayName || null),
+    updatedAt: Date.now(),
+  };
+
+  return await saveAgentRecord(cleanTag, next);
+}
+
+/**
+ * Persists a verified Self Agent ID (mainnet or testnet linked agentAddress) into PostgreSQL.
+ */
+export async function persistSelfVerificationLink({
+  tag,
+  ownerAddress,
+  agentAddress,
+  agentId,
+  chainId = 42220,
+  nullifier = null,
+  proofExpiresAt = null,
+}) {
+  if (!tag) throw new Error('NairaTag is required.');
+  const cleanTag = String(tag).trim().replace(/^[₦$@#]/, '').toLowerCase();
+  let agent = await getAgentRecord(cleanTag);
+  if (!agent) {
+    agent = {
+      tag: cleanTag,
+      canonicalTag: `₦${cleanTag}`,
+      ownerAddress: ownerAddress || agentAddress,
+      status: LIFECYCLE_STATUS.ACTIVE,
+      self: {},
+      altana: {},
+      erc8004: {},
+      createdAt: Date.now(),
+    };
+  }
+
+  const next = {
+    ...agent,
+    self: {
+      ...(agent.self || {}),
+      verified: true,
+      status: VERIFICATION_STATUS.VERIFIED,
+      agentId: Number(agentId || 0),
+      agentAddress: agentAddress || agent.ownerAddress,
+      chainId: Number(chainId || 42220),
+      network: Number(chainId) === 11142220 ? 'testnet' : 'mainnet',
+      nullifierHash: nullifier || agent.self?.nullifierHash || null,
+      proofExpiresAt: proofExpiresAt || agent.self?.proofExpiresAt || null,
+      verifiedAt: Date.now(),
+    },
     updatedAt: Date.now(),
   };
 

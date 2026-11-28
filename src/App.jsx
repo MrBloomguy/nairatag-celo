@@ -163,6 +163,7 @@ import {
   getAgentControlStatus,
   grantAgentSessionPolicy,
   updateAgentProfileMetadata,
+  persistSelfVerificationLink,
 } from './services/agentLifecycleService.js';
 import {
   buildNairaTagAgentMetadataUri,
@@ -8054,14 +8055,29 @@ function ArcAppShell() {
               walletAddress={walletAddress}
               onConnectWallet={() => setIsConnectModalOpen(true)}
               initialAgentTag={myTag?.tag ? `₦${myTag.tag.replace(/^₦/, '')}` : undefined}
-              initialAgentAddress={walletAddress || undefined}
-              onVerified={(data) => {
+              initialAgentAddress={myAgentControlStatus?.selfAgentAddress || walletAddress || undefined}
+              initialChainId={myAgentControlStatus?.selfChainId || 42220}
+              onVerified={async (data) => {
                 setMyAgentControlStatus((prev) => ({
                   ...(prev || {}),
                   selfVerified: true,
                   selfAgentId: data?.agentId || prev?.selfAgentId || null,
+                  selfChainId: data?.chainId || prev?.selfChainId || 42220,
+                  selfAgentAddress: data?.agentAddress || prev?.selfAgentAddress || walletAddress,
                   selfStatus: 'verified',
                 }));
+                const ownedTag = myTag?.tag?.replace(/^[$₦]/, '').toLowerCase();
+                if (ownedTag && data?.agentAddress) {
+                  await persistSelfVerificationLink({
+                    tag: ownedTag,
+                    ownerAddress: walletAddress,
+                    agentAddress: data.agentAddress,
+                    agentId: data.agentId,
+                    chainId: data.chainId || 42220,
+                    nullifier: data.nullifier || null,
+                    proofExpiresAt: data.proofExpiresAt || null,
+                  }).catch(() => {});
+                }
               }}
             />
           </div>

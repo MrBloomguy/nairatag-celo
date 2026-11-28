@@ -307,11 +307,14 @@ export async function initiateAgentRegistrationSession({
   };
 
   try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
     const res = await fetch(`${SELF_API_BASE}/api/agent/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
       body: JSON.stringify(registrationPayload),
-    }).catch(() => null);
+      signal: controller.signal,
+    }).catch(() => null).finally(() => clearTimeout(timeoutId));
 
     if (res && res.ok) {
       const apiSession = await res.json();

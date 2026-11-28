@@ -8010,7 +8010,7 @@ function ArcAppShell() {
           ─────────────────────────────────────────────────────────────────── */}
       {isSelfDemoModalOpen && (
         <div className="agent-modal-backdrop" onClick={() => setIsSelfDemoModalOpen(false)}>
-          <div className="agent-modal-dialog" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '560px', padding: '16px' }}>
+          <div className="agent-modal-dialog" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '430px', padding: '16px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <ShieldCheck size={16} color="#059669" />

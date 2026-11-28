@@ -69,6 +69,7 @@ export default function SelfAgentVerificationCard({
   const activeChainId = selfNetwork === 'testnet' ? 11142220 : 42220;
   const activeRegistryAddress = selfNetwork === 'testnet' ? SELF_REGISTRY_CELO_TESTNET : SELF_REGISTRY_CELO_MAINNET;
   const [verificationData, setVerificationData] = useState(null);
+  const [showX402Demo, setShowX402Demo] = useState(false);
   const [isLoadingVerification, setIsLoadingVerification] = useState(false);
   const [verificationError, setVerificationError] = useState('');
 
@@ -120,6 +121,40 @@ export default function SelfAgentVerificationCard({
   useEffect(() => {
     handleCheckVerification();
   }, [handleCheckVerification]);
+
+  // ─── Auto-poll Self registration status while QR session is active ───
+  useEffect(() => {
+    if (!registrationSession?.isLiveSession || !registrationSession?.sessionToken) return undefined;
+    let active = true;
+    let currentToken = registrationSession.sessionToken;
+
+    const poll = async () => {
+      try {
+        const res = await fetch('https://agent-api.self.xyz/api/agent/register/status', {
+          headers: { Authorization: `Bearer ${currentToken}`, Accept: 'application/json' },
+        });
+        if (!active || !res.ok) return;
+        const status = await res.json();
+        if (status?.sessionToken) currentToken = status.sessionToken;
+        if (status?.stage === 'completed') {
+          const mintedAddr = status.agentAddress || registrationSession.agentAddress;
+          setRegistrationSession(null);
+          await handleCheckVerification(mintedAddr);
+        } else if (status?.stage === 'failed' || status?.stage === 'expired') {
+          setVerificationError(`Self registration ${status.stage}. Please generate a new QR code.`);
+          setRegistrationSession(null);
+        }
+      } catch {
+        // ignore transient poll error
+      }
+    };
+
+    const timer = setInterval(poll, 4000);
+    return () => {
+      active = false;
+      clearInterval(timer);
+    };
+  }, [registrationSession?.sessionToken, registrationSession?.isLiveSession, registrationSession?.agentAddress, handleCheckVerification]);
 
   // ─── Initiate Self Registration Flow ───
   const handleStartVerificationSession = async () => {
@@ -338,65 +373,12 @@ export default function SelfAgentVerificationCard({
         </div>
       </div>
 
-      <div style={{ padding: '4px 0 12px 0' }}>
+      <div style={{ padding: '4px 0 10px 0' }}>
         <p style={{ margin: 0, fontSize: '12px', color: 'var(--text-secondary, #6b7280)', lineHeight: '1.4' }}>
           {selfNetwork === 'testnet'
-            ? 'Celo Sepolia Testnet mode: accepts Mock Passports from the Self app for multi-agent testing.'
-            : 'Zero-knowledge identity & x402 micropayments on Celo Mainnet (Real NFC Passport).'}
+            ? 'Celo Sepolia Testnet: scan with Mock Document in the Self app.'
+            : 'Prove you are a real human once with your passport in the Self app.'}
         </p>
-      </div>
-
-      {/* ─── Hackathon Track 3: 1-Click Interactive Scenarios ─── */}
-      <div style={{ background: 'var(--surface-2, #f8fafc)', borderRadius: '10px', padding: '10px', border: '1px solid rgba(0,0,0,0.08)', marginBottom: '14px' }}>
-        <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--privy-color-foreground-2, #475569)', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-          Verified Agent Payments · Test Scenarios
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
-          <button
-            type="button"
-            onClick={() => {
-              setSelectedTag('₦unverified');
-              setAgentAddress('0x000000000000000000000000000000000000dEaD');
-              resetFlow();
-            }}
-            style={{
-              padding: '6px 8px',
-              borderRadius: '8px',
-              border: '1px solid #fecaca',
-              background: '#fff1f2',
-              color: '#dc2626',
-              fontSize: '11px',
-              fontWeight: 600,
-              cursor: 'pointer',
-              textAlign: 'left',
-            }}
-            title="Load unverified agent to verify access denial"
-          >
-            <strong>Scenario A</strong>: Unverified (403)
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setSelectedTag('₦nairatag');
-              setAgentAddress(OFFICIAL_AGENT_WALLET);
-              resetFlow();
-            }}
-            style={{
-              padding: '6px 8px',
-              borderRadius: '8px',
-              border: '1px solid #a7f3d0',
-              background: '#ecfdf5',
-              color: '#059669',
-              fontSize: '11px',
-              fontWeight: 600,
-              cursor: 'pointer',
-              textAlign: 'left',
-            }}
-            title="Load verified official agent to verify 402 challenge and execution"
-          >
-            <strong>Scenario B/C</strong>: Verified (402 → Pay)
-          </button>
-        </div>
       </div>
 
       {/* Target Agent & Verification Status */}
@@ -495,6 +477,11 @@ export default function SelfAgentVerificationCard({
       </div>
 
       {/* Verify Action Button / QR Flow */}
+      {verificationError && (
+        <div style={{ marginBottom: '10px', padding: '8px 10px', borderRadius: '8px', background: '#fef2f2', border: '1px solid #fecaca', color: '#dc2626', fontSize: '11.5px', fontWeight: 600 }}>
+          {verificationError}
+        </div>
+      )}
       {!verificationData?.isVerified && !registrationSession && (
         <button
           type="button"
@@ -662,7 +649,34 @@ export default function SelfAgentVerificationCard({
         </div>
       )}
 
-      {/* x402 Micropayment Flow */}
+      {/* Subtle Collapsible x402 Demo Toggle */}
+      <button
+        type="button"
+        onClick={() => setShowX402Demo((v) => !v)}
+        style={{
+          width: '100%',
+          padding: '8px 10px',
+          borderRadius: '8px',
+          border: '1px solid var(--border-color, #e5e7eb)',
+          background: 'transparent',
+          color: 'var(--text-secondary, #6b7280)',
+          fontSize: '11.5px',
+          fontWeight: 600,
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginBottom: showX402Demo ? '10px' : '0',
+        }}
+      >
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+          <Zap size={13} color="#0D9488" /> x402 Payment &amp; Judge Demo
+        </span>
+        <span>{showX402Demo ? '▾' : '▸'}</span>
+      </button>
+
+      {/* x402 Micropayment Flow (Collapsed by default) */}
+      {showX402Demo && (
       <div
         style={{
           padding: '14px',
@@ -905,6 +919,7 @@ export default function SelfAgentVerificationCard({
           </div>
         )}
       </div>
+      )}
     </div>
   );
 }

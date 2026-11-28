@@ -881,16 +881,16 @@ export default function TagToTagSendCard({
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
               <span style={{ fontWeight: 800, color: '#047857' }}>{resolvedRecipient.displayName}</span>
-              {!recipientSelfGate.checking && (
-                <SelfAgentIdBadge size="xs" isVerified={recipientSelfGate.allowed} />
-              )}
-              {recipientSelfGate.allowed && recipientSelfGate.agentId != null && (
-                <span style={{ fontSize: '10px', fontFamily: 'monospace', fontWeight: 700, color: '#047857' }}>
-                  #{recipientSelfGate.agentId}
+              {!recipientSelfGate.checking && recipientSelfGate.allowed && (
+                <span
+                  title={recipientSelfGate.agentId != null ? `Self Agent ID #${recipientSelfGate.agentId} Verified` : 'Self Agent ID Verified'}
+                  style={{ display: 'inline-flex', alignItems: 'center' }}
+                >
+                  <SelfIcon size={13} color="#059669" />
                 </span>
               )}
               <span style={{ color: 'var(--privy-color-foreground-3)', fontFamily: 'monospace', fontSize: '10.5px' }}>
-                ({resolvedRecipient.address.slice(0, 6)}...{resolvedRecipient.address.slice(-4)})
+                ({resolvedRecipient.isAltanaWallet ? 'Altana ' : ''}{resolvedRecipient.address.slice(0, 6)}...{resolvedRecipient.address.slice(-4)})
               </span>
             </div>
             <button

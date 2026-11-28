@@ -4175,7 +4175,17 @@ function ArcAppShell() {
                     }}
                   >
                     <div className="agent-circle-left">
-                      <img src={mobileSearchResult.agent.avatar} alt="" className="agent-circle-avatar-img" />
+                      <span style={{ position: 'relative', display: 'inline-flex', flexShrink: 0 }}>
+                        <img src={mobileSearchResult.agent.avatar} alt="" className="agent-circle-avatar-img" />
+                        {!IS_CONCORDIUM_SITE && Boolean(mobileSearchResult.agent.self?.verified) && (
+                          <span
+                            title="Verified with Self Agent ID"
+                            style={{ position: 'absolute', bottom: '-2px', right: '-2px', width: '16px', height: '16px', borderRadius: '50%', background: '#ffffff', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 1px 4px rgba(0,0,0,0.2)' }}
+                          >
+                            <SelfIcon size={12} />
+                          </span>
+                        )}
+                      </span>
                       <div className="agent-circle-meta">
                         <div className="agent-directory-list-description">
                           {agent.name && agent.name !== agent.tag ? agent.name : agent.category || agent.role}
@@ -7603,7 +7613,7 @@ function ArcAppShell() {
               <div className="agent-profile-main-row" style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: 0, position: 'relative' }}>
                 <div style={{ position: 'relative', width: '50px', height: '50px', flexShrink: 0 }}>
                   <img className="agent-profile-avatar" src={selectedAgentProfile.avatar} alt="" style={{ width: '50px', height: '50px', borderRadius: '50%', display: 'block' }} />
-                  {!IS_CONCORDIUM_SITE && (agentControlStatus?.selfVerified ?? selectedAgentProfile.self?.verified) && (
+                  {!IS_CONCORDIUM_SITE && Boolean(agentControlStatus?.selfVerified || selectedAgentProfile.self?.verified) && (
                     <span
                       title={`Verified with Self Agent ID${(agentControlStatus?.selfAgentId || selectedAgentProfile.self?.agentId || selectedAgentProfile.identity?.erc8004AgentId) ? ` #${agentControlStatus?.selfAgentId || selectedAgentProfile.self?.agentId || selectedAgentProfile.identity?.erc8004AgentId}` : ''}`}
                       style={{

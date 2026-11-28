@@ -27,7 +27,6 @@ import {
   createPublicClient,
   http,
 } from 'viem';
-import { generateRegistrationJSON } from '@selfxyz/agent-sdk';
 import { publicClient, getEthereumProvider } from './celoPayment.js';
 import {
   CELO_ERC8004_IDENTITY_REGISTRY,
@@ -801,7 +800,8 @@ export function buildCombinedAgentRegistration({
   const webEndpoint = `${baseOrigin}/agent/${encodeURIComponent(cleanTag)}`;
   const avatarUrl = image || `https://api.dicebear.com/11.x/adventurer-neutral/svg?seed=${encodeURIComponent(cleanTag)}`;
 
-  const baseDoc = generateRegistrationJSON({
+  const baseDoc = {
+    type: 'https://eips.ethereum.org/EIPS/eip-8004#registration-v1',
     name: name || `₦${cleanTag.toUpperCase()}`,
     description: description || `Human-backed sovereign NairaTag agent (₦${cleanTag.toUpperCase()}) verified via Self Protocol with an Altana smart wallet on Celo Mainnet.`,
     image: avatarUrl,
@@ -810,14 +810,12 @@ export function buildCombinedAgentRegistration({
       { name: 'MCP', endpoint: mcpEndpoint, version: '1.0' },
       { name: 'web', endpoint: webEndpoint },
     ],
-    a2a: {
-      version: '1.0.0',
-      url: a2aEndpoint,
-      provider: { name: 'NairaTag Protocol', url: baseOrigin },
-      capabilities: { streaming: false, pushNotifications: false },
-      securitySchemes: { bearer: { type: 'http', scheme: 'bearer' } },
-    },
-  });
+    url: a2aEndpoint,
+    version: '1.0.0',
+    provider: { name: 'NairaTag Protocol', url: baseOrigin },
+    capabilities: { streaming: false, pushNotifications: false },
+    securitySchemes: { bearer: { type: 'http', scheme: 'bearer' } },
+  };
 
   return {
     ...baseDoc,

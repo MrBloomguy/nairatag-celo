@@ -82,6 +82,24 @@ export function TokenIcon({ symbol, size = 24 }) {
       />
     );
   }
+  if (symbol === 'USDC') {
+    return (
+      <svg width={size} height={size} viewBox="0 0 32 32" fill="none">
+        <circle cx="16" cy="16" r="16" fill="#2775CA" />
+        <text
+          x="16"
+          y="21"
+          textAnchor="middle"
+          fill="#ffffff"
+          fontSize="14"
+          fontWeight="800"
+          fontFamily="system-ui, -apple-system, sans-serif"
+        >
+          $
+        </text>
+      </svg>
+    );
+  }
   if (symbol === 'CELO') {
     return (
       <img
@@ -138,6 +156,8 @@ export function TokenIcon({ symbol, size = 24 }) {
 
 const TOKEN_LIST = [
   { symbol: 'USD₮', name: 'Tether USD', address: CELO_USDT_ADDRESS, decimals: 6 },
+  { symbol: 'USDC', name: 'USD Coin', address: '0xcebA9300f2b948710d2653dD7B07f33A8B32118C', decimals: 6 },
+  { symbol: 'CELO', name: 'Celo', address: '0x471EcE3750Da237f93B8E339c536989b8978a438', decimals: 18 },
   { symbol: 'cNGN', name: 'Celo Naira', address: CELO_CNGN_ADDRESS, decimals: 6 },
   { symbol: 'cUSD', name: 'Celo Dollar', address: CELO_CUSD_ADDRESS, decimals: 18 },
   { symbol: 'IDRX', name: 'Indonesian Rupiah', address: '0x18Bc5bcC660cf2B9cE3cd51a404aFe1a0cBD3C22', decimals: 6 },
@@ -294,6 +314,8 @@ export default function TagToTagSendCard({
   // Active Sender Balance
   const activeSenderBalance = useMemo(() => {
     if (sourceToken === 'USD₮' || sourceToken === 'USDT') return balances.usdt;
+    if (sourceToken === 'USDC') return balances.usdc || '0.00';
+    if (sourceToken === 'CELO') return balances.celo || '0.00';
     if (sourceToken === 'cNGN') return balances.cngn;
     return '0.00';
   }, [sourceToken, balances]);

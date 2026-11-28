@@ -108,6 +108,22 @@ export const SUPPORTED_CELO_STABLECOINS = {
     fiatSymbol: '$',
     isSupportedByTextile: false,
   },
+  USDC: {
+    symbol: 'USDC',
+    name: 'USD Coin',
+    address: getAddress('0xcebA9300f2b948710d2653dD7B07f33A8B32118C'),
+    decimals: 6,
+    fiatSymbol: '$',
+    isSupportedByTextile: false,
+  },
+  CELO: {
+    symbol: 'CELO',
+    name: 'Celo Native Asset',
+    address: getAddress('0x471EcE3750Da237f93B8E339c536989b8978a438'),
+    decimals: 18,
+    fiatSymbol: 'CELO',
+    isSupportedByTextile: false,
+  },
 };
 
 export function isValidEvmAddress(val) {

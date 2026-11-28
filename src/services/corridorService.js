@@ -128,9 +128,15 @@ export async function getCorridorBalances(walletAddress) {
   const addr = getAddress(walletAddress);
 
   try {
-    const [usdtRaw, cngnRaw, celoRaw] = await Promise.all([
+    const [usdtRaw, usdcRaw, cngnRaw, celoRaw] = await Promise.all([
       publicClient.readContract({
         address: CELO_USDT_ADDRESS,
+        abi: ERC20_ABI,
+        functionName: 'balanceOf',
+        args: [addr],
+      }),
+      publicClient.readContract({
+        address: '0xcebA9300f2b948710d2653dD7B07f33A8B32118C',
         abi: ERC20_ABI,
         functionName: 'balanceOf',
         args: [addr],
@@ -146,15 +152,17 @@ export async function getCorridorBalances(walletAddress) {
 
     return {
       usdt: Number(formatUnits(usdtRaw, 6)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 4 }),
+      usdc: Number(formatUnits(usdcRaw, 6)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 4 }),
       cngn: Number(formatUnits(cngnRaw, 6)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
       celo: Number(formatUnits(celoRaw, 18)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 4 }),
       rawUsdt: usdtRaw,
+      rawUsdc: usdcRaw,
       rawCngn: cngnRaw,
       rawCelo: celoRaw,
     };
   } catch (err) {
     console.warn('Failed reading corridor balances:', err);
-    return { usdt: '0.00', cngn: '0.00', celo: '0.00', rawUsdt: 0n, rawCngn: 0n };
+    return { usdt: '0.00', usdc: '0.00', cngn: '0.00', celo: '0.00', rawUsdt: 0n, rawUsdc: 0n, rawCngn: 0n };
   }
 }
 

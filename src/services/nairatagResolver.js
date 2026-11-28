@@ -25,8 +25,8 @@ export function normalizeTag(rawInput) {
   }
 
   const trimmed = rawInput.trim();
-  // Strip optional leading currency or at symbols: ₦, N, @, #
-  const clean = trimmed.replace(/^[₦Nn@#]/, '').toLowerCase();
+  // Strip optional leading currency or at symbols: ₦, $, @, #
+  const clean = trimmed.replace(/^[₦$@#]/, '').toLowerCase();
 
   // 1. Direct EVM address or truncated hex address with ellipses (e.g. 0x... or 0x5a84...5955)
   if (clean.startsWith('0x') || isAddress(clean) || isAddress(trimmed)) {
@@ -87,7 +87,7 @@ export function normalizeTag(rawInput) {
 export function classifyInput(input) {
   if (!input || typeof input !== 'string') return { type: 'invalid' };
   const trimmed = input.trim();
-  const stripped = trimmed.replace(/^[₦Nn@#]/, '');
+  const stripped = trimmed.replace(/^[₦$@#]/, '');
 
   if (isAddress(trimmed) || isAddress(stripped)) {
     return {
@@ -142,7 +142,7 @@ export async function resolveTag(rawTag, network = 'celo') {
   }
 
   const trimmed = rawTag.trim();
-  const stripped = trimmed.replace(/^[₦Nn@#]/, '');
+  const stripped = trimmed.replace(/^[₦$@#]/, '');
 
   // 1. Direct EVM address check
   if (isAddress(trimmed) || isAddress(stripped)) {
